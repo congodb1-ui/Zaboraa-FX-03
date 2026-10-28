@@ -15,6 +15,12 @@ import {
 } from './src/db/sqlite';
 import { auditCandles, fixCandles } from './src/engine/data/candleQuality';
 import { candleCsvLines, importCandlesCsv } from './src/engine/data/candleCsv';
+import {
+  analyzeMarketWithAi,
+  reviewDataWithAi,
+  adviseStrategyWithAi,
+  quantChatWithAi,
+} from './src/services/aiAdvisorService';
 import { ForexSymbol, Timeframe, DatasetRecord } from './src/types/forex';
 
 dotenv.config();
@@ -80,7 +86,7 @@ async function startServer() {
   });
 
   app.get('/api/bridge/tick/:symbol', async (req: Request, res: Response) => {
-    const rawSym = req.params.symbol;
+    const rawSym = String(req.params.symbol);
     if (!validateSymbol(rawSym)) {
       return res.status(400).json({ error: 'INVALID_SYMBOL' });
     }
@@ -648,6 +654,78 @@ async function startServer() {
   });
 
   // ==========================================
+  // 3C-AI. AI QUANTITATIVE ANALYSIS & DATA REVIEW
+  // ==========================================
+
+  app.post('/api/ai/analyze-market', async (req: Request, res: Response) => {
+    try {
+      const { symbol, timeframe, price, technicalReport, cotData, macroData, sentimentData } = req.body;
+      const result = await analyzeMarketWithAi({
+        symbol: symbol || 'XAUUSD',
+        timeframe: timeframe || 'H1',
+        price,
+        technicalReport,
+        cotData,
+        macroData,
+        sentimentData,
+      });
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'AI_MARKET_ANALYSIS_FAILED', message: err.message });
+    }
+  });
+
+  app.post('/api/ai/review-data', async (req: Request, res: Response) => {
+    try {
+      const { symbol, timeframe, candleCount, qualityScore, gapCount, isResearchEligible, anomalies } = req.body;
+      const result = await reviewDataWithAi({
+        symbol: symbol || 'EURUSD',
+        timeframe: timeframe || 'H1',
+        candleCount: candleCount || 0,
+        qualityScore: qualityScore || 0,
+        gapCount: gapCount || 0,
+        isResearchEligible: Boolean(isResearchEligible),
+        anomalies: anomalies || [],
+      });
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'AI_DATA_REVIEW_FAILED', message: err.message });
+    }
+  });
+
+  app.post('/api/ai/strategy-advisor', async (req: Request, res: Response) => {
+    try {
+      const { strategyName, strategyId, symbol, timeframe, params, report, strategyCode, userQuery } = req.body;
+      const result = await adviseStrategyWithAi({
+        strategyName: strategyName || 'Trend Pullback Pro',
+        strategyId,
+        symbol,
+        timeframe,
+        params,
+        report,
+        strategyCode,
+        userQuery,
+      });
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'AI_STRATEGY_ADVICE_FAILED', message: err.message });
+    }
+  });
+
+  app.post('/api/ai/quant-chat', async (req: Request, res: Response) => {
+    try {
+      const { messages, contextData } = req.body;
+      if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: 'INVALID_MESSAGES' });
+      }
+      const result = await quantChatWithAi(messages, contextData);
+      return res.json(result);
+    } catch (err: any) {
+      return res.status(500).json({ error: 'AI_CHAT_FAILED', message: err.message });
+    }
+  });
+
+  // ==========================================
   // 3D. STRATEGY CRUD & PERSISTENCE
   // ==========================================
 
@@ -686,7 +764,7 @@ async function startServer() {
 
   app.delete('/api/strategies/:id', (req: Request, res: Response) => {
     try {
-      const id = req.params.id;
+      const id = String(req.params.id);
       deleteStrategyFromDb(id);
       return res.json({ success: true, deletedId: id });
     } catch (e: any) {

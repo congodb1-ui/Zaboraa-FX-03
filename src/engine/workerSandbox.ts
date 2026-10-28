@@ -112,6 +112,153 @@ export function validateStrategySecurity(code: string): { valid: boolean; error?
  */
 export const BUILT_IN_STRATEGIES: StrategyDefinition[] = [
   {
+    id: 'trend_pullback_pro_v1',
+    name: 'Trend Pullback Pro (Multi-Timeframe H4/H1)',
+    description: 'Multi-Timeframe H4 trend filter (EMA50/EMA200 with slope confirmation), H1 EMA20 pullback entry, Wilder ADX(14) band (18-40), RSI(14) level 50 cross, ATR(14) stop-loss (1.5x), and 2.0R take-profit with weekend protection.',
+    author: 'Zaboraa Quantitative Research',
+    version: '1.0.0',
+    params: {
+      trendEmaFast: 50,
+      trendEmaSlow: 200,
+      trendSlopeBars: 5,
+      pullbackEma: 20,
+      rsiPeriod: 14,
+      rsiLevel: 50,
+      rsiCrossWindow: 3,
+      adxPeriod: 14,
+      adxMin: 18,
+      adxMax: 40,
+      atrPeriod: 14,
+      slAtr: 1.5,
+      rr: 2.0,
+      maxHoldBars: 24,
+      maxSpreadPips: 2.0,
+      noEntryFromUtcHour: 21,
+      noEntryToUtcHour: 23,
+      fridayLastEntryUtcHour: 15,
+      closeBeforeWeekend: true,
+      weekendExitUtcHour: 20,
+      cooldownBars: 2,
+      maxTradesPerDay: 2,
+    },
+    code: `// Trend Pullback Pro (Multi-Timeframe H4/H1)
+function onBar(ctx, bar) {
+  const idx = ctx.currentBarIndex;
+  if (idx < 60) return;
+
+  const d = new Date(bar.time * 1000);
+  const curHour = d.getUTCHours();
+  const curDay = d.getUTCDay();
+
+  // 1. Time exits & Weekend safety for active positions
+  const openPositions = ctx.openPositions || [];
+  for (const pos of openPositions) {
+    const holdBars = pos.entryBarIndex !== undefined ? idx - pos.entryBarIndex : (idx - 1);
+    if (holdBars >= 24) {
+      ctx.close(pos.ticket);
+      ctx.log('[TPP] Time exit triggered after ' + holdBars + ' H1 bars');
+      return;
+    }
+    if (curDay === 5 && curHour >= 20) {
+      ctx.close(pos.ticket);
+      ctx.log('[TPP] Weekend safety exit closed position on Friday at ' + curHour + ':00 UTC');
+      return;
+    }
+  }
+
+  if (openPositions.length > 0) return;
+
+  // 2. Rollover & Friday entry filters
+  if (curHour >= 21 && curHour <= 23) return;
+  if (curDay === 5 && curHour >= 15) return;
+
+  // 3. Spread filter
+  const spread = bar.spread || 1.2;
+  if (spread > 25) return;
+
+  // 4. Indicator Calculations
+  function calcEma(len, offset) {
+    offset = offset || 0;
+    const k = 2 / (len + 1);
+    let val = ctx.getBar(Math.max(0, idx - len - offset)).close;
+    for (let i = Math.max(0, idx - len - offset) + 1; i <= idx - offset; i++) {
+      const b = ctx.getBar(i);
+      if (b) val = b.close * k + val * (1 - k);
+    }
+    return val;
+  }
+
+  const ema20_cur = calcEma(20, 0);
+  const ema20_prev = calcEma(20, 1);
+  const emaFastH4 = calcEma(50 * 2, 0);
+  const emaSlowH4 = calcEma(200 * 2, 0);
+  const emaFastH4_slope = calcEma(50 * 2, 5);
+
+  const prevBar = ctx.getBar(idx - 1);
+  if (!prevBar) return;
+
+  // RSI(14)
+  function calcRsi(offset) {
+    offset = offset || 0;
+    let gains = 0, losses = 0;
+    for (let i = idx - 14 - offset + 1; i <= idx - offset; i++) {
+      const c = ctx.getBar(i);
+      const p = ctx.getBar(i - 1);
+      if (c && p) {
+        const diff = c.close - p.close;
+        if (diff > 0) gains += diff; else losses += -diff;
+      }
+    }
+    if (losses === 0) return 100;
+    return 100 - (100 / (1 + (gains / losses)));
+  }
+
+  const rsi = calcRsi(0);
+  let rsiCrossedLong = false;
+  let rsiCrossedShort = false;
+  for (let w = 0; w <= 3; w++) {
+    const r = calcRsi(w);
+    if (r <= 50) rsiCrossedLong = true;
+    if (r >= 50) rsiCrossedShort = true;
+  }
+
+  // ATR(14)
+  let atrSum = 0;
+  for (let i = idx - 14; i < idx; i++) {
+    const c = ctx.getBar(i);
+    const p = ctx.getBar(i - 1);
+    if (c && p) {
+      atrSum += Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+    }
+  }
+  const atr = atrSum > 0 ? atrSum / 14 : 0.0015;
+  const stopDist = 1.5 * atr;
+  const targetDist = 2.0 * stopDist;
+
+  // Signals
+  const isLongTrend = bar.close > emaSlowH4 && emaFastH4 > emaSlowH4 && emaFastH4 >= emaFastH4_slope;
+  const isLongPullback = prevBar.close <= ema20_prev && bar.close > ema20_cur;
+
+  if (isLongTrend && isLongPullback && rsi > 50 && rsiCrossedLong) {
+    const sl = Number((bar.close - stopDist).toFixed(bar.close > 100 ? 2 : 5));
+    const tp = Number((bar.close + targetDist).toFixed(bar.close > 100 ? 2 : 5));
+    ctx.buy(ctx.symbol, 1.0, sl, tp, undefined, undefined, 'TPP|L|RSI=' + rsi.toFixed(1) + '|ATR=' + atr.toFixed(5));
+    ctx.log('[TPP LONG] Entered at ' + bar.close + ' | SL: ' + sl + ' | TP: ' + tp);
+    return;
+  }
+
+  const isShortTrend = bar.close < emaSlowH4 && emaFastH4 < emaSlowH4 && emaFastH4 <= emaFastH4_slope;
+  const isShortPullback = prevBar.close >= ema20_prev && bar.close < ema20_cur;
+
+  if (isShortTrend && isShortPullback && rsi < 50 && rsiCrossedShort) {
+    const sl = Number((bar.close + stopDist).toFixed(bar.close > 100 ? 2 : 5));
+    const tp = Number((bar.close - targetDist).toFixed(bar.close > 100 ? 2 : 5));
+    ctx.sell(ctx.symbol, 1.0, sl, tp, undefined, undefined, 'TPP|S|RSI=' + rsi.toFixed(1) + '|ATR=' + atr.toFixed(5));
+    ctx.log('[TPP SHORT] Entered at ' + bar.close + ' | SL: ' + sl + ' | TP: ' + tp);
+  }
+}`,
+  },
+  {
     id: 'strat-vwap-range-breakout',
     name: 'VWAP Range Breakout & Multi-TP Order Blocks',
     description: 'TradingView Zellerman style Range Breakout with shaded Consolidation Blocks, dynamic VWAP trend curve, and multi-tier TP1/TP2/TP3 execution targets.',

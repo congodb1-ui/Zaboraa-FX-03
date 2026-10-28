@@ -9,6 +9,7 @@ import { DataManagerView } from './components/DataManagerView';
 import { BotsView } from './components/BotsView';
 import { FundamentalView } from './components/FundamentalView';
 import { TechnicalAnalysisView } from './components/TechnicalAnalysisView';
+import { AIAnalysisView } from './components/AIAnalysisView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsView } from './components/SettingsView';
 import { KillSwitchModal } from './components/KillSwitchModal';
@@ -443,6 +444,14 @@ export const App: React.FC = () => {
               orders={orders}
               onPlaceOrder={handlePlaceOrder}
               onClosePosition={handleClosePosition}
+            />
+          )}
+
+          {activeTab === 'ai-analyst' && (
+            <AIAnalysisView
+              onNavigateToTab={(tab) => setActiveTab(tab)}
+              activeReport={activeReport}
+              strategies={strategies}
             />
           )}
 

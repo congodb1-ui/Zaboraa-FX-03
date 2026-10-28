@@ -12,12 +12,14 @@ import {
   Settings,
   ShieldAlert,
   Sliders,
+  Sparkles,
   TrendingUp,
 } from 'lucide-react';
 import { BrokerState } from '../types/forex';
 
 export type NavTab =
   | 'markets'
+  | 'ai-analyst'
   | 'backtest'
   | 'strategies'
   | 'optimization'
@@ -116,6 +118,12 @@ export const Header: React.FC<HeaderProps> = ({
           onClick={() => setActiveTab('markets')}
           icon={<Activity className="w-4 h-4" />}
           label="Markets & Trading"
+        />
+        <NavButton
+          active={activeTab === 'ai-analyst'}
+          onClick={() => setActiveTab('ai-analyst')}
+          icon={<Sparkles className="w-4 h-4 text-indigo-400" />}
+          label="AI Analysis & Advisor"
         />
         <NavButton
           active={activeTab === 'backtest'}

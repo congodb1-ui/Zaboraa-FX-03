@@ -15,6 +15,7 @@ import {
   Trash2,
   Upload,
   Wrench,
+  Sparkles,
 } from 'lucide-react';
 import { Candle, DatasetRecord, ForexSymbol, Timeframe } from '../types/forex';
 
@@ -51,6 +52,39 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
   // Autofix logs
   const [autofixLogs, setAutofixLogs] = useState<string[]>([]);
+
+  // AI Data Review state
+  const [aiReview, setAiReview] = useState<any | null>(null);
+  const [isAiReviewing, setIsAiReviewing] = useState<boolean>(false);
+
+  const handleRunAiAudit = async () => {
+    const active = catalog.find((c) => c.id === selectedDatasetId);
+    if (!active) return;
+    setIsAiReviewing(true);
+    try {
+      const res = await fetch('/api/ai/review-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: active.symbol,
+          timeframe: active.timeframe,
+          candleCount: active.candleCount,
+          qualityScore: active.qualityScore,
+          gapCount: active.gapCount,
+          isResearchEligible: active.isResearchEligible,
+          anomalies: active.gapCount > 0 ? [`${active.gapCount} data gaps identified`] : [],
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiReview(data);
+      }
+    } catch (e) {
+      console.error('Failed AI audit:', e);
+    } finally {
+      setIsAiReviewing(false);
+    }
+  };
 
   // Load catalog from SQLite database
   const loadCatalogFromBackend = async () => {
@@ -264,10 +298,19 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <button
                   type="button"
                   onClick={handleRunAutofix}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-all cursor-pointer"
                 >
                   <Wrench className="w-3.5 h-3.5" />
                   Run Integrity Autofix
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRunAiAudit}
+                  disabled={isAiReviewing}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${isAiReviewing ? 'animate-spin' : ''}`} />
+                  {isAiReviewing ? 'Auditing...' : 'AI Data Quality Review'}
                 </button>
               </>
             )}
@@ -324,7 +367,67 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
       {/* Dataset Details & Stored OHLC Inspection */}
       {activeDs && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <>
+          {aiReview && (
+            <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-r from-indigo-950/20 via-[#0E1524] to-slate-900 p-5 shadow-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                    AI Data Health Audit & Research Appraisal
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Score: {aiReview.healthScore}%</span>
+                  <span
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                      aiReview.verdict === 'PRODUCTION_READY'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {aiReview.verdict.replace(/_/g, ' ')}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setAiReview(null)}
+                    className="text-xs text-slate-500 hover:text-slate-300 ml-2 cursor-pointer"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-300 leading-relaxed">{aiReview.summary}</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
+                <div className="p-3 rounded bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="font-semibold text-indigo-400">Weekend & Gap Analysis:</span>
+                  <p className="text-slate-300 text-[11px]">{aiReview.gapAnalysis}</p>
+                </div>
+                <div className="p-3 rounded bg-slate-900/80 border border-slate-800 space-y-1">
+                  <span className="font-semibold text-emerald-400">Slippage & Spread Considerations:</span>
+                  <p className="text-slate-300 text-[11px]">{aiReview.slippageSpreadRisks}</p>
+                </div>
+              </div>
+
+              {aiReview.cleaningRecommendations?.length > 0 && (
+                <div className="pt-1 text-xs">
+                  <span className="font-semibold text-slate-400 block mb-1">AI Cleaning Suggestions:</span>
+                  <ul className="space-y-1">
+                    {aiReview.cleaningRecommendations.map((r: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-1.5 text-slate-300 text-[11px]">
+                        <span className="text-indigo-400">•</span>
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Metadata Card */}
           <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-3 font-mono text-xs">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
@@ -455,7 +558,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             )}
           </div>
         </div>
-      )}
+      </>
+    )}
 
       {/* Fetch from MT5 Bridge Modal */}
       {isFetchModalOpen && (

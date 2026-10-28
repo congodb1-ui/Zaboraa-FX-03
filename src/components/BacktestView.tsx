@@ -21,7 +21,7 @@ import { BUILT_IN_STRATEGIES, StrategyDefinition } from '../engine/workerSandbox
 import { runBacktest } from '../engine/backtester';
 import { CandlestickChart } from './CandlestickChart';
 import { D3SimulationTimeline } from './D3SimulationTimeline';
-import { Layers } from 'lucide-react';
+import { Layers, Sparkles } from 'lucide-react';
 
 interface BacktestViewProps {
   datasets: DatasetRecord[];
@@ -54,6 +54,36 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [runError, setRunError] = useState<string | null>(null);
   const [chartViewMode, setChartViewMode] = useState<'both' | 'candles' | 'timeline'>('both');
+  const [aiAdvice, setAiAdvice] = useState<any | null>(null);
+  const [isAdvising, setIsAdvising] = useState<boolean>(false);
+
+  const handleConsultAiDoctor = async () => {
+    if (!activeReport) return;
+    setIsAdvising(true);
+    try {
+      const res = await fetch('/api/ai/strategy-advisor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategyName: activeReport.strategyName,
+          strategyId: activeReport.strategyId,
+          symbol: activeReport.symbol,
+          timeframe: activeReport.timeframe,
+          params: selectedStrategy?.params || {},
+          report: activeReport,
+          strategyCode: selectedStrategy?.code,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAiAdvice(data);
+      }
+    } catch (e) {
+      console.error('Failed AI strategy doctor call:', e);
+    } finally {
+      setIsAdvising(false);
+    }
+  };
 
   const selectedDataset = datasets.find((d) => d.id === selectedDatasetId);
   const selectedStrategy = strategies.find((s) => s.id === selectedStrategyId) || strategies[0];
@@ -353,10 +383,98 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
       {activeReport ? (
         <div className="space-y-6">
           {/* 10-Part Performance Metrics Cards */}
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
-              Audited Performance Attribution
-            </h3>
+          {/* Performance Header with AI Doctor trigger */}
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                Audited Performance Attribution
+              </h3>
+              <button
+                type="button"
+                onClick={handleConsultAiDoctor}
+                disabled={isAdvising}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isAdvising ? 'animate-spin' : ''}`} />
+                {isAdvising ? 'Diagnosing with Gemini...' : 'AI Strategy Doctor & Suggestions'}
+              </button>
+            </div>
+
+            {aiAdvice && (
+              <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-r from-indigo-950/20 via-[#0E1524] to-slate-900 p-5 shadow-xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    <h4 className="text-xs font-bold text-white uppercase tracking-wider">
+                      AI Quantitative Strategy Diagnosis
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-slate-400">
+                      Score: {aiAdvice.overallScore}/100
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                      {aiAdvice.performanceVerdict.replace(/_/g, ' ')}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAiAdvice(null)}
+                      className="text-xs text-slate-500 hover:text-slate-300 ml-2 cursor-pointer"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed">{aiAdvice.executiveCritique}</p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                  {/* Parameter Tuning Suggestions */}
+                  <div className="p-3.5 rounded bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
+                    <span className="font-semibold text-blue-400 uppercase text-[11px] block">
+                      Parameter Tuning Suggestions
+                    </span>
+                    <div className="space-y-2">
+                      {aiAdvice.parameterSuggestions?.map((p: any, i: number) => (
+                        <div key={i} className="p-2 rounded bg-slate-950/60 border border-slate-800 space-y-1">
+                          <div className="flex justify-between font-mono text-[11px]">
+                            <span className="text-indigo-400">{p.parameter}</span>
+                            <span className="text-slate-400">
+                              {p.currentValue} → <strong className="text-emerald-400">{p.suggestedValue}</strong>
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-400">{p.rationale}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Bottlenecks & Regime Filters */}
+                  <div className="p-3.5 rounded bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
+                    <span className="font-semibold text-amber-400 uppercase text-[11px] block">
+                      Bottlenecks & Regime Gates
+                    </span>
+                    <ul className="space-y-1 text-slate-300 text-[11px]">
+                      {aiAdvice.bottlenecks?.map((b: string, i: number) => (
+                        <li key={i} className="flex items-start gap-1.5">
+                          <span className="text-amber-400">•</span>
+                          <span>{b}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {aiAdvice.regimeFilters?.length > 0 && (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                        <span className="font-semibold text-emerald-400 text-[11px] block">
+                          Suggested Filter: {aiAdvice.regimeFilters[0].filterName}
+                        </span>
+                        <p className="text-[10px] text-slate-400">{aiAdvice.regimeFilters[0].description}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
               <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
                 <span className="text-[11px] font-sans text-slate-400">Net Profit</span>
