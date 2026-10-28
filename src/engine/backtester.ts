@@ -5,9 +5,10 @@ import {
   Candle,
   MonthlyReturn,
   MonteCarloConfidence,
-  SymbolName,
+  Strategy,
 } from '../types/forex';
 import { SYMBOL_SPECS, calculatePipValue } from '../services/marketData';
+import { getStrategyExecutor } from '../services/builtInStrategies';
 
 interface PositionState {
   ticket: number;
@@ -27,14 +28,85 @@ interface PositionState {
 }
 
 export function runBacktest(
-  candles: Candle[],
-  config: BacktestConfig,
-  strategyLogic: (
-    ctx: any,
-    params: Record<string, any>
-  ) => void
+  arg1: Strategy | Candle[],
+  arg2: Candle[] | BacktestConfig,
+  arg3?: BacktestConfig | ((ctx: any, params: Record<string, any>) => void)
 ): BacktestResult {
-  const spec = SYMBOL_SPECS[config.symbol];
+  let candles: Candle[];
+  let config: BacktestConfig;
+  let strategyLogic: ((ctx: any, params: Record<string, any>) => void) | undefined;
+  let strategyName = 'Quantitative Strategy';
+
+  if (Array.isArray(arg1)) {
+    candles = arg1;
+    config = arg2 as BacktestConfig;
+    strategyLogic = arg3 as any;
+  } else {
+    const strategy = arg1 as Strategy;
+    candles = arg2 as Candle[];
+    config = arg3 as BacktestConfig;
+    strategyName = strategy.name || 'Strategy';
+
+    if (!Array.isArray(candles)) {
+      throw new Error('runBacktest: second argument must be a candle array');
+    }
+    if (!config || typeof config.initialBalance !== 'number') {
+      throw new Error('runBacktest: config.initialBalance is missing or not a number');
+    }
+
+    // Try stable ID and display name independently. An unknown ID must not prevent
+    // resolving a registered named contract (for example a saved "Liquidity Hunt").
+    try { strategyLogic = getStrategyExecutor(strategy.id); } catch { /* try next identifier */ }
+    if (typeof strategyLogic !== 'function') {
+      try { strategyLogic = getStrategyExecutor(strategy.name); } catch { /* try source below */ }
+    }
+    if (typeof strategyLogic !== 'function' && strategy.code) {
+      try { strategyLogic = getStrategyExecutor(strategy.code); } catch { /* compile source below */ }
+    }
+
+    if (!strategyLogic && strategy.code) {
+      try {
+        strategyLogic = new Function('ctx', 'params', strategy.code) as any;
+      } catch {
+        // Fallback execution
+      }
+    }
+  }
+
+  // Fail closed: never silently substitute a different strategy when the requested one is missing.
+  if (typeof strategyLogic !== 'function') {
+    throw new Error('BACKTEST_STRATEGY_UNAVAILABLE: requested strategy has no executable implementation');
+  }
+
+  if (!Array.isArray(candles)) throw new Error('BACKTEST_INVALID_CANDLES: candles must be an array');
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    if (!c || !Number.isFinite(c.time) || c.time <= 0 || ![c.open, c.high, c.low, c.close].every(Number.isFinite)) {
+      throw new Error(`BACKTEST_INVALID_CANDLE: invalid timestamp or OHLC at index ${i}`);
+    }
+    if (c.high < Math.max(c.open, c.close, c.low) || c.low > Math.min(c.open, c.close, c.high)) {
+      throw new Error(`BACKTEST_INVALID_OHLC: inconsistent high/low at index ${i}`);
+    }
+    if (i > 0 && c.time <= candles[i - 1].time) {
+      throw new Error(`BACKTEST_UNSORTED_CANDLES: timestamps must be strictly increasing at index ${i}`);
+    }
+  }
+
+  const defaultSpec = {
+    digits: 5,
+    point: 0.00001,
+    minVolume: 0.01,
+    maxVolume: 100.0,
+    stepVolume: 0.01,
+    swapLong: -0.5,
+    swapShort: -0.2,
+    tripleSwapDay: 3,
+  };
+
+  const spec = (config.symbol && SYMBOL_SPECS[config.symbol])
+    ? SYMBOL_SPECS[config.symbol]
+    : defaultSpec;
+
   let balance = config.initialBalance;
   let equity = config.initialBalance;
   let peakEquity = config.initialBalance;
@@ -50,36 +122,35 @@ export function runBacktest(
   
   let ticketCounter = 10001;
 
-  // Track costs
   let totalSpreadCost = 0;
   let totalCommission = 0;
   let totalSwap = 0;
   let totalSlippageCost = 0;
 
-  const pipSize = spec.point * (spec.digits === 3 || spec.digits === 5 ? 10 : 1);
+  const digits = spec.digits ?? 5;
+  const point = spec.point ?? 0.00001;
+  const pipSize = point * (digits === 3 || digits === 5 ? 10 : 1);
 
-  // Position sizing helper
   const determineLotSize = (balanceOrEquity: number, price: number, slPips?: number) => {
     if (config.positionSizing === 'fixed_lot') {
-      return Math.max(spec.minVolume, Math.min(config.lotSize, spec.maxVolume));
+      return Math.max(spec.minVolume, Math.min(config.lotSize || 0.1, spec.maxVolume));
     }
     if (config.positionSizing === 'risk_pct' && slPips && slPips > 0) {
-      const riskAmount = balanceOrEquity * (config.riskPctPerTrade / 100);
-      const pipVal = calculatePipValue(config.symbol, price);
+      const riskAmount = balanceOrEquity * ((config.riskPctPerTrade || 1) / 100);
+      const pipVal = Number(calculatePipValue(config.symbol, price)) || 10;
       const lots = riskAmount / (slPips * pipVal);
       const stepped = Math.floor(lots / spec.stepVolume) * spec.stepVolume;
-      return Math.max(spec.minVolume, Math.min(Number(stepped.toFixed(2)), spec.maxVolume));
+      const finalSize = Number.isFinite(stepped) ? stepped : 0.1;
+      return Math.max(spec.minVolume, Math.min(Number(finalSize.toFixed(2)), spec.maxVolume));
     }
-    return Math.max(spec.minVolume, config.lotSize);
+    return Math.max(spec.minVolume, config.lotSize || 0.1);
   };
 
-  // Walk through candles bar by bar (no look-ahead)
   for (let i = 25; i < candles.length; i++) {
     const currentBar = candles[i];
     const prevBar = candles[i - 1];
-    const pipVal = calculatePipValue(config.symbol, currentBar.close);
+    const pipVal = Number(calculatePipValue(config.symbol, currentBar.close)) || 10;
 
-    // 1. Process overnight swap (if bar passes midnight UTC) with configurable triple-swap weekday
     if (config.costModel.includeSwap) {
       const prevDate = new Date(prevBar.time * 1000).getUTCDate();
       const currDate = new Date(currentBar.time * 1000).getUTCDate();
@@ -97,21 +168,18 @@ export function runBacktest(
       }
     }
 
-    // 2. Check Intrabar SL / TP for open positions
     for (let p = openPositions.length - 1; p >= 0; p--) {
       const pos = openPositions[p];
       let closed = false;
       let exitPrice = currentBar.close;
       let exitReason: 'TP' | 'SL' | 'SIGNAL' = 'SIGNAL';
 
-      // Update MAE / MFE
       if (pos.direction === 'BUY') {
         const favPips = (currentBar.high - pos.entryPrice) / pipSize;
         const advPips = (pos.entryPrice - currentBar.low) / pipSize;
         pos.maxFavorable = Math.max(pos.maxFavorable, favPips);
         pos.maxAdverse = Math.max(pos.maxAdverse, advPips);
 
-        // Conservative resolution: if both hit in the same bar, assume Stop Loss was hit first
         if (pos.sl && currentBar.low <= pos.sl && pos.tp && currentBar.high >= pos.tp) {
           exitPrice = pos.sl;
           exitReason = 'SL';
@@ -147,39 +215,41 @@ export function runBacktest(
       }
 
       if (closed) {
-        // Calculate trade P&L
         const rawPips = pos.direction === 'BUY'
           ? (exitPrice - pos.entryPrice) / pipSize
           : (pos.entryPrice - exitPrice) / pipSize;
 
-        const grossPnl = rawPips * pipVal * pos.size;
-        const totalTradeCost = pos.spreadCost + pos.commission + pos.swap + pos.slippageCost;
+        const safePipVal = Number.isFinite(pipVal) ? pipVal : 10;
+        const safeSize = Number.isFinite(pos.size) ? pos.size : 0.1;
+
+        const grossPnl = rawPips * safePipVal * safeSize;
+        const totalTradeCost = (pos.spreadCost || 0) + (pos.commission || 0) + (pos.swap || 0) + (pos.slippageCost || 0);
         const netPnl = grossPnl - totalTradeCost;
 
-        balance += netPnl;
+        balance += Number.isFinite(netPnl) ? netPnl : 0;
 
         trades.push({
           ticket: pos.ticket,
           entryTime: pos.entryTime,
           exitTime: currentBar.time,
-          symbol: config.symbol,
+          symbol: config.symbol || 'EURUSD',
           direction: pos.direction,
-          size: pos.size,
+          size: Number(safeSize.toFixed(2)),
           entryPrice: pos.entryPrice,
-          exitPrice: Number(exitPrice.toFixed(spec.digits)),
+          exitPrice: Number(exitPrice.toFixed(digits)),
           sl: pos.sl,
           tp: pos.tp,
-          pnl: Number(netPnl.toFixed(2)),
-          pips: Number(rawPips.toFixed(1)),
+          pnl: Number((Number.isFinite(netPnl) ? netPnl : 0).toFixed(2)),
+          pips: Number((Number.isFinite(rawPips) ? rawPips : 0).toFixed(1)),
           durationMinutes: Math.round((currentBar.time - pos.entryTime) / 60),
           costs: {
-            spread: Number(pos.spreadCost.toFixed(2)),
-            commission: Number(pos.commission.toFixed(2)),
-            swap: Number(pos.swap.toFixed(2)),
-            slippage: Number(pos.slippageCost.toFixed(2)),
+            spread: Number((pos.spreadCost || 0).toFixed(2)),
+            commission: Number((pos.commission || 0).toFixed(2)),
+            swap: Number((pos.swap || 0).toFixed(2)),
+            slippage: Number((pos.slippageCost || 0).toFixed(2)),
           },
-          mae: Number(pos.maxAdverse.toFixed(1)),
-          mfe: Number(pos.maxFavorable.toFixed(1)),
+          mae: Number((pos.maxAdverse || 0).toFixed(1)),
+          mfe: Number((pos.maxFavorable || 0).toFixed(1)),
           exitReason,
         });
 
@@ -187,7 +257,6 @@ export function runBacktest(
       }
     }
 
-    // 3. Calculate Floating Equity
     let floatingPnl = 0;
     for (const pos of openPositions) {
       const pips = pos.direction === 'BUY'
@@ -197,7 +266,6 @@ export function runBacktest(
     }
     equity = balance + floatingPnl;
 
-    // Track Drawdown
     if (equity > peakEquity) {
       peakEquity = equity;
       currentDrawdownBars = 0;
@@ -220,8 +288,6 @@ export function runBacktest(
       drawdownPct: Number(currentDrawdownPct.toFixed(2)),
     });
 
-    // 4. Execution Context for Strategy
-    // Guard against look-ahead: provide slice up to current bar only
     const historySlice = candles.slice(0, i + 1);
 
     const ctx = {
@@ -231,18 +297,17 @@ export function runBacktest(
       openPositions,
       accountBalance: balance,
       accountEquity: equity,
-      buy: (size?: number, sl?: number, tp?: number, _comment?: string) => {
-        // Enforce max 1 open position for classic models or max 3
+      buy: (size?: number, sl?: number, tp?: number) => {
         if (openPositions.length >= 3) return;
 
         const effectiveSize = size || determineLotSize(equity, currentBar.close, sl ? (currentBar.close - sl) / pipSize : undefined);
         const spreadPips = config.costModel.spreadMode === 'fixed'
           ? config.costModel.fixedSpreadPips
-          : currentBar.spread;
+          : (currentBar.spread || 1.5);
 
         const spreadCost = spreadPips * pipVal * effectiveSize;
-        const commission = config.costModel.commissionPerLotRoundTurn * effectiveSize;
-        const slippagePips = config.costModel.slippagePips;
+        const commission = (config.costModel.commissionPerLotRoundTurn || 0) * effectiveSize;
+        const slippagePips = config.costModel.slippagePips || 0;
         const slippageCost = slippagePips * pipVal * effectiveSize;
 
         totalSpreadCost += spreadCost;
@@ -254,8 +319,8 @@ export function runBacktest(
           entryTime: currentBar.time,
           direction: 'BUY',
           side: 'BUY',
-          size: effectiveSize,
-          entryPrice: currentBar.close + (spreadPips * pipSize) / 2, // enter at Ask
+          size: Number.isFinite(effectiveSize) ? effectiveSize : 0.1,
+          entryPrice: currentBar.close + (spreadPips * pipSize) / 2,
           sl,
           tp,
           spreadCost,
@@ -266,17 +331,17 @@ export function runBacktest(
           maxAdverse: 0,
         });
       },
-      sell: (size?: number, sl?: number, tp?: number, _comment?: string) => {
+      sell: (size?: number, sl?: number, tp?: number) => {
         if (openPositions.length >= 3) return;
 
         const effectiveSize = size || determineLotSize(equity, currentBar.close, sl ? (sl - currentBar.close) / pipSize : undefined);
         const spreadPips = config.costModel.spreadMode === 'fixed'
           ? config.costModel.fixedSpreadPips
-          : currentBar.spread;
+          : (currentBar.spread || 1.5);
 
         const spreadCost = spreadPips * pipVal * effectiveSize;
-        const commission = config.costModel.commissionPerLotRoundTurn * effectiveSize;
-        const slippagePips = config.costModel.slippagePips;
+        const commission = (config.costModel.commissionPerLotRoundTurn || 0) * effectiveSize;
+        const slippagePips = config.costModel.slippagePips || 0;
         const slippageCost = slippagePips * pipVal * effectiveSize;
 
         totalSpreadCost += spreadCost;
@@ -288,8 +353,8 @@ export function runBacktest(
           entryTime: currentBar.time,
           direction: 'SELL',
           side: 'SELL',
-          size: effectiveSize,
-          entryPrice: currentBar.close - (spreadPips * pipSize) / 2, // enter at Bid
+          size: Number.isFinite(effectiveSize) ? effectiveSize : 0.1,
+          entryPrice: currentBar.close - (spreadPips * pipSize) / 2,
           sl,
           tp,
           spreadCost,
@@ -307,33 +372,37 @@ export function runBacktest(
             const rawPips = pos.direction === 'BUY'
               ? (currentBar.close - pos.entryPrice) / pipSize
               : (pos.entryPrice - currentBar.close) / pipSize;
-            const grossPnl = rawPips * pipVal * pos.size;
-            const totalCosts = pos.spreadCost + pos.commission + pos.swap + pos.slippageCost;
+            
+            const safePipVal = Number.isFinite(pipVal) ? pipVal : 10;
+            const safeSize = Number.isFinite(pos.size) ? pos.size : 0.1;
+
+            const grossPnl = rawPips * safePipVal * safeSize;
+            const totalCosts = (pos.spreadCost || 0) + (pos.commission || 0) + (pos.swap || 0) + (pos.slippageCost || 0);
             const netPnl = grossPnl - totalCosts;
 
-            balance += netPnl;
+            balance += Number.isFinite(netPnl) ? netPnl : 0;
             trades.push({
               ticket: pos.ticket,
               entryTime: pos.entryTime,
               exitTime: currentBar.time,
-              symbol: config.symbol,
+              symbol: config.symbol || 'EURUSD',
               direction: pos.direction,
-              size: pos.size,
+              size: Number(safeSize.toFixed(2)),
               entryPrice: pos.entryPrice,
               exitPrice: currentBar.close,
               sl: pos.sl,
               tp: pos.tp,
-              pnl: Number(netPnl.toFixed(2)),
-              pips: Number(rawPips.toFixed(1)),
+              pnl: Number((Number.isFinite(netPnl) ? netPnl : 0).toFixed(2)),
+              pips: Number((Number.isFinite(rawPips) ? rawPips : 0).toFixed(1)),
               durationMinutes: Math.round((currentBar.time - pos.entryTime) / 60),
               costs: {
-                spread: Number(pos.spreadCost.toFixed(2)),
-                commission: Number(pos.commission.toFixed(2)),
-                swap: Number(pos.swap.toFixed(2)),
-                slippage: Number(pos.slippageCost.toFixed(2)),
+                spread: Number((pos.spreadCost || 0).toFixed(2)),
+                commission: Number((pos.commission || 0).toFixed(2)),
+                swap: Number((pos.swap || 0).toFixed(2)),
+                slippage: Number((pos.slippageCost || 0).toFixed(2)),
               },
-              mae: Number(pos.maxAdverse.toFixed(1)),
-              mfe: Number(pos.maxFavorable.toFixed(1)),
+              mae: Number((pos.maxAdverse || 0).toFixed(1)),
+              mfe: Number((pos.maxFavorable || 0).toFixed(1)),
               exitReason: 'SIGNAL',
             });
             openPositions.splice(p, 1);
@@ -347,14 +416,12 @@ export function runBacktest(
           if (tp !== undefined) pos.tp = tp;
         }
       },
-      // Aliases
       close: (ticket?: number) => {
         ctx.closePosition(ticket);
       },
       modify: (ticket: number, sl?: number, tp?: number) => {
         ctx.modifyPosition(ticket, sl, tp);
       },
-      // Indicator helpers
       sma: (period: number, offset = 0) => {
         const targetIdx = i - offset;
         if (targetIdx < period - 1 || targetIdx < 0) return null;
@@ -431,7 +498,6 @@ export function runBacktest(
       },
     };
 
-    // Run user/AI strategy logic
     try {
       strategyLogic(ctx, config.params);
     } catch (e) {
@@ -439,7 +505,6 @@ export function runBacktest(
     }
   }
 
-  // 5. Final trade metrics compilation
   const winningTrades = trades.filter((t) => t.pnl > 0);
   const losingTrades = trades.filter((t) => t.pnl < 0);
   const totalTrades = trades.length;
@@ -476,7 +541,6 @@ export function runBacktest(
   const netProfit = balance - config.initialBalance;
   const returnPct = (netProfit / config.initialBalance) * 100;
 
-  // Annualized Sharpe & Sortino (assuming daily steps equivalent)
   const returns = trades.map((t) => t.pnl / config.initialBalance);
   const meanReturn = returns.length > 0 ? returns.reduce((a, b) => a + b, 0) / returns.length : 0;
   const variance = returns.length > 1
@@ -494,7 +558,6 @@ export function runBacktest(
 
   const calmarRatio = maxDrawdownPct > 0 ? returnPct / maxDrawdownPct : 0;
 
-  // Monthly returns matrix
   const monthlyMap: Record<number, Record<number, number>> = {};
   for (const t of trades) {
     const d = new Date(t.exitTime * 1000);
@@ -515,7 +578,6 @@ export function runBacktest(
     };
   });
 
-  // Hourly and Weekday Performance Distributions
   const hourlyMap: Record<number, { pnl: number; count: number }> = {};
   for (let h = 0; h < 24; h++) hourlyMap[h] = { pnl: 0, count: 0 };
 
@@ -555,11 +617,9 @@ export function runBacktest(
     tradesCount: data.count,
   }));
 
-  // Seeded Monte Carlo Simulation (using 1,000 iterations and Mulberry32 PRNG)
   const mcSeed = (config.params && typeof config.params._mcSeed === 'number') ? config.params._mcSeed : 123456789;
   const mcIterations = 1000;
   
-  // Mulberry32
   let mcA = mcSeed >>> 0;
   const mcRng = () => {
     let t = (mcA += 0x6d2b79f5);
@@ -573,7 +633,6 @@ export function runBacktest(
   const mcRuns: { maxDd: number; finalBal: number }[] = [];
 
   for (let m = 0; m < mcIterations; m++) {
-    // Fisher-Yates reshuffling with seeded RNG
     const shuffled = [...tradePnls];
     for (let idx = nTrades - 1; idx > 0; idx--) {
       const j = Math.floor(mcRng() * (idx + 1));
@@ -612,7 +671,6 @@ export function runBacktest(
     },
   ];
 
-  // Heuristic Overfitting Score calculation
   const paramCount = Object.keys(config.params || {}).filter(k => !k.startsWith('_')).length || 2;
   const tpp = totalTrades / Math.max(1, paramCount);
   const tppPenalty = Math.min(100, Math.max(0, 100 * (1 - tpp / 30)));
@@ -649,7 +707,7 @@ export function runBacktest(
   return {
     id: `bt_${Date.now()}`,
     strategyId: config.strategyId,
-    strategyName: config.strategyId,
+    strategyName: strategyName,
     symbol: config.symbol,
     timeframe: config.timeframe,
     period: candles.length > 0

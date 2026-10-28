@@ -113,8 +113,11 @@ export function generateHistoricalCandles(
 
   if (timeframe === 'M1') intervalSec = 60;
   else if (timeframe === 'M5') intervalSec = 300;
+  else if (timeframe === 'M10') intervalSec = 600;
   else if (timeframe === 'M15') intervalSec = 900;
+  else if (timeframe === 'M30') intervalSec = 1800;
   else if (timeframe === 'H1') intervalSec = 3600;
+  else if (timeframe === 'H3') intervalSec = 10800;
   else if (timeframe === 'H4') intervalSec = 14400;
   else if (timeframe === 'D1') intervalSec = 86400;
 

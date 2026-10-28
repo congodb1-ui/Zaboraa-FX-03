@@ -1,13 +1,26 @@
-node_modules/
-build/
-dist/
-coverage/
-.DS_Store
-*.log
-.env*
-!.env.example
+# ==========================================
+# ZABORAA FX CRITICAL CORE SHIELD
+# ==========================================
+
+# 1. Protect the Local Trading Database (CRITICAL)
 data/
-.aistudio/
-*.sqlite*
+*.sqlite
+*.sqlite-journal
+*.sqlite3
+
+# 2. Protect Private Keys and Broker Passwords
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+mt5-bridge/.env
+
+# 3. Protect Local Virtual Environments & Packages
+node_modules/
+.venv/
 __pycache__/
-*.pyc
+.pytest_cache/
+
+# 4. Ignore Local Build Output
+dist/

@@ -6,12 +6,10 @@ import {
   DatasetRecord,
   BacktestConfig,
   BacktestResult,
-  BacktestTrade,
-  DataProvenance,
 } from '../types/forex';
-import { runBacktest } from '../engine/backtester';
-import { getStrategyExecutor } from '../services/builtInStrategies';
+import { runContractStrategyBacktest } from '../engine/contractBacktest';
 import { generateStandaloneBacktestHtmlReport } from '../engine/htmlReport';
+import { CandlestickChart } from './CandlestickChart';
 import {
   Play,
   RotateCcw,
@@ -19,13 +17,12 @@ import {
   AlertTriangle,
   Sparkles,
   TrendingUp,
-  Percent,
   Calendar,
   Layers,
-  Database,
   ShieldAlert,
-  Info,
   Clock,
+  FolderOpen,
+  Trash2,
 } from 'lucide-react';
 
 interface BacktestViewProps {
@@ -55,21 +52,22 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
   const [lotSize, setLotSize] = useState<number>(0.1);
 
   // Cost Model
-  const [spreadMode, setSpreadMode] = useState<'fixed' | 'historical'>('historical');
-  const [fixedSpreadPips, setFixedSpreadPips] = useState<number>(1.0);
-  const [commissionPerLot, setCommissionPerLot] = useState<number>(7.0);
-  const [slippagePips, setSlippagePips] = useState<number>(0.2);
-  const [includeSwap, setIncludeSwap] = useState<boolean>(true);
+  const [spreadMode] = useState<'fixed' | 'historical'>('historical');
+  const [fixedSpreadPips] = useState<number>(1.0);
+  const [commissionPerLot] = useState<number>(7.0);
+  const [slippagePips] = useState<number>(0.2);
+  const [includeSwap] = useState<boolean>(true);
 
   // Execution State
   const [isRunning, setIsRunning] = useState(false);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [jobProgress, setJobProgress] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [result, setResult] = useState<BacktestResult | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [tradeFilter, setTradeFilter] = useState<'ALL' | 'WIN' | 'LOSS'>('ALL');
+  const [saveMessage, setSaveMessage] = useState('');
+  const [savedReports, setSavedReports] = useState<any[]>([]);
+  React.useEffect(() => { fetch('/api/backtests').then(r => r.json()).then(j => setSavedReports(j.reports || [])).catch(() => setSavedReports([])); }, []);
 
   const selectedStrategy = strategies.find((s) => s.id === selectedStratId) || strategies[0];
 
@@ -78,7 +76,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
     (d) => d.symbol === symbol && d.timeframe === timeframe
   ) || datasets.find((d) => d.symbol === symbol);
 
-  const handleRun = async () => {
+  const handleRun = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+
     if (!selectedStrategy) return;
     if (!activeDataset || activeDataset.candles.length === 0) {
       setErrorMessage(`Cannot run backtest: No research dataset loaded for ${symbol} (${timeframe}). Please load a benchmark dataset or import a CSV in Data Manager.`);
@@ -86,7 +89,6 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
     }
 
     setIsRunning(true);
-    setJobProgress(10);
     setErrorMessage(null);
     setAiAnalysis(null);
 
@@ -113,76 +115,31 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
     };
 
     try {
-      const startRes = await fetch('/api/jobs/backtest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          config,
-          symbol,
-          timeframe,
-          candles: activeDataset.candles,
-          strategyCode: selectedStrategy.code,
-        }),
+      // Direct in-browser event-driven backtest execution
+      const backtestRes = await runContractStrategyBacktest(
+        selectedStrategy,
+        activeDataset.candles,
+        config
+      );
+
+      setResult({
+        ...backtestRes,
+        provenance: activeDataset.provenance,
+        barCount: activeDataset.candles.length,
       });
-
-      if (!startRes.ok) {
-        const errData = await startRes.json();
-        throw new Error(errData.error || 'Failed to submit backtest job');
-      }
-
-      const { jobId } = await startRes.json();
-      setActiveJobId(jobId);
-
-      const pollInterval = setInterval(async () => {
-        try {
-          const pollRes = await fetch(`/api/jobs/${jobId}`);
-          if (pollRes.ok) {
-            const jobData = await pollRes.json();
-            setJobProgress(jobData.progress || 20);
-
-            if (jobData.status === 'COMPLETED' && jobData.result) {
-              clearInterval(pollInterval);
-              setResult({
-                ...jobData.result,
-                provenance: activeDataset.provenance,
-                barCount: activeDataset.candles.length,
-              });
-              setIsRunning(false);
-              setActiveJobId(null);
-            } else if (jobData.status === 'FAILED') {
-              clearInterval(pollInterval);
-              setErrorMessage(jobData.errorMessage || jobData.error || 'Backtest failed');
-              setIsRunning(false);
-              setActiveJobId(null);
-            } else if (jobData.status === 'CANCELLED') {
-              clearInterval(pollInterval);
-              setIsRunning(false);
-              setActiveJobId(null);
-            }
-          }
-        } catch (err: any) {
-          clearInterval(pollInterval);
-          setIsRunning(false);
-          setActiveJobId(null);
-          setErrorMessage(err.message || 'Error polling backtest progress');
-        }
-      }, 200);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Backtest execution error';
+      setErrorMessage(message);
+    } finally {
       setIsRunning(false);
-      setErrorMessage(err.message || 'Backtest execution error');
     }
   };
 
-  const handleCancel = async () => {
-    if (!activeJobId) return;
-    try {
-      await fetch(`/api/jobs/${activeJobId}/cancel`, { method: 'POST' });
-    } catch (_) {}
-    setIsRunning(false);
-    setActiveJobId(null);
-  };
-
-  const handleFetchAiAnalysis = async () => {
+  const handleFetchAiAnalysis = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!result || !selectedStrategy) return;
     setIsAnalyzing(true);
     try {
@@ -208,7 +165,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
     }
   };
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (!result) return;
     const reportHtml = generateStandaloneBacktestHtmlReport(result);
     const blob = new Blob([reportHtml], { type: 'text/html' });
@@ -218,6 +179,83 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
     a.download = `ZaboraaFX_${result.symbol}_${result.timeframe}_Backtest_${Date.now()}.html`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const refreshSavedReports = async () => {
+    const response = await fetch('/api/backtests');
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'Could not load saved reports');
+    setSavedReports(Array.isArray(payload.reports) ? payload.reports : []);
+  };
+
+  const handleSaveReport = async () => {
+    if (!result) return;
+    try {
+      const response = await fetch('/api/backtests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ result, strategyCode: selectedStrategy?.code || '', parameters: selectedStrategy?.params || {}, periodStart: activeDataset?.firstDate, periodEnd: activeDataset?.lastDate }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Save failed');
+      setSaveMessage('Backtest saved to persistent storage.');
+      await refreshSavedReports();
+    } catch (e: any) { setSaveMessage(e?.message || 'Could not save report'); }
+  };
+
+  const handleOpenSavedReport = async (reportId: string) => {
+    try {
+      const response = await fetch(`/api/backtests/${encodeURIComponent(reportId)}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not open saved report');
+      const savedResult = payload.report?.result;
+      if (!savedResult || typeof savedResult !== 'object' || !Array.isArray(savedResult.trades)) {
+        throw new Error('Saved report data is incomplete or invalid.');
+      }
+      setResult(savedResult as BacktestResult);
+      if (typeof savedResult.strategyId === 'string') setSelectedStratId(savedResult.strategyId);
+      if (typeof savedResult.symbol === 'string') setSymbol(savedResult.symbol as SymbolName);
+      if (typeof savedResult.timeframe === 'string') setTimeframe(savedResult.timeframe as Timeframe);
+      setErrorMessage(null);
+      setAiAnalysis(null);
+      setSaveMessage('Saved backtest report loaded. Configuration controls may not reproduce the original run unless its dataset and parameters are restored separately.');
+    } catch (e: any) {
+      setSaveMessage(e?.message || 'Could not open saved report');
+    }
+  };
+
+  const handleDeleteSavedReport = async (reportId: string) => {
+    if (!window.confirm('Delete this saved backtest report? This cannot be undone.')) return;
+    try {
+      const response = await fetch(`/api/backtests/${encodeURIComponent(reportId)}`, { method: 'DELETE' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not delete saved report');
+      await refreshSavedReports();
+      setSaveMessage('Saved backtest report deleted.');
+    } catch (e: any) {
+      setSaveMessage(e?.message || 'Could not delete saved report');
+    }
+  };
+
+  const handleClearBacktestHistory = async () => {
+    if (!window.confirm('Clear ALL saved backtest history? This permanently deletes saved backtest reports and their stored trade/equity results. Strategies and market candle data will not be deleted.')) return;
+    try {
+      const response = await fetch('/api/backtests', { method: 'DELETE' });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'Could not clear backtest history');
+      setSavedReports([]);
+      setSaveMessage(`Backtest history cleared. ${Number(payload.deleted) || 0} saved report(s) deleted. The currently displayed result remains available until you leave or rerun the backtest.`);
+    } catch (e: any) {
+      setSaveMessage(e?.message || 'Could not clear backtest history');
+    }
+  };
+
+  const handlePrintReport = () => {
+    if (!result) return;
+    const html = generateStandaloneBacktestHtmlReport(result).replace('</head>', '<style>@media print{@page{size:A4;margin:12mm}body{background:#fff!important;color:#111!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}button{display:none!important}table{break-inside:auto}tr{break-inside:avoid}}</style></head>');
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setSaveMessage('Report opened in a new tab. Use Print → Save as PDF.');
   };
 
   const filteredTrades = result?.trades.filter((t) => {
@@ -236,20 +274,21 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               Event-Driven Backtest Configuration
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Bar-by-bar execution with proven zero look-ahead bias & realistic friction
+              Bar-by-bar execution with proven zero look-ahead bias &amp; realistic friction
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            {isRunning && (
-              <button
-                onClick={handleCancel}
-                className="px-3 py-2 bg-red-950/80 hover:bg-red-900 border border-red-700/60 text-red-300 font-bold text-xs rounded-lg transition-all"
-              >
-                Cancel
-              </button>
-            )}
             <button
+              type="button"
+              onClick={() => void handleClearBacktestHistory()}
+              title={`Delete ${savedReports.length} saved backtest report(s); strategies and market data are preserved`}
+              className="px-3 py-2 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 font-semibold text-xs rounded-lg transition-all inline-flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Clear History ({savedReports.length})
+            </button>
+            <button
+              type="button"
               onClick={handleRun}
               disabled={isRunning}
               className="px-5 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all flex items-center gap-1.5 shadow-md shadow-blue-900/30"
@@ -257,7 +296,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               {isRunning ? (
                 <>
                   <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Simulating in QuickJS ({jobProgress}%)...</span>
+                  <span>Simulating Strategy...</span>
                 </>
               ) : (
                 <>
@@ -284,7 +323,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <span>No dataset loaded for {symbol} ({timeframe}). Backtests are blocked on empty data.</span>
             </div>
             <button
-              onClick={onNavigateToData}
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onNavigateToData();
+              }}
               className="px-3 py-1 bg-amber-600 hover:bg-amber-500 text-white rounded font-bold text-xs"
             >
               Go to Data Manager to Import
@@ -333,7 +377,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <option value="M5">M5</option>
               <option value="M15">M15</option>
               <option value="H1">H1</option>
-              <option value="H4">H4</option>
+              <option value="H3">H3</option>
               <option value="D1">D1</option>
             </select>
           </div>
@@ -361,10 +405,13 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-400 mb-1">Data Provenance Source</label>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-[11px] text-slate-300 truncate">
-              {activeDataset ? activeDataset.provenance.label : 'None Loaded'}
-            </div>
+            <label className="block text-slate-400 mb-1">Leverage</label>
+            <input
+              type="number"
+              value={leverage}
+              onChange={(e) => setLeverage(Number(e.target.value) || 200)}
+              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-white text-xs focus:outline-none focus:border-blue-500"
+            />
           </div>
         </div>
       </div>
@@ -465,7 +512,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
                 <h3 className="text-sm font-bold text-white">
-                  Cumulative Equity Curve & Underwater Drawdown
+                  Cumulative Equity Curve &amp; Underwater Drawdown
                 </h3>
               </div>
               <div className="flex items-center gap-4 text-xs font-mono text-slate-400">
@@ -545,7 +592,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             {/* Cost Breakdown */}
             <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-4 shadow-sm">
               <div className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center justify-between">
-                <span>Broker Friction & Costs</span>
+                <span>Broker Friction &amp; Costs</span>
                 <span className="font-mono text-amber-400">
                   ${(result.totalSpreadCost + result.totalCommission + result.totalSwap + result.totalSlippageCost).toFixed(2)}
                 </span>
@@ -641,7 +688,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                       <Clock className="w-3.5 h-3.5 text-blue-400" />
-                      Hourly P&L Distribution (UTC)
+                      Hourly P&amp;L Distribution (UTC)
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono">00:00 - 23:00</span>
                   </div>
@@ -672,7 +719,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                      Weekday P&L Distribution
+                      Weekday P&amp;L Distribution
                     </span>
                     <span className="text-[10px] text-slate-500 font-mono">Mon - Fri</span>
                   </div>
@@ -700,6 +747,9 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </div>
           )}
 
+          {/* Price chart with entry/exit markers for the executed trades */}
+          {activeDataset?.candles?.length ? <div className="rounded-xl border border-slate-800 bg-[#0D1322] p-4"><h3 className="text-sm font-bold text-white mb-3">Backtest price chart · UTC</h3><CandlestickChart symbol={symbol} timeframe={timeframe} candles={activeDataset.candles} onSelectTimeframe={setTimeframe} tradeMarkers={(result.trades || []).flatMap(t => ([{ time: t.entryTime, price: t.entryPrice, direction: t.direction, pnl: t.pnl }, { time: t.exitTime, price: t.exitPrice, direction: t.direction === 'BUY' ? 'SELL' as const : 'BUY' as const, pnl: t.pnl }]))} height={420} /></div> : null}
+
           {/* Trade Execution List */}
           <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3 mb-3">
@@ -711,19 +761,34 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
                 <div className="flex items-center gap-1 bg-slate-900 p-0.5 rounded border border-slate-800 text-[10px]">
                   <button
-                    onClick={() => setTradeFilter('ALL')}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTradeFilter('ALL');
+                    }}
                     className={`px-2 py-0.5 rounded ${tradeFilter === 'ALL' ? 'bg-blue-600 text-white' : 'text-slate-400'}`}
                   >
                     All
                   </button>
                   <button
-                    onClick={() => setTradeFilter('WIN')}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTradeFilter('WIN');
+                    }}
                     className={`px-2 py-0.5 rounded ${tradeFilter === 'WIN' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
                   >
                     Wins
                   </button>
                   <button
-                    onClick={() => setTradeFilter('LOSS')}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setTradeFilter('LOSS');
+                    }}
                     className={`px-2 py-0.5 rounded ${tradeFilter === 'LOSS' ? 'bg-rose-600 text-white' : 'text-slate-400'}`}
                   >
                     Losses
@@ -733,6 +798,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={handleFetchAiAnalysis}
                   disabled={isAnalyzing}
                   className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors"
@@ -740,7 +806,10 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>{isAnalyzing ? 'Analyzing...' : 'AI Critique'}</span>
                 </button>
+                <button type="button" onClick={handleSaveReport} className="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-emerald-300 text-xs font-semibold rounded-lg">Save Report</button>
+                <button type="button" onClick={handlePrintReport} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg">Print / Save PDF</button>
                 <button
+                  type="button"
                   onClick={handleDownloadReport}
                   className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg flex items-center gap-1.5 transition-colors"
                 >
@@ -750,6 +819,29 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               </div>
             </div>
 
+            {saveMessage && <div className="mb-3 text-xs text-emerald-300">{saveMessage}</div>}
+            {savedReports.length > 0 && (
+              <div className="mb-4 rounded-lg border border-slate-800 p-3">
+                <div className="text-xs font-semibold text-slate-300 mb-2">Saved backtest reports ({savedReports.length})</div>
+                <div className="space-y-2">
+                  {savedReports.slice(0, 8).map((report: any) => (
+                    <div key={report.id} className="flex flex-wrap items-center justify-between gap-2 rounded bg-slate-900/70 border border-slate-800 px-3 py-2">
+                      <div className="text-[10px] text-slate-400">
+                        <span className="text-slate-200">{report.strategyId}</span> · {report.symbol} {report.timeframe} · {report.createdAt ? new Date(report.createdAt).toLocaleString() : 'Date unavailable'}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => void handleOpenSavedReport(String(report.id))} className="inline-flex items-center gap-1 rounded border border-blue-500/30 px-2 py-1 text-[10px] text-blue-300 hover:bg-blue-500/10">
+                          <FolderOpen className="h-3 w-3" /> Open
+                        </button>
+                        <button type="button" onClick={() => void handleDeleteSavedReport(String(report.id))} className="inline-flex items-center gap-1 rounded border border-rose-500/30 px-2 py-1 text-[10px] text-rose-300 hover:bg-rose-500/10">
+                          <Trash2 className="h-3 w-3" /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {aiAnalysis && (
               <div className="mb-4 p-3 bg-indigo-950/40 border border-indigo-500/40 rounded-lg text-xs text-indigo-200 leading-relaxed">
                 <strong className="block text-white font-bold mb-1">AI Quantitative Critique:</strong>
@@ -769,7 +861,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <th className="py-2 px-2.5">Pips</th>
                     <th className="py-2 px-2.5">Costs</th>
                     <th className="py-2 px-2.5">Exit Reason</th>
-                    <th className="py-2 px-2.5 text-right">Net P&L</th>
+                    <th className="py-2 px-2.5 text-right">Net P&amp;L</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -817,7 +909,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           <Play className="w-10 h-10 text-slate-600 mx-auto mb-3" />
           <p className="text-sm text-slate-300 font-semibold">Ready to Backtest</p>
           <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-            Select your strategy and dataset above, then click "Run Realistic Backtest" to generate the verified quantitative report.
+            Select your strategy and dataset above, then click &quot;Run Realistic Backtest&quot; to generate the verified quantitative report.
           </p>
         </div>
       )}

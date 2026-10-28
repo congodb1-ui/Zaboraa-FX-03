@@ -1,4 +1,4 @@
-import { Candle, OptimizationConfig, OptimizationReport, OptimizationTrial } from '../types/forex';
+import { Candle, DataProvenance, OptimizationConfig, OptimizationReport, OptimizationTrial } from '../types/forex';
 import { runBacktest } from './backtester';
 import { getStrategyExecutor } from '../services/builtInStrategies';
 import { calculateHeuristicOverfittingScore } from './overfittingHeuristic';
@@ -6,6 +6,7 @@ import { createMulberry32 } from './monteCarlo';
 
 export interface OptimizationOptions {
   isCancelled?: () => boolean;
+  provenance?: DataProvenance;
 }
 
 /**
@@ -18,14 +19,31 @@ export async function runOptimizationSweep(
   onProgress?: (progressPct: number, currentTrial: number, totalTrials: number) => void,
   options?: OptimizationOptions
 ): Promise<OptimizationReport> {
+  if (!Array.isArray(candles) || candles.length < 100) {
+    throw new Error('OPTIMIZATION_INSUFFICIENT_DATA: at least 100 ordered candles are required');
+  }
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    if (!c || !Number.isFinite(c.time) || ![c.open, c.high, c.low, c.close].every(Number.isFinite)) {
+      throw new Error(`OPTIMIZATION_INVALID_CANDLE: invalid timestamp/OHLC at index ${i}`);
+    }
+    if (i > 0 && c.time <= candles[i - 1].time) throw new Error(`OPTIMIZATION_UNSORTED_CANDLES: index ${i}`);
+  }
   const seed = config.seed ?? 987654321;
   const rng = createMulberry32(seed);
 
-  // Split candles into In-Sample and Out-of-Sample
+  // FR-N3: the final 20% is a permanently reserved holdout. It is not passed to
+  // any backtest, trial scorer, heatmap, or ranking. IS/OOS validation occurs
+  // only inside the first 80% development partition.
+  const reservedTestBars = Math.max(1, Math.floor(candles.length * 0.20));
+  const developmentCandles = candles.slice(0, candles.length - reservedTestBars);
   const splitRatio = Math.max(0.3, Math.min(0.9, config.inSamplePct / 100));
-  const splitIdx = Math.floor(candles.length * splitRatio);
-  const isCandles = candles.slice(0, splitIdx);
-  const oosCandles = candles.slice(splitIdx);
+  const splitIdx = Math.floor(developmentCandles.length * splitRatio);
+  const isCandles = developmentCandles.slice(0, splitIdx);
+  const oosCandles = developmentCandles.slice(splitIdx);
+  if (isCandles.length < 30 || oosCandles.length < 20) {
+    throw new Error('OPTIMIZATION_SPLIT_TOO_SMALL: need at least 30 in-sample and 20 validation candles before the reserved holdout');
+  }
 
   // Generate parameter combinations
   const paramCombinations: Record<string, any>[] = [];
@@ -91,11 +109,13 @@ export async function runOptimizationSweep(
         costModel: config.costModel,
         params,
         provenance: {
-          source: 'SIMULATED',
-          label: 'SIMULATED',
-          details: 'In-Sample Optimization Partition',
-          utcOffsetHours: 0,
-          isResearchEligible: true,
+          source: options?.provenance?.source ?? 'SIMULATED',
+          label: options?.provenance?.label ?? 'SIMULATED',
+          details: `In-Sample Optimization Partition; source: ${options?.provenance?.details ?? 'unverified input'}`,
+          brokerServer: options?.provenance?.brokerServer,
+          accountType: options?.provenance?.accountType,
+          utcOffsetHours: options?.provenance?.utcOffsetHours ?? 0,
+          isResearchEligible: Boolean(options?.provenance?.isResearchEligible && options?.provenance?.source !== 'SIMULATED'),
         },
       },
       executor
@@ -118,11 +138,13 @@ export async function runOptimizationSweep(
         costModel: config.costModel,
         params,
         provenance: {
-          source: 'SIMULATED',
-          label: 'SIMULATED',
-          details: 'Out-of-Sample Verification Partition',
-          utcOffsetHours: 0,
-          isResearchEligible: true,
+          source: options?.provenance?.source ?? 'SIMULATED',
+          label: options?.provenance?.label ?? 'SIMULATED',
+          details: `Out-of-Sample Verification Partition; source: ${options?.provenance?.details ?? 'unverified input'}`,
+          brokerServer: options?.provenance?.brokerServer,
+          accountType: options?.provenance?.accountType,
+          utcOffsetHours: options?.provenance?.utcOffsetHours ?? 0,
+          isResearchEligible: Boolean(options?.provenance?.isResearchEligible && options?.provenance?.source !== 'SIMULATED'),
         },
       },
       executor
@@ -193,5 +215,7 @@ export async function runOptimizationSweep(
     heatmapMatrix,
     seed,
     createdAt: new Date().toISOString(),
+    reservedTestBars,
+    reservedTestStartTime: candles[candles.length - reservedTestBars]?.time,
   };
 }

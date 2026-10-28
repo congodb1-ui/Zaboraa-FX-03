@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Candle, SymbolName, Timeframe, BrokerAccount } from '../types/forex';
 import { CandlestickChart } from './CandlestickChart';
 import { SYMBOL_SPECS } from '../services/marketData';
@@ -9,15 +9,24 @@ interface MarketsViewProps {
   currentSymbol: SymbolName;
   currentTimeframe: Timeframe;
   candles: Candle[];
+  /** Where the chart data comes from (stored UTC data, simulated benchmark, ...). */
+  dataLabel?: string;
   onSelectSymbol: (symbol: SymbolName) => void;
   onSelectTimeframe: (tf: Timeframe) => void;
+  /** Resolves with the real outcome from the server. Never assume success. */
   onPlaceOrder: (order: {
     symbol: SymbolName;
     side: 'BUY' | 'SELL';
     volume: number;
     sl?: number;
     tp?: number;
-  }) => void;
+  }) => Promise<{ ok: boolean; message: string; simulated?: boolean }>;
+}
+
+interface LiveTick {
+  bid: number;
+  ask: number;
+  marketClosed: boolean;
 }
 
 export const MarketsView: React.FC<MarketsViewProps> = ({
@@ -25,6 +34,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
   currentSymbol,
   currentTimeframe,
   candles,
+  dataLabel,
   onSelectSymbol,
   onSelectTimeframe,
   onPlaceOrder,
@@ -33,13 +43,59 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
   const [lotSize, setLotSize] = useState<number>(0.1);
   const [slPips, setSlPips] = useState<number>(30);
   const [tpPips, setTpPips] = useState<number>(60);
-  const [orderSubmittedMessage, setOrderSubmittedMessage] = useState<string | null>(null);
+  const [orderResult, setOrderResult] = useState<{ ok: boolean; message: string; simulated?: boolean } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [tick, setTick] = useState<LiveTick | null>(null);
 
   const symbols: SymbolName[] = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD'];
   const spec = SYMBOL_SPECS[currentSymbol];
   const pipMultiplier = currentSymbol === 'XAUUSD' ? 1.0 : (currentSymbol === 'USDJPY' ? 0.01 : 0.0001);
 
-  const currentPrice = orderSide === 'BUY' ? spec.ask : spec.bid;
+  // With a real broker connected, prices and stops come from the live tick, never from the static spec table.
+  const needsLive = account.isConnected && !account.isSimulated;
+  const brokerSymbol = `${currentSymbol}${account.symbolSuffix || ''}`;
+
+  useEffect(() => {
+    if (!needsLive) {
+      setTick(null);
+      return;
+    }
+    let alive = true;
+    setTick(null);
+    const load = async () => {
+      try {
+        const r = await fetch(`/api/bridge/tick?symbol=${encodeURIComponent(brokerSymbol)}`);
+        const d = await r.json();
+        if (!alive) return;
+        if (r.ok && d.ok && typeof d.bid === 'number' && typeof d.ask === 'number') {
+          setTick({ bid: d.bid, ask: d.ask, marketClosed: d.marketClosed === true });
+        } else {
+          setTick(null);
+        }
+      } catch {
+        if (alive) setTick(null);
+      }
+    };
+    void load();
+    const id = setInterval(() => void load(), 3000);
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
+  }, [needsLive, brokerSymbol]);
+
+  const askPx = needsLive && tick ? tick.ask : spec.ask;
+  const bidPx = needsLive && tick ? tick.bid : spec.bid;
+  const priceReady = !needsLive || (tick !== null && !tick.marketClosed);
+  const priceProblem = !needsLive
+    ? null
+    : tick === null
+      ? `No live price for ${brokerSymbol}. Ordering is disabled.`
+      : tick.marketClosed
+        ? 'Market closed or price is stale. Ordering is disabled.'
+        : null;
+
+  const currentPrice = orderSide === 'BUY' ? askPx : bidPx;
   const calculatedSL = orderSide === 'BUY'
     ? Number((currentPrice - slPips * pipMultiplier).toFixed(spec.digits))
     : Number((currentPrice + slPips * pipMultiplier).toFixed(spec.digits));
@@ -52,17 +108,19 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
   const estRewardUSD = tpPips * spec.pipValuePerLotUSD * lotSize;
   const marginRequiredUSD = (lotSize * spec.contractSize * (currentSymbol === 'XAUUSD' ? currentPrice : 1)) / account.leverage;
 
-  const handleSubmitOrder = () => {
-    onPlaceOrder({
+  const handleSubmitOrder = async () => {
+    if (!priceReady || submitting) return;
+    setSubmitting(true);
+    const result = await onPlaceOrder({
       symbol: currentSymbol,
       side: orderSide,
       volume: lotSize,
       sl: calculatedSL,
       tp: calculatedTP,
     });
-
-    setOrderSubmittedMessage(`Order executed: ${orderSide} ${lotSize} lots ${currentSymbol} at ${currentPrice.toFixed(spec.digits)}`);
-    setTimeout(() => setOrderSubmittedMessage(null), 4000);
+    setOrderResult(result);
+    setSubmitting(false);
+    setTimeout(() => setOrderResult(null), 8000);
   };
 
   return (
@@ -110,23 +168,48 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
         </div>
       </div>
 
-      {orderSubmittedMessage && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-mono flex items-center justify-between animate-fadeIn">
-          <span>{orderSubmittedMessage}</span>
-          <span className="text-[10px] text-emerald-400">Filled instantly</span>
+      {orderResult && (
+        <div
+          className={`p-3 border rounded-xl text-xs font-mono ${
+            orderResult.ok
+              ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300'
+              : orderResult.simulated
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                : 'bg-rose-950/60 border-rose-500/50 text-rose-300'
+          }`}
+        >
+          {orderResult.message}
         </div>
       )}
 
       {/* Main Grid: Candlestick Chart (70%) + Order Ticket (30%) */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <div className="lg:col-span-3">
-          <CandlestickChart
-            symbol={currentSymbol}
-            timeframe={currentTimeframe}
-            candles={candles}
-            onSelectTimeframe={onSelectTimeframe}
-            height={520}
-          />
+          {dataLabel && <div className="mb-1.5 text-[11px] font-mono text-slate-400">{dataLabel}</div>}
+          {candles.length === 0 ? (
+            <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-10 text-center text-xs text-slate-400" style={{ minHeight: 320 }}>
+              No stored candles for {currentSymbol} {currentTimeframe}. Download them in the Data Manager. Nothing is simulated here.
+              <div className="mt-3 flex justify-center gap-1">
+                {(['M1', 'M5', 'M15', 'H1', 'D1'] as Timeframe[]).map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => onSelectTimeframe(tf)}
+                    className={`px-2 py-0.5 text-xs font-mono rounded ${currentTimeframe === tf ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <CandlestickChart
+              symbol={currentSymbol}
+              timeframe={currentTimeframe}
+              candles={candles}
+              onSelectTimeframe={onSelectTimeframe}
+              height={520}
+            />
+          )}
         </div>
 
         {/* Live Order Ticket */}
@@ -154,7 +237,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                   <ArrowUpRight className="w-3.5 h-3.5" /> BUY
                 </div>
                 <div className="text-sm font-mono font-bold mt-1 tabular-nums">
-                  {spec.ask.toFixed(spec.digits)}
+                  {askPx.toFixed(spec.digits)}
                 </div>
               </button>
 
@@ -171,7 +254,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                   <ArrowDownRight className="w-3.5 h-3.5" /> SELL
                 </div>
                 <div className="text-sm font-mono font-bold mt-1 tabular-nums">
-                  {spec.bid.toFixed(spec.digits)}
+                  {bidPx.toFixed(spec.digits)}
                 </div>
               </button>
             </div>
@@ -262,20 +345,22 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
           </div>
 
           <div className="pt-4 space-y-2">
+            {priceProblem && <div className="text-[11px] text-amber-300 font-mono text-center">{priceProblem}</div>}
             <button
               type="button"
-              onClick={handleSubmitOrder}
-              className={`w-full py-2.5 rounded-lg text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg ${
+              onClick={() => void handleSubmitOrder()}
+              disabled={!priceReady || submitting}
+              className={`w-full py-2.5 rounded-lg text-white font-bold text-xs uppercase tracking-wider transition-all shadow-lg disabled:opacity-40 disabled:cursor-not-allowed ${
                 orderSide === 'BUY'
                   ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-950/50'
                   : 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/50'
               }`}
             >
-              Execute {orderSide} {lotSize} Lot
+              {submitting ? 'Sending...' : `Execute ${orderSide} ${lotSize} Lot`}
             </button>
             <div className="flex items-center justify-center gap-1 text-[10px] text-slate-500 text-center">
               <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              <span>Broker-side SL & TP guaranteed attached</span>
+              <span>SL and TP are sent with the order; the bridge rejects wrong-side or too-close stops</span>
             </div>
           </div>
         </div>

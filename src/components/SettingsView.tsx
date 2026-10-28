@@ -37,7 +37,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   // Bridge connection state
   const [bridgeUrl, setBridgeUrl] = useState('http://127.0.0.1:8001');
-  const [bridgeToken, setBridgeToken] = useState('');
+  const bridgeToken = ''; // D6: token never handled in the browser
   const [isTestingBridge, setIsTestingBridge] = useState(false);
   const [bridgeTestMessage, setBridgeTestMessage] = useState<{ text: string; success: boolean } | null>(null);
 
@@ -207,15 +207,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             />
           </div>
 
-          <div>
-            <label className="block text-slate-400 mb-1">Bearer Auth Token</label>
-            <input
-              type="password"
-              value={bridgeToken}
-              onChange={(e) => setBridgeToken(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 font-mono text-white text-xs focus:outline-none focus:border-blue-500"
-            />
-          </div>
+          <p className="text-xs text-slate-500">The bridge token lives only in the server .env files. It is never typed into or stored by the browser.</p>
 
           <div>
             <label className="block text-slate-400 mb-1">Configured Server Suffix</label>

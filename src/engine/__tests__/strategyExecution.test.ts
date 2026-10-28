@@ -202,9 +202,13 @@ describe('Stage 2: Unified Strategy Execution & Safety Architecture', () => {
     let isCancelled = false;
     let trialsRun = 0;
 
-    // After 2 trials, trigger cancellation
+    // After 2 trials, trigger cancellation. Use a longer ordered fixture because
+    // the optimizer now reserves a final holdout and requires a viable IS/OOS split.
+    const optimizationCandles = Array.from({ length: 120 }, (_, i) => ({
+      ...testCandles[i % testCandles.length], time: testCandles[0].time + i * 3600,
+    }));
     const cancelPromise = runOptimizationSweep(
-      testCandles,
+      optimizationCandles,
       {
         strategyId: 'strat_sma_cross',
         symbol: 'EURUSD',

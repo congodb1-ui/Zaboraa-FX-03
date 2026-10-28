@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CandleTableView } from './CandleTableView';
 import {
   SymbolName,
   Timeframe,
@@ -19,28 +20,44 @@ import {
   Server,
   FileText,
   Info,
+  Play,
+  Pause,
+  RefreshCcw,
 } from 'lucide-react';
 
 interface DataManagerViewProps {
   datasets: DatasetRecord[];
   onAddDataset: (dataset: DatasetRecord) => void;
+  onLoadStoredData: (symbol: string, tf: Timeframe) => Promise<boolean>;
   onAutoFixAnomalies: (datasetId: string) => void;
-  onFetchFromBridge: (symbol: SymbolName, tf: Timeframe) => Promise<boolean>;
+  onFetchFromBridge: (symbol: string, tf: Timeframe) => Promise<boolean>;
+  onCancelDownload?: () => Promise<void>;
   bridgeStatus: { isOnline: boolean; serverName?: string; accountType?: string; error?: string };
 }
 
 export const DataManagerView: React.FC<DataManagerViewProps> = ({
   datasets,
   onAddDataset,
+  onLoadStoredData,
   onAutoFixAnomalies,
   onFetchFromBridge,
+  onCancelDownload,
   bridgeStatus,
 }) => {
-  const [selectedSymbol, setSelectedSymbol] = useState<SymbolName>('EURUSD');
+  const [selectedSymbol, setSelectedSymbol] = useState<SymbolName | 'XAUUSDm'>('EURUSD');
   const [selectedTf, setSelectedTf] = useState<Timeframe>('H1');
+  const [dataTab, setDataTab] = useState<'manager' | 'candles'>('manager');
   const [isSyncingBridge, setIsSyncingBridge] = useState(false);
+  const [checkingStoredData, setCheckingStoredData] = useState(false);
+  const [storedDataStatus, setStoredDataStatus] = useState<string | null>(null);
   const [activeReport, setActiveReport] = useState<QualityReport | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warn' } | null>(null);
+
+  // D28 UI Controls state
+  const [marketClosed, setMarketClosed] = useState<boolean>(false);
+  const [downloadProgress, setDownloadProgress] = useState<number>(0);
+  const [downloadCancelled, setDownloadCancelled] = useState<boolean>(false);
+  const [retryBackoffCount, setRetryBackoffCount] = useState<number>(0);
 
   // CSV Import State
   const [showCsvModal, setShowCsvModal] = useState(false);
@@ -50,16 +67,56 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
   const [csvTf, setCsvTf] = useState<Timeframe>('H1');
   const [csvUtcOffset, setCsvUtcOffset] = useState<number>(0);
 
-  const handleBridgeDownload = async () => {
+  const handleCheckStoredData = async () => {
+    setCheckingStoredData(true);
+    setStoredDataStatus(null);
+    try {
+      const q = new URLSearchParams({ symbol: selectedSymbol, timeframe: selectedTf });
+      const response = await fetch(`/api/data/check?${q.toString()}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Data check failed');
+      if (result.exists) {
+        const count = result.candle_count ?? result.barCount ?? 0;
+        setStoredDataStatus(`Stored data found: ${count} bars (${selectedSymbol} ${selectedTf}). Loading into Active Research Datasets…`);
+        const activated = await onLoadStoredData(selectedSymbol, selectedTf);
+        setStoredDataStatus(activated
+          ? `Stored data found and loaded: ${count} bars (${selectedSymbol} ${selectedTf}). Source is marked unverified until provenance is confirmed.`
+          : `Stored data exists (${count} bars), but activation failed. Check the portal API/server logs.`);
+      } else {
+        setStoredDataStatus(`No stored data found for ${selectedSymbol} ${selectedTf}.`);
+      }
+    } catch (err) {
+      setStoredDataStatus(err instanceof Error ? err.message : 'Could not check stored data.');
+    } finally {
+      setCheckingStoredData(false);
+    }
+  };
+
+  const handleBridgeDownload = async (event?: React.MouseEvent<HTMLButtonElement>) => {
+    event?.preventDefault();
+    event?.stopPropagation();
     setIsSyncingBridge(true);
+    setDownloadCancelled(false);
+    setDownloadProgress(25);
+    
+    // Check M1 size warning per D28 requirements
+    if (selectedTf === 'M1') {
+      setNotification({
+        message: 'M1 Timeframe download requested: High disk allocation and extended download duration anticipated (>500MB).',
+        type: 'warn',
+      });
+    }
+
     const success = await onFetchFromBridge(selectedSymbol, selectedTf);
     setIsSyncingBridge(false);
     if (success) {
+      setDownloadProgress(100);
       setNotification({
         message: `Successfully synchronized ${selectedSymbol} ${selectedTf} from Exness MT5 Bridge (${bridgeStatus.serverName || 'Exness-MT5Trial9'}).`,
         type: 'success',
       });
     } else {
+      setDownloadProgress(0);
       setNotification({
         message: `MT5 Bridge unreachable on http://127.0.0.1:8001. Please start mt5-bridge locally or import via CSV.`,
         type: 'warn',
@@ -68,11 +125,23 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
     setTimeout(() => setNotification(null), 5000);
   };
 
+  const handleCancelDownload = () => {
+    void onCancelDownload?.();
+    setIsSyncingBridge(false);
+    setDownloadCancelled(true);
+    setDownloadProgress(0);
+    setNotification({
+      message: 'Download cancelled by user.',
+      type: 'warn',
+    });
+    setTimeout(() => setNotification(null), 3000);
+  };
+
   const handleGenerateBenchmark = () => {
-    const candles = generateHistoricalCandles(selectedSymbol, selectedTf, 500);
+    const candles = generateHistoricalCandles(selectedSymbol === 'XAUUSDm' ? 'XAUUSD' : selectedSymbol, selectedTf, 500);
     const newRecord: DatasetRecord = {
       id: `ds_benchmark_${selectedSymbol.toLowerCase()}_${selectedTf.toLowerCase()}_${Date.now()}`,
-      symbol: selectedSymbol,
+      symbol: selectedSymbol as SymbolName,
       timeframe: selectedTf,
       rowCount: candles.length,
       fileSizeKB: Math.round(candles.length * 0.045),
@@ -82,7 +151,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
         source: 'SIMULATED',
         label: 'SIMULATED',
         details: 'Simulated high-frequency geometric Brownian motion with realistic tick spreads.',
-        isResearchEligible: true,
+        isResearchEligible: false,
         utcOffsetHours: 2,
       },
       candles,
@@ -206,6 +275,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
   return (
     <div className="space-y-6">
+      <div className="flex gap-2"><button onClick={() => setDataTab('manager')} className={`px-3 py-2 rounded-lg text-xs font-semibold ${dataTab === 'manager' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Data Manager</button><button onClick={() => setDataTab('candles')} className={`px-3 py-2 rounded-lg text-xs font-semibold ${dataTab === 'candles' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Stored OHLC Table</button></div>
+      {dataTab === 'candles' ? <CandleTableView symbol={selectedSymbol as SymbolName} timeframe={selectedTf} /> : <>
       {/* Top Banner / Ingestion Box */}
       <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-3 mb-4">
@@ -219,7 +290,18 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {/* D28 Market Closed Indicator Toggle */}
+            <button
+              onClick={() => setMarketClosed(!marketClosed)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1.5 ${
+                marketClosed ? 'bg-red-950/60 border-red-500 text-red-300' : 'bg-emerald-950/60 border-emerald-500 text-emerald-300'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${marketClosed ? 'bg-red-400' : 'bg-emerald-400 animate-pulse'}`}></span>
+              <span>{marketClosed ? 'Market Closed' : 'Market Open'}</span>
+            </button>
+
             <button
               onClick={handleGenerateBenchmark}
               className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-blue-500/40"
@@ -249,7 +331,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           </div>
         )}
 
-        {/* Sync Controls */}
+        {/* Sync Controls & D28 Download Progress/Controls */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
           <div>
             <label className="block text-xs text-slate-400 mb-1">Target Pair</label>
@@ -262,6 +344,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               <option value="GBPUSD">GBPUSD (GBPUSDm)</option>
               <option value="USDJPY">USDJPY (USDJPYm)</option>
               <option value="XAUUSD">XAUUSD (Gold / US Dollar)</option>
+              <option value="XAUUSDm">XAUUSDm (Exness suffix)</option>
             </select>
           </div>
 
@@ -272,11 +355,13 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               onChange={(e) => setSelectedTf(e.target.value as Timeframe)}
               className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
             >
-              <option value="M1">M1 (1 Minute)</option>
+              <option value="M1">M1 (1 Minute - High Disk Size Warning)</option>
               <option value="M5">M5 (5 Minutes)</option>
+              <option value="M10">M10 (10 Minutes)</option>
               <option value="M15">M15 (15 Minutes)</option>
+              <option value="M30">M30 (30 Minutes)</option>
               <option value="H1">H1 (1 Hour - Recommended)</option>
-              <option value="H4">H4 (4 Hours)</option>
+              <option value="H3">H3 (3 Hours)</option>
               <option value="D1">D1 (Daily)</option>
             </select>
           </div>
@@ -291,17 +376,51 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             </div>
           </div>
 
-          <div>
+          <div className="flex gap-2 mb-2">
             <button
-              onClick={handleBridgeDownload}
-              disabled={isSyncingBridge}
-              className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/30"
+              onClick={handleCheckStoredData}
+              disabled={checkingStoredData || isSyncingBridge}
+              className="w-full py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-semibold text-xs rounded-lg transition-all"
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>{isSyncingBridge ? 'Fetching Rates...' : 'Fetch from MT5 Bridge'}</span>
+              {checkingStoredData ? 'Checking stored data…' : 'Check Stored Data'}
             </button>
           </div>
+          {storedDataStatus && <p role="status" className="mb-2 text-xs text-slate-300">{storedDataStatus}</p>}
+          <div className="flex gap-2">
+            {isSyncingBridge ? (
+              <button
+                type="button"
+                onClick={handleCancelDownload}
+                className="w-full py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md"
+              >
+                <Pause className="w-3.5 h-3.5" />
+                <span>Cancel Download</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBridgeDownload}
+                className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/30"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Fetch from MT5 Bridge</span>
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* D28 Download Progress bar & Earliest Bar status */}
+        {isSyncingBridge && (
+          <div className="mt-4 pt-3 border-t border-slate-800 space-y-1.5">
+            <div className="flex justify-between text-[11px] font-mono text-slate-400">
+              <span>Downloading historical stream for {selectedSymbol} ({selectedTf})...</span>
+              <span>{downloadProgress}%</span>
+            </div>
+            <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${downloadProgress}%` }}></div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Datasets Table */}
@@ -447,9 +566,12 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   >
                     <option value="M1">M1</option>
                     <option value="M5">M5</option>
+                    <option value="M10">M10</option>
                     <option value="M15">M15</option>
+                    <option value="M30">M30</option>
                     <option value="H1">H1</option>
-                    <option value="H4">H4</option>
+                    <option value="H3">H3</option>
+                    <option value="H3">H3</option>
                     <option value="D1">D1</option>
                   </select>
                 </div>
@@ -517,6 +639,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };

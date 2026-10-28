@@ -23,11 +23,11 @@ export interface BridgeHealthResponse {
   broker_connected: boolean;
   algo_trading_enabled: boolean;
   server_name: string;
-  account_type: 'DEMO' | 'REAL' | 'CONTEST';
+  account_type: 'DEMO' | 'REAL' | 'CONTEST' | 'UNKNOWN';
   is_demo: boolean;
   trade_mode?: number;
   login?: number;
-  broker_utc_offset_hours: number;
+  broker_utc_offset_hours: number | null; // null until measured or set by BROKER_UTC_OFFSET_HOURS
   allow_trading: boolean;
   kill_engaged: boolean;
   timestamp_utc: string;
@@ -36,7 +36,7 @@ export interface BridgeHealthResponse {
 export interface BridgeAccountResponse {
   login: number;
   server: string;
-  account_type: 'DEMO' | 'REAL' | 'CONTEST';
+  account_type: 'DEMO' | 'REAL' | 'CONTEST' | 'UNKNOWN';
   is_demo: boolean;
   trade_mode?: number;
   balance: number;
@@ -45,7 +45,7 @@ export interface BridgeAccountResponse {
   free_margin: number;
   leverage: number;
   currency: string;
-  utc_offset_hours: number;
+  utc_offset_hours: number | null;
   status: string;
 }
 
@@ -75,7 +75,9 @@ export interface BridgeCandlesResponse {
   broker_symbol?: string;
   timeframe: string;
   count: number;
-  utc_offset_hours: number;
+  utc_offset_hours: number | null;
+  utc_offset_measured?: boolean;
+  time_basis?: 'broker' | 'utc';
   candles: BridgeCandle[];
   message?: string;
 }
@@ -109,12 +111,14 @@ export interface BridgeOrderRequest {
 }
 
 export interface BridgeOrderResponse {
-  status: 'SUCCESS' | 'ERROR';
+  status: 'SUCCESS' | 'PARTIAL' | 'ERROR';
   message: string;
   ticket?: number;
   fill_price?: number;
   volume?: number;
   symbol?: string;
+  retcode?: number;
+  deal?: number | null;
 }
 
 export interface BridgeCloseResponse {
@@ -128,6 +132,9 @@ export interface BridgeKillResponse {
   allFlat: boolean;
   closed: number[];
   unclosed: number[];
+  pending_cancelled?: number[];
+  pending_remaining?: number[];
+  failures?: Record<string, unknown>;
   kill_state_engaged: boolean;
   timestamp: string;
 }
@@ -147,6 +154,7 @@ export interface BridgeDeal {
   profit: number;
   symbol: string;
   comment: string;
+  time_basis?: string; // 'broker': deal times are broker server time, not UTC
 }
 
 export interface BridgeCancelPendingResponse {
@@ -166,6 +174,7 @@ export type BridgeErrorCode =
   | 'BRIDGE_UNAUTHORIZED'
   | 'BRIDGE_FORBIDDEN'
   | 'BRIDGE_BAD_REQUEST'
+  | 'BRIDGE_NOT_FOUND'
   | 'BRIDGE_TIMEOUT'
   | 'BRIDGE_ERROR';
 
@@ -173,14 +182,75 @@ export class BridgeError extends Error {
   public statusCode: number;
   public code: BridgeErrorCode;
   public details?: any;
+  /** The bridge's own error code (e.g. ORDER_REJECTED, MT5_DISCONNECTED), when the body carried one. */
+  public bridgeCode?: string;
 
-  constructor(statusCode: number, code: BridgeErrorCode, message: string, details?: any) {
+  constructor(statusCode: number, code: BridgeErrorCode, message: string, details?: any, bridgeCode?: string) {
     super(message);
     this.name = 'BridgeError';
     this.statusCode = statusCode;
     this.code = code;
     this.details = details;
+    this.bridgeCode = bridgeCode;
   }
+}
+
+/**
+ * The FastAPI bridge answers errors as {"detail": {"error": CODE, "message": TEXT, ...}}.
+ * Older shapes ({"detail": "text"} and {"error": "text"}) are still understood.
+ */
+export function parseBridgeErrorBody(body: any): { code?: string; message?: string } {
+  if (!body || typeof body !== 'object') return {};
+  const d = body.detail;
+  if (Array.isArray(d)) {
+    const msg = d.map((x: any) => (typeof x?.msg === 'string' ? x.msg : '')).filter(Boolean).join('; ');
+    return { code: 'VALIDATION_ERROR', message: msg || undefined };
+  }
+  if (d && typeof d === 'object') {
+    const code = typeof d.error === 'string' ? d.error : undefined;
+    const message = typeof d.message === 'string' ? (code ? `${code}: ${d.message}` : d.message) : code;
+    return { code, message };
+  }
+  if (typeof d === 'string') return { message: d };
+  if (typeof body.error === 'string') return { code: body.error, message: body.error };
+  return {};
+}
+
+/** Bridge error codes that are raised BEFORE order_send, so the broker never saw the order. */
+const NOT_SENT_BRIDGE_CODES = new Set([
+  'ORDER_REJECTED',
+  'ORDER_CHECK_FAILED',
+  'MT5_DISCONNECTED',
+  'ACCOUNT_TYPE_UNKNOWN',
+  'NO_TICK',
+  'SYMBOL_NOT_FOUND',
+  'SYMBOL_TRADING_RESTRICTED',
+  'TRADING_DISABLED',
+  'LIVE_NOT_ALLOWED',
+  'INVALID_STOPS',
+  'INVALID_VOLUME',
+  'INVALID_SIDE',
+  'INVALID_SYMBOL',
+  'MANDATORY_STOP_LOSS_REQUIRED',
+]);
+
+/**
+ * True when the order certainly did not reach the broker (so REJECTED is the honest state).
+ * Timeouts, network failures, ORDER_OUTCOME_UNKNOWN and unlabelled 5xx stay UNKNOWN for reconciliation.
+ */
+export function isDefiniteNotSent(err: BridgeError): boolean {
+  if (err.statusCode === 408) return false;
+  if (err.bridgeCode === 'ORDER_OUTCOME_UNKNOWN') return false;
+  if (err.statusCode >= 400 && err.statusCode < 500) return true;
+  if (
+    err.code === 'BRIDGE_BAD_REQUEST' ||
+    err.code === 'BRIDGE_FORBIDDEN' ||
+    err.code === 'BRIDGE_UNAUTHORIZED' ||
+    err.code === 'BRIDGE_NOT_FOUND'
+  ) {
+    return true;
+  }
+  return err.bridgeCode !== undefined && NOT_SENT_BRIDGE_CODES.has(err.bridgeCode);
 }
 
 export interface BridgeClientOptions {
@@ -217,7 +287,8 @@ export class BridgeClient {
     endpoint: string,
     method: 'GET' | 'POST' | 'DELETE' = 'GET',
     body?: any,
-    maxRetriesOverride?: number
+    maxRetriesOverride?: number,
+    timeoutMsOverride?: number
   ): Promise<T> {
     if (!this.token) {
       throw new BridgeError(
@@ -230,13 +301,14 @@ export class BridgeClient {
     const url = `${this.baseUrl}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     let lastError: any = null;
     const maxAttempts = maxRetriesOverride !== undefined ? maxRetriesOverride : this.maxRetries;
+    const effectiveTimeoutMs = timeoutMsOverride ?? this.timeoutMs;
 
     for (let attempt = 0; attempt <= maxAttempts; attempt++) {
       const controller = new AbortController();
       let timeoutId: any = null;
 
       try {
-        timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+        timeoutId = setTimeout(() => controller.abort(), effectiveTimeoutMs);
 
         const headers: Record<string, string> = {
           Authorization: `Bearer ${this.token}`,
@@ -256,56 +328,51 @@ export class BridgeClient {
 
         clearTimeout(timeoutId);
 
-        // Immediate Fast-Fail on Auth & Client validation errors (DO NOT RETRY)
-        if (response.status === 401) {
-          let errDetail = 'Invalid or missing bridge token.';
-          try {
-            const errJson = await response.json();
-            errDetail = errJson.detail || errJson.error || errDetail;
-          } catch (_) {}
-          throw new BridgeError(401, 'BRIDGE_UNAUTHORIZED', `Bridge authentication rejected: ${errDetail}`);
-        }
-
-        if (response.status === 403) {
-          let errDetail = 'Operation forbidden by bridge.';
-          try {
-            const errJson = await response.json();
-            errDetail = errJson.detail || errJson.error || errDetail;
-          } catch (_) {}
-          throw new BridgeError(403, 'BRIDGE_FORBIDDEN', `Bridge access forbidden: ${errDetail}`);
-        }
-
-        if (response.status === 400) {
-          let errDetail = 'Bad request sent to bridge.';
-          try {
-            const errJson = await response.json();
-            errDetail = errJson.detail || errJson.error || errDetail;
-          } catch (_) {}
-          throw new BridgeError(400, 'BRIDGE_BAD_REQUEST', `Bridge rejected request parameters: ${errDetail}`);
-        }
-
         if (response.ok) {
           const data = await response.json();
           return data as T;
         }
 
-        // For HTTP 5xx or unhandled status:
         let errBody: any = null;
         try {
           errBody = await response.json();
         } catch (_) {}
+        const info = parseBridgeErrorBody(errBody);
 
+        // Immediate Fast-Fail on Auth & Client validation errors (DO NOT RETRY)
+        if (response.status === 401) {
+          throw new BridgeError(401, 'BRIDGE_UNAUTHORIZED', `Bridge authentication rejected: ${info.message || 'Invalid or missing bridge token.'}`, errBody, info.code);
+        }
+        if (response.status === 403) {
+          throw new BridgeError(403, 'BRIDGE_FORBIDDEN', `Bridge access forbidden: ${info.message || 'Operation forbidden by bridge.'}`, errBody, info.code);
+        }
+        if (response.status === 400) {
+          throw new BridgeError(400, 'BRIDGE_BAD_REQUEST', `Bridge rejected request parameters: ${info.message || 'Bad request sent to bridge.'}`, errBody, info.code);
+        }
+        // Other 4xx (404 not found, 409, 422 validation) will not change on retry.
+        if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+          throw new BridgeError(
+            response.status,
+            response.status === 404 ? 'BRIDGE_NOT_FOUND' : 'BRIDGE_BAD_REQUEST',
+            `Bridge HTTP ${response.status}: ${info.message || response.statusText}`,
+            errBody,
+            info.code
+          );
+        }
+
+        // HTTP 5xx (and 408/429): retryable for reads.
         lastError = new BridgeError(
           response.status,
           'BRIDGE_ERROR',
-          `Bridge HTTP ${response.status}: ${errBody?.detail || errBody?.error || response.statusText}`,
-          errBody
+          `Bridge HTTP ${response.status}: ${info.message || response.statusText}`,
+          errBody,
+          info.code
         );
       } catch (err: any) {
         if (timeoutId) clearTimeout(timeoutId);
 
         // Fast-fail errors must rethrow immediately
-        if (err instanceof BridgeError && (err.code === 'BRIDGE_UNAUTHORIZED' || err.code === 'BRIDGE_FORBIDDEN' || err.code === 'BRIDGE_BAD_REQUEST')) {
+        if (err instanceof BridgeError && (err.code === 'BRIDGE_UNAUTHORIZED' || err.code === 'BRIDGE_FORBIDDEN' || err.code === 'BRIDGE_BAD_REQUEST' || err.code === 'BRIDGE_NOT_FOUND')) {
           throw err;
         }
 
@@ -313,7 +380,7 @@ export class BridgeClient {
           lastError = new BridgeError(
             408,
             'BRIDGE_TIMEOUT',
-            `Bridge request to ${endpoint} timed out after ${this.timeoutMs}ms (attempt ${attempt + 1}/${maxAttempts + 1})`
+            `Bridge request to ${endpoint} timed out after ${effectiveTimeoutMs}ms (attempt ${attempt + 1}/${maxAttempts + 1})`
           );
         } else {
           lastError = new BridgeError(
@@ -391,7 +458,8 @@ export class BridgeClient {
   }
 
   public async tripKillSwitch(): Promise<BridgeKillResponse> {
-    return this.request<BridgeKillResponse>('/kill', 'POST');
+    // /kill closes positions one by one on the bridge and can take well over the default 5 s.
+    return this.request<BridgeKillResponse>('/kill', 'POST', undefined, 1, 30000);
   }
 
   public async resetKillSwitch(): Promise<BridgeResetKillResponse> {
@@ -628,7 +696,7 @@ export async function executeOrderThroughBridge(
       magicNumber: order.magicNumber,
       symbol: order.symbol,
       side: order.side,
-      volume: order.volume,
+      volume: bridgeResp.volume ?? order.volume,
       openPrice: fillPrice,
       currentPrice: fillPrice,
       sl: order.sl,
@@ -645,15 +713,9 @@ export async function executeOrderThroughBridge(
     };
   } catch (err: any) {
     if (err instanceof BridgeError) {
-      // Clear 4xx client errors (400 Bad Request, 403 Forbidden, 401 Unauthorized) map to REJECTED.
-      // 408 Timeout is ambiguous and MUST map to UNKNOWN.
-      if (
-        err.statusCode !== 408 &&
-        ((err.statusCode >= 400 && err.statusCode < 500) ||
-          err.code === 'BRIDGE_BAD_REQUEST' ||
-          err.code === 'BRIDGE_FORBIDDEN' ||
-          err.code === 'BRIDGE_UNAUTHORIZED')
-      ) {
+      // Definite not-sent errors (4xx, or bridge codes raised before order_send) map to REJECTED.
+      // 408 Timeout, ORDER_OUTCOME_UNKNOWN and unlabelled 5xx are ambiguous and MUST map to UNKNOWN.
+      if (isDefiniteNotSent(err)) {
         const rejected = transitionOrderRejected(order.id, err.message);
         return { success: false, order: rejected, error: err.message };
       }

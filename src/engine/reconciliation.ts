@@ -26,6 +26,8 @@ export interface ReconciliationReport {
   missingSlPositions: number;
   details: string[];
   timestamp: string;
+  /** false when broker positions could not be read: nothing was reconciled, so callers must not treat this as success. */
+  complete: boolean;
 }
 
 /**
@@ -53,6 +55,7 @@ export async function reconcileWithBroker(
     missingSlPositions: 0,
     details: [],
     timestamp: new Date().toISOString(),
+    complete: true,
   };
 
   // Fetch current broker active positions and recent deals
@@ -63,13 +66,15 @@ export async function reconcileWithBroker(
     brokerPositions = await client.getPositions();
   } catch (err: any) {
     report.details.push(`Failed to fetch positions from bridge: ${err.message}`);
+    report.complete = false;
     return report;
   }
 
   try {
     brokerDeals = await client.getDeals();
   } catch (_) {
-    // Non-fatal if deals history is unavailable
+    // Non-fatal if deals history is unavailable, but say so: closing prices and PnL fall back to defaults.
+    report.details.push('Deal history unavailable: closed-position prices and PnL may be approximate');
   }
 
   const brokerTickets = new Set<number>(brokerPositions.map((p) => p.ticket));
@@ -82,9 +87,17 @@ export async function reconcileWithBroker(
 
   for (const order of pendingOrders) {
     // Case 1: Order found in active broker positions or deals -> mark FILLED
-    const matchingPos = brokerPositions.find(
-      (p) => (order.ticket && p.ticket === order.ticket) || (p.magic === order.magicNumber && p.symbol === order.symbol)
-    );
+    const matchingPos = brokerPositions.find((p) => {
+      if (order.ticket && p.ticket === order.ticket) return true;
+      if (order.comment && p.comment === order.comment) return true;
+      // Fallback: same bot magic, symbol and side, but never claim a position the database already tracks.
+      return (
+        p.magic === order.magicNumber &&
+        p.symbol === order.symbol &&
+        (p.type === 0 ? 'BUY' : 'SELL') === order.side &&
+        !getPositionByTicketDb(p.ticket)
+      );
+    });
 
     if (matchingPos) {
       updateOrderStatus(order.id, 'FILLED', matchingPos.ticket, matchingPos.price_open);
@@ -120,8 +133,10 @@ export async function reconcileWithBroker(
     }
 
     // Check if order was already executed and closed in deal history
+    // Match by order ticket or by the unique order comment. Matching on magic + symbol alone would
+    // mark a never-sent order FILLED because of any older deal from the same bot.
     const matchingDeal = brokerDeals.find(
-      (d) => (order.ticket && d.order === order.ticket) || (d.magic === order.magicNumber && d.symbol === order.symbol)
+      (d) => (order.ticket && d.order === order.ticket) || (order.comment && d.comment === order.comment && d.symbol === order.symbol)
     );
 
     if (matchingDeal) {

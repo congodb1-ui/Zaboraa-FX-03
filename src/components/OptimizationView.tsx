@@ -21,13 +21,13 @@ import {
   Candle,
 } from '../types/forex';
 import { runOptimizationSweep } from '../engine/optimizer';
-import { generateHistoricalCandles } from '../services/marketData';
 
 interface OptimizationViewProps {
   strategies: Strategy[];
   currentSymbol: SymbolName;
   currentTimeframe: Timeframe;
   historicalCandles?: Candle[];
+  researchProvenance?: import('../types/forex').DataProvenance;
 }
 
 export const OptimizationView: React.FC<OptimizationViewProps> = ({
@@ -35,6 +35,7 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({
   currentSymbol,
   currentTimeframe,
   historicalCandles,
+  researchProvenance,
 }) => {
   const [selectedStrategyId, setSelectedStrategyId] = useState(strategies[0]?.id || '');
   const [searchType, setSearchType] = useState<'grid' | 'random'>('grid');
@@ -54,8 +55,18 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [report, setReport] = useState<OptimizationReport | null>(null);
+  const [runError, setRunError] = useState<string | null>(null);
 
   const handleRunOptimization = async () => {
+    setRunError(null);
+    if (!researchProvenance || !researchProvenance.isResearchEligible || researchProvenance.source === 'SIMULATED') {
+      setRunError('Optimization blocked: import a verified, research-eligible CSV or MT5 dataset for this symbol/timeframe first. Synthetic benchmark data is not eligible.');
+      return;
+    }
+    if (!historicalCandles || historicalCandles.length < 100) {
+      setRunError(`Optimization requires at least 100 eligible stored candles; found ${historicalCandles?.length ?? 0}.`);
+      return;
+    }
     setIsRunning(true);
     setProgress(0);
 
@@ -84,16 +95,13 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({
     };
 
     try {
-      const candlesToUse =
-        historicalCandles && historicalCandles.length >= 100
-          ? historicalCandles
-          : generateHistoricalCandles(currentSymbol, currentTimeframe, 500);
-
-      const result = await runOptimizationSweep(candlesToUse, config, (pct) => {
+      const result = await runOptimizationSweep(historicalCandles, config, (pct) => {
         setProgress(pct);
-      });
+      }, { provenance: researchProvenance });
       setReport(result);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setRunError(message);
       console.error('Optimization sweep failed:', err);
     } finally {
       setIsRunning(false);
@@ -110,6 +118,8 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {runError && <div role="alert" className="rounded-lg border border-amber-700 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">{runError}</div>}
+      {!researchProvenance && <div className="rounded-lg border border-slate-700 bg-slate-900/50 px-4 py-3 text-sm text-slate-300">No verified research dataset is selected. Optimization remains disabled until eligible data is imported or downloaded.</div>}
       {/* Header and Controls */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-[#0F172A] border border-slate-800 rounded-xl">
         <div>

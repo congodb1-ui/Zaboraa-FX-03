@@ -11,6 +11,7 @@ import { BrokerAccount } from '../types/forex';
 
 interface NavbarProps {
   account: BrokerAccount;
+  bridgeAccountType?: string;
   onToggleAccountMode: (newMode: 'DEMO' | 'LIVE') => void;
   activeBotsCount: number;
   onOpenKillSwitch: () => void;
@@ -18,6 +19,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   account,
+  bridgeAccountType = 'UNKNOWN',
   onToggleAccountMode,
   activeBotsCount,
   onOpenKillSwitch,
@@ -96,13 +98,13 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={() => setShowAccountDropdown(!showAccountDropdown)}
               className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md border text-xs font-semibold transition-all ${
-                account.mode === 'LIVE'
+                bridgeAccountType === 'REAL'
                   ? 'bg-rose-950/40 border-rose-600/50 text-rose-300 hover:bg-rose-900/50'
                   : 'bg-emerald-950/30 border-emerald-600/40 text-emerald-300 hover:bg-emerald-900/40'
               }`}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-current" />
-              <span>{account.mode === 'LIVE' ? 'LIVE ACCOUNT' : 'DEMO ACCOUNT'}</span>
+              <span>{bridgeAccountType === 'REAL' ? 'REAL ACCOUNT' : bridgeAccountType === 'CONTEST' ? 'CONTEST ACCOUNT' : bridgeAccountType === 'DEMO' ? 'DEMO ACCOUNT' : 'ACCOUNT UNKNOWN'}</span>
               <ChevronDown className="w-3 h-3 opacity-60" />
             </button>
 

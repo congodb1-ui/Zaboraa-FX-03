@@ -150,6 +150,10 @@ npm run build
 
 ---
 
+## Current phase validation notes
+
+See [`docs/PHASE-2-4-IMPLEMENTATION-AND-ACCEPTANCE.md`](docs/PHASE-2-4-IMPLEMENTATION-AND-ACCEPTANCE.md) for the Phase 2–4 implementation summary, manual MT5 demo checklist, Data Manager acceptance steps, and outstanding verification items. Live/demo checks must be completed locally; packaging the code does not certify trading safety.
+
 ## Safety Ground Rules
 
 1. **Simulation Default**: If the MT5 bridge is offline or unreachable, the portal automatically operates in simulation mode with visible `"SIMULATION: no broker connected"` indicators.

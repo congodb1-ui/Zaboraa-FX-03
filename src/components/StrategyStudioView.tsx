@@ -17,7 +17,7 @@ import {
 interface StrategyStudioViewProps {
   strategies: Strategy[];
   onSelectStrategy: (strat: Strategy) => void;
-  onSaveStrategy: (strat: Strategy) => void;
+  onSaveStrategy: (strat: Strategy) => Promise<boolean> | boolean | void;
   onLaunchBacktest: (strat: Strategy) => void;
 }
 
@@ -32,6 +32,8 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
   const [activeParams, setActiveParams] = useState<Record<string, any>>(strategies[0]?.params || {});
   const [copied, setCopied] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [workerTestResult, setWorkerTestResult] = useState<{ passed: boolean; message: string } | null>(null);
 
   const currentStrat = strategies.find((s) => s.id === selectedStratId) || strategies[0];
@@ -50,16 +52,26 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
     }));
   };
 
-  const handleSave = () => {
-    if (!currentStrat) return;
+  const handleSave = async () => {
+    if (!currentStrat || isSaving) return;
     const updated: Strategy = {
       ...currentStrat,
       code: codeContent,
       params: activeParams,
     };
-    onSaveStrategy(updated);
-    setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setIsSaving(true);
+    setSaveError(null);
+    try {
+      const ok = await onSaveStrategy(updated);
+      if (ok === false) {
+        setSaveError(`Strategy '${updated.name}' was NOT saved to the database.`);
+        return;
+      }
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCopyCode = () => {
@@ -102,6 +114,14 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
     }
   };
 
+  if (!currentStrat) {
+    return (
+      <div className="p-4 bg-[#0B101D] border border-slate-800 rounded-xl text-xs text-slate-400 font-mono">
+        No strategies available.
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       {/* Strategy Selector Strip */}
@@ -110,7 +130,7 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
           {strategies.map((s) => {
             const isSelected = s.id === selectedStratId;
             return (
-              <button
+              <button type="button"
                 key={s.id}
                 onClick={() => handleSelectStrat(s)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
@@ -126,8 +146,8 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
           })}
         </div>
 
-        <button
-          onClick={() => {
+        <button type="button"
+          onClick={async () => {
             const newStrat: Strategy = {
               id: `strat_custom_${Date.now()}`,
               name: 'Custom Alpha Strategy',
@@ -157,7 +177,14 @@ export const strategy = {
 `,
               createdAt: new Date().toISOString(),
             };
-            onSaveStrategy(newStrat);
+            // Select the new strategy only after the server confirmed it, otherwise the editor
+            // would show new code while Save targets a different strategy.
+            const ok = await onSaveStrategy(newStrat);
+            if (ok === false) {
+              setSaveError('New strategy was NOT saved to the database.');
+              return;
+            }
+            setSaveError(null);
             setSelectedStratId(newStrat.id);
             setCodeContent(newStrat.code);
             setActiveParams(newStrat.params);
@@ -184,6 +211,13 @@ export const strategy = {
         </div>
       )}
 
+      {saveError && (
+        <div className="p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-mono flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+          <span>{saveError}</span>
+        </div>
+      )}
+
       {/* Editor & Parameter Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Code Editor */}
@@ -197,26 +231,27 @@ export const strategy = {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
+              <button type="button"
                 onClick={handleWorkerSmokeTest}
                 className="px-2.5 py-1 text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/30 rounded text-xs flex items-center gap-1 transition-colors"
               >
                 <Play className="w-3 h-3" />
                 <span>Test in Worker</span>
               </button>
-              <button
+              <button type="button"
                 onClick={handleCopyCode}
                 className="px-2.5 py-1 text-slate-400 hover:text-white bg-slate-900 border border-slate-800 rounded text-xs flex items-center gap-1 transition-colors"
               >
                 {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                 <span>{copied ? 'Copied' : 'Copy'}</span>
               </button>
-              <button
+              <button type="button"
                 onClick={handleSave}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded text-xs font-bold flex items-center gap-1 transition-colors shadow-sm"
+                disabled={isSaving}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded text-xs font-bold flex items-center gap-1 transition-colors shadow-sm"
               >
                 <Save className="w-3.5 h-3.5" />
-                <span>Save</span>
+                <span>{isSaving ? 'Saving...' : 'Save'}</span>
               </button>
             </div>
           </div>
@@ -288,7 +323,7 @@ export const strategy = {
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-800/80">
-              <button
+              <button type="button"
                 onClick={() => onLaunchBacktest({ ...currentStrat, params: activeParams })}
                 className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-950/40"
               >

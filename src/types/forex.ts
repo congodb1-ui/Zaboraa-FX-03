@@ -1,5 +1,5 @@
 export type SymbolName = 'EURUSD' | 'GBPUSD' | 'USDJPY' | 'XAUUSD';
-export type Timeframe = 'M1' | 'M5' | 'M15' | 'H1' | 'H4' | 'D1';
+export type Timeframe = 'M1' | 'M5' | 'M10' | 'M15' | 'M30' | 'H1' | 'H3' | 'H4' | 'D1';
 
 export interface SymbolSpec {
   symbol: SymbolName;
@@ -30,11 +30,11 @@ export interface Candle {
   spread: number; // in pips
 }
 
-export type ProvenanceType = 'MT5_BRIDGE' | 'USER_CSV' | 'SIMULATED';
+export type ProvenanceType = 'MT5_BRIDGE' | 'USER_CSV' | 'SIMULATED' | 'STORED_UNVERIFIED';
 
 export interface DataProvenance {
   source: ProvenanceType;
-  label: 'MT5 BRIDGE' | 'USER CSV' | 'SIMULATED';
+  label: 'MT5 BRIDGE' | 'USER CSV' | 'SIMULATED' | 'STORED DATA (SOURCE UNVERIFIED)';
   details: string;
   brokerServer?: string;
   accountType?: 'DEMO' | 'REAL';
@@ -475,6 +475,9 @@ export interface OptimizationReport {
   heatmapMatrix: { x: number; y: number; value: number }[];
   seed: number;
   createdAt: string;
+  /** FR-N3: reserved final bars excluded from all optimization and ranking calculations. */
+  reservedTestBars?: number;
+  reservedTestStartTime?: number;
 }
 
 export interface MonteCarloAnalysis {

@@ -1,8 +1,5 @@
 import { BacktestTrade, TradingViewComparisonReport, TradingViewTradeRecord } from '../types/forex';
 
-/**
- * Parses a raw TradingView "List of Trades" CSV export string
- */
 export function parseTradingViewTradesCsv(csvContent: string): TradingViewTradeRecord[] {
   const lines = csvContent.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length < 2) return [];
@@ -19,7 +16,6 @@ export function parseTradingViewTradesCsv(csvContent: string): TradingViewTradeR
   const parsedTrades: TradingViewTradeRecord[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    // Regex to split on comma outside quotes
     const cols = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => c.trim().replace(/^["']|["']$/g, ''));
     if (cols.length < 3) continue;
 
@@ -29,6 +25,11 @@ export function parseTradingViewTradesCsv(csvContent: string): TradingViewTradeR
     else if (rawType.toLowerCase().includes('entry') && rawType.toLowerCase().includes('short')) type = 'Entry Short';
     else if (rawType.toLowerCase().includes('exit') && rawType.toLowerCase().includes('short')) type = 'Exit Short';
 
+    const rawProfit = profitIdx >= 0 ? cols[profitIdx]?.trim() : undefined;
+    const parsedProfit = rawProfit !== undefined && rawProfit !== '' && !isNaN(Number(rawProfit))
+      ? Number(rawProfit)
+      : undefined;
+
     const tradeRecord: TradingViewTradeRecord = {
       tradeNumber: parseInt(cols[tradeNumIdx >= 0 ? tradeNumIdx : 0], 10) || i,
       type,
@@ -36,7 +37,7 @@ export function parseTradingViewTradesCsv(csvContent: string): TradingViewTradeR
       date: cols[dateIdx >= 0 ? dateIdx : 3] || '',
       price: parseFloat(cols[priceIdx >= 0 ? priceIdx : 4]) || 0,
       contracts: parseFloat(cols[contractsIdx >= 0 ? contractsIdx : 5]) || 0.1,
-      profitUSD: profitIdx >= 0 ? parseFloat(cols[profitIdx]) || undefined : undefined,
+      profitUSD: parsedProfit,
     };
     parsedTrades.push(tradeRecord);
   }
@@ -44,20 +45,18 @@ export function parseTradingViewTradesCsv(csvContent: string): TradingViewTradeR
   return parsedTrades;
 }
 
-/**
- * Compares portal backtest trades against parsed TradingView trade records
- */
 export function compareWithTradingViewTrades(
   portalTrades: BacktestTrade[],
   tvTrades: TradingViewTradeRecord[]
 ): TradingViewComparisonReport {
-  // Filter for exits to compare realized round-trip P&L
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+
   const tvExits = tvTrades.filter(t => t.type.startsWith('Exit'));
   const tvTradeCount = tvExits.length > 0 ? tvExits.length : Math.floor(tvTrades.length / 2);
   const portalTradeCount = portalTrades.length;
 
-  const tvNetProfit = tvExits.reduce((acc, t) => acc + (t.profitUSD || 0), 0);
-  const portalNetProfit = portalTrades.reduce((acc, t) => acc + t.pnl, 0);
+  const tvNetProfit = tvExits.reduce((acc, t) => acc + num(t.profitUSD), 0);
+  const portalNetProfit = portalTrades.reduce((acc, t) => acc + num(t.pnl), 0);
 
   const tradeCountMatch = Math.abs(tvTradeCount - portalTradeCount) <= 1;
   const pnlDifferenceUSD = Math.abs(portalNetProfit - tvNetProfit);
@@ -78,10 +77,13 @@ export function compareWithTradingViewTrades(
     notes.push(`P&L divergence is ${pnlDifferencePct.toFixed(1)}% ($${pnlDifferenceUSD.toFixed(2)} delta). Check TradingView commission and tick-spread settings.`);
   }
 
-  // Calculate overall alignment score (0 - 100)
   const countPenalty = Math.min(50, Math.abs(tvTradeCount - portalTradeCount) * 10);
   const pnlPenalty = Math.min(50, pnlDifferencePct * 0.5);
-  const alignmentScore = Math.max(0, Math.min(100, Math.round(100 - (countPenalty + pnlPenalty))));
+  
+  const rawScore = 100 - (countPenalty + pnlPenalty);
+  const alignmentScore = Number.isFinite(rawScore)
+    ? Math.max(0, Math.min(100, Math.round(rawScore)))
+    : 0;
 
   return {
     tvTradeCount,

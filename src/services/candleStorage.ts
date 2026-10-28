@@ -55,10 +55,9 @@ export function auditCandleIntegrity(candles: Candle[], timeframe: Timeframe): D
   // Expected bar step in seconds
   const stepMap: Record<Timeframe, number> = {
     M1: 60,
-    M5: 300,
-    M15: 900,
-    H1: 3600,
-    H4: 14400,
+    M5: 300, M10: 600,
+    M15: 900, M30: 1800,
+    H1: 3600, H3: 10800, H4: 14400,
     D1: 86400,
   };
   const expectedStep = stepMap[timeframe] || 3600;
@@ -124,115 +123,65 @@ export function auditCandleIntegrity(candles: Candle[], timeframe: Timeframe): D
  * writes to .tmp first, and updates SQLite catalog metadata.
  */
 export async function savePartitionedCandles(
-  symbol: SymbolName,
-  timeframe: Timeframe,
-  candles: Candle[]
+  symbol: SymbolName, timeframe: Timeframe, candles: Candle[]
 ): Promise<DataIntegrityReport> {
   const audit = auditCandleIntegrity(candles, timeframe);
-
-  // Group candles by UTC calendar year
-  const byYear = new Map<number, Candle[]>();
-  for (const c of candles) {
-    const yr = new Date(c.time * 1000).getUTCFullYear();
-    let arr = byYear.get(yr);
-    if (!arr) {
-      arr = [];
-      byYear.set(yr, arr);
-    }
-    arr.push(c);
-  }
-
   const db = getDb();
-
-  for (const [year, yearCandles] of byYear.entries()) {
-    yearCandles.sort((a, b) => a.time - b.time);
-    const yearHash = computeCandlesHash(yearCandles);
-
-    const partitionDir = path.join(CANDLE_DIR, symbol, timeframe);
-    ensureDir(partitionDir);
-
-    const targetFile = path.join(partitionDir, `${year}.json`);
-    const tmpFile = path.join(partitionDir, `${year}.tmp.${Date.now()}`);
-
-    // Atomic write pattern: write to .tmp, flush, and rename
-    await fs.promises.writeFile(tmpFile, JSON.stringify(yearCandles, null, 2), 'utf8');
-    await fs.promises.rename(tmpFile, targetFile);
-
-    const firstTime = yearCandles[0].time;
-    const lastTime = yearCandles[yearCandles.length - 1].time;
-
-    // Update SQLite Data Catalog
-    const catalogId = `${symbol}_${timeframe}_${year}`;
-    db.prepare(`
-      INSERT INTO data_catalog (
-        id, symbol, timeframe, year, file_path, sha256_hash,
-        first_candle_time, last_candle_time, candle_count, gap_count, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        file_path = excluded.file_path,
-        sha256_hash = excluded.sha256_hash,
-        first_candle_time = excluded.first_candle_time,
-        last_candle_time = excluded.last_candle_time,
-        candle_count = excluded.candle_count,
-        gap_count = excluded.gap_count,
-        updated_at = excluded.updated_at
-    `).run(
-      catalogId,
-      symbol,
-      timeframe,
-      year,
-      targetFile,
-      yearHash,
-      firstTime,
-      lastTime,
-      yearCandles.length,
-      audit.gapCount,
-      new Date().toISOString()
-    );
+  const now = new Date().toISOString();
+  const upsert = db.prepare(`INSERT INTO candles
+    (symbol,timeframe,time,open,high,low,close,tick_volume,spread,updated_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,timeframe,time) DO UPDATE SET
+    open=excluded.open,high=excluded.high,low=excluded.low,close=excluded.close,
+    tick_volume=excluded.tick_volume,spread=excluded.spread,updated_at=excluded.updated_at`);
+  db.exec('BEGIN IMMEDIATE');
+  try { for (const c of candles) upsert.run(symbol,timeframe,Math.floor(c.time),c.open,c.high,c.low,c.close,c.tickVolume||0,c.spread||0,now); db.exec('COMMIT'); }
+  catch (err) { db.exec('ROLLBACK'); throw err; }
+  // Maintain the legacy year catalog shape for compatibility with existing UI.
+  const byYear = new Map<number, Candle[]>();
+  for (const c of candles) { const y = new Date(c.time * 1000).getUTCFullYear(); byYear.set(y, [...(byYear.get(y) || []), c]); }
+  for (const [year, rows] of byYear) {
+    const all = loadSqliteCandles(symbol, timeframe, yearStart(year), yearEnd(year));
+    const id = `${symbol}_${timeframe}_${year}`;
+    db.prepare(`INSERT INTO data_catalog(id,symbol,timeframe,year,file_path,sha256_hash,first_candle_time,last_candle_time,candle_count,gap_count,updated_at)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET file_path=excluded.file_path,sha256_hash=excluded.sha256_hash,
+      first_candle_time=excluded.first_candle_time,last_candle_time=excluded.last_candle_time,candle_count=excluded.candle_count,
+      gap_count=excluded.gap_count,updated_at=excluded.updated_at`).run(id,symbol,timeframe,year,'sqlite:candles',computeCandlesHash(all),all[0]?.time??null,all.at(-1)?.time??null,all.length,audit.gapCount,now);
   }
-
   return audit;
 }
+function yearStart(y:number){return Math.floor(Date.UTC(y,0,1)/1000)}
+function yearEnd(y:number){return Math.floor(Date.UTC(y+1,0,1)/1000)-1}
+function loadSqliteCandles(symbol: SymbolName, timeframe: Timeframe, start?: number, end?: number): Candle[] {
+  const db=getDb(); let sql='SELECT time,open,high,low,close,tick_volume AS tickVolume,spread FROM candles WHERE symbol=? AND timeframe=?';
+  const args:any[]=[symbol,timeframe]; if(start!==undefined){sql+=' AND time>=?';args.push(start)} if(end!==undefined){sql+=' AND time<=?';args.push(end)}
+  sql+=' ORDER BY time ASC'; return db.prepare(sql).all(...args) as unknown as Candle[];
+}
 
-/**
- * Loads partitioned candles from disk for a symbol, timeframe, and optional date range
- */
-export async function loadPartitionedCandles(
-  symbol: SymbolName,
-  timeframe: Timeframe,
-  startTimeSec?: number,
-  endTimeSec?: number
-): Promise<Candle[]> {
-  const partitionDir = path.join(CANDLE_DIR, symbol, timeframe);
-  if (!fs.existsSync(partitionDir)) {
-    return [];
-  }
-
-  const files = await fs.promises.readdir(partitionDir);
-  const jsonFiles = files.filter(f => f.endsWith('.json')).sort();
-
-  let allCandles: Candle[] = [];
-
-  for (const file of jsonFiles) {
-    const filePath = path.join(partitionDir, file);
-    try {
-      const content = await fs.promises.readFile(filePath, 'utf8');
-      const parsed: Candle[] = JSON.parse(content);
-      allCandles = allCandles.concat(parsed);
-    } catch (err) {
-      console.error(`Failed to read candle partition ${filePath}:`, err);
+/** Loads canonical SQLite candles; migrates old year JSON partitions on first access. */
+export async function loadPartitionedCandles(symbol: SymbolName, timeframe: Timeframe, startTimeSec?: number, endTimeSec?: number): Promise<Candle[]> {
+  const db=getDb();
+  const count = (db.prepare('SELECT COUNT(*) AS n FROM candles WHERE symbol=? AND timeframe=?').get(symbol,timeframe) as any).n as number;
+  if (count === 0) {
+    const partitionDir=path.join(CANDLE_DIR,symbol,timeframe);
+    if(fs.existsSync(partitionDir)) {
+      const files=(await fs.promises.readdir(partitionDir)).filter(f=>/^\d{4}\.json$/.test(f));
+      for(const file of files) { try { const rows=JSON.parse(await fs.promises.readFile(path.join(partitionDir,file),'utf8')) as Candle[]; const stmt=db.prepare('INSERT OR IGNORE INTO candles(symbol,timeframe,time,open,high,low,close,tick_volume,spread,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)'); db.exec('BEGIN IMMEDIATE'); try { for(const c of rows) stmt.run(symbol,timeframe,c.time,c.open,c.high,c.low,c.close,c.tickVolume||0,c.spread||0,new Date().toISOString()); db.exec('COMMIT'); } catch(e) { db.exec('ROLLBACK'); throw e; } } catch(e){ console.error('Legacy candle migration failed',file,e); } }
     }
   }
+  const exact = loadSqliteCandles(symbol,timeframe,startTimeSec,endTimeSec);
+  if (exact.length > 0) return exact;
 
-  // Filter by time range if requested
-  if (startTimeSec !== undefined) {
-    allCandles = allCandles.filter(c => c.time >= startTimeSec);
+  // Compatibility lookup for historical data saved before symbol canonicalization.
+  // Prefer an exact match; only query a suffix alias when the exact symbol has no bars.
+  const upper = String(symbol).toUpperCase();
+  const base = upper.endsWith('M') ? upper.slice(0, -1) : upper;
+  if (!/^[A-Z]{6}$/.test(base) && base !== 'XAUUSD' && base !== 'XAGUSD') return [];
+  const candidates = upper.endsWith('M') ? [base] : [`${base}m`, `${base}M`];
+  for (const candidate of candidates) {
+    const aliasCount = (db.prepare('SELECT COUNT(*) AS n FROM candles WHERE symbol=? AND timeframe=?').get(candidate,timeframe) as any).n as number;
+    if (aliasCount > 0) return loadSqliteCandles(candidate as SymbolName,timeframe,startTimeSec,endTimeSec);
   }
-  if (endTimeSec !== undefined) {
-    allCandles = allCandles.filter(c => c.time <= endTimeSec);
-  }
-
-  return allCandles.sort((a, b) => a.time - b.time);
+  return [];
 }
 
 /**

@@ -415,7 +415,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     <option value="M5">M5</option>
                     <option value="M15">M15</option>
                     <option value="H1">H1</option>
-                    <option value="H4">H4</option>
+                    <option value="H3">H3</option>
                   </select>
                 </div>
               </div>

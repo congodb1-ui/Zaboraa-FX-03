@@ -62,14 +62,12 @@ export const KillSwitchModal: React.FC<KillSwitchModalProps> = ({
         onClose();
       }, 2500);
     } catch (err: any) {
-      // Local fallback execution
-      onExecuteKillSwitch();
+      // D4: never show success when the server cannot be reached.
+      setLoudFailure({
+        hasFailed: true,
+        error: 'Portal server unreachable. NOTHING WAS CLOSED. Positions may still be open: check MT5 directly.',
+      });
       setIsEngaging(false);
-      setHasEngaged(true);
-      setTimeout(() => {
-        setHasEngaged(false);
-        onClose();
-      }, 2500);
     }
   };
 

@@ -28,7 +28,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const timeframes: Timeframe[] = ['M1', 'M5', 'M15', 'H1', 'H4', 'D1'];
+  const timeframes: Timeframe[] = ['M1', 'M5', 'M10', 'M15', 'M30', 'H1', 'H3', 'D1'];
   const spec = SYMBOL_SPECS[symbol];
 
   // Slice visible candles

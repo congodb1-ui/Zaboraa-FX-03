@@ -256,11 +256,147 @@ export const strategy = {
     lastBacktestNetProfit: 2890.00,
     lastBacktestWinRate: 51.2,
   },
+  {
+    id: 'strat_trend_pullback',
+    name: 'ATR Trend Pullback',
+    description: 'Trades only with the prevailing trend: price on the right side of a rising or falling slow SMA, entry when RSI recovers from a pullback, stop at a multiple of ATR, fixed reward-to-risk target, one position at a time and a time stop. Research strategy: validate on your own held-out data before relying on it.',
+    sourceType: 'typescript',
+    version: '1.0.0',
+    tags: ['Trend Following', 'Pullback', 'ATR Risk', 'H1-H4'],
+    author: 'Zaboraa FX Quant Team',
+    licenseNote: 'Apache-2.0 Open Source',
+    paramsSchema: [
+      { name: 'trendPeriod', type: 'number', default: 100, min: 50, max: 250, step: 10, description: 'Slow SMA period that defines the trend' },
+      { name: 'slopeBars', type: 'number', default: 10, min: 3, max: 30, step: 1, description: 'Bars back used to check the SMA is rising or falling' },
+      { name: 'rsiPeriod', type: 'number', default: 14, min: 5, max: 30, step: 1, description: 'RSI period used to detect the pullback' },
+      { name: 'pullbackLevel', type: 'number', default: 40, min: 25, max: 48, step: 1, description: 'Long: RSI must recover above this level. Short uses 100 minus this level' },
+      { name: 'atrPeriod', type: 'number', default: 14, min: 5, max: 30, step: 1, description: 'ATR period used for stop distance' },
+      { name: 'atrStopMult', type: 'number', default: 1.5, min: 0.8, max: 3.0, step: 0.1, description: 'Stop distance as a multiple of ATR' },
+      { name: 'riskReward', type: 'number', default: 2.0, min: 1.0, max: 4.0, step: 0.25, description: 'Target distance as a multiple of the stop distance' },
+      { name: 'minAtrPct', type: 'number', default: 0.0003, min: 0, max: 0.002, step: 0.0001, description: 'Skip entries when ATR divided by price is below this (dead market filter)' },
+      { name: 'maxHoldHours', type: 'number', default: 48, min: 0, max: 240, step: 6, description: 'Close the trade after this many hours; 0 disables the time stop' },
+    ],
+    params: {
+      trendPeriod: 100,
+      slopeBars: 10,
+      rsiPeriod: 14,
+      pullbackLevel: 40,
+      atrPeriod: 14,
+      atrStopMult: 1.5,
+      riskReward: 2.0,
+      minAtrPct: 0.0003,
+      maxHoldHours: 48,
+    },
+    code: `// ATR Trend Pullback Strategy
+// Implements Zaboraa FX TypeScript Strategy Contract
+//
+// Trade with the trend only. Enter when RSI recovers from a pullback, risk a multiple of ATR,
+// aim for a fixed reward-to-risk, hold one position at a time, close on a time stop.
+// Uses only closed-bar data up to the current bar. Position size comes from the run settings.
+
+export const strategy = {
+  name: "ATR Trend Pullback",
+  version: "1.0.0",
+  paramsSchema: [
+    { name: "trendPeriod", type: "number", default: 100, description: "Slow SMA period" },
+    { name: "slopeBars", type: "number", default: 10, description: "SMA slope lookback" },
+    { name: "rsiPeriod", type: "number", default: 14, description: "RSI period" },
+    { name: "pullbackLevel", type: "number", default: 40, description: "RSI recovery level" },
+    { name: "atrPeriod", type: "number", default: 14, description: "ATR period" },
+    { name: "atrStopMult", type: "number", default: 1.5, description: "Stop in ATR" },
+    { name: "riskReward", type: "number", default: 2.0, description: "Reward to risk" },
+    { name: "minAtrPct", type: "number", default: 0.0003, description: "Min ATR / price" },
+    { name: "maxHoldHours", type: "number", default: 48, description: "Time stop in hours" }
+  ],
+  init(ctx) {
+    ctx.warmupPeriod = 120;
+  },
+  onBar(ctx, bar) {
+    const p = ctx.params || {};
+    const trendP = Math.max(20, Math.floor(Number(p.trendPeriod) || 100));
+    const slopeBars = Math.max(2, Math.floor(Number(p.slopeBars) || 10));
+    const rsiP = Math.max(2, Math.floor(Number(p.rsiPeriod) || 14));
+    const pullback = Number(p.pullbackLevel) || 40;
+    const atrP = Math.max(2, Math.floor(Number(p.atrPeriod) || 14));
+    const stopMult = Math.max(0.5, Number(p.atrStopMult) || 1.5);
+    const rr = Math.max(1, Number(p.riskReward) || 2);
+    const minAtrPct = p.minAtrPct === undefined ? 0.0003 : Math.max(0, Number(p.minAtrPct) || 0);
+    const maxHold = p.maxHoldHours === undefined ? 48 : Math.max(0, Number(p.maxHoldHours) || 0);
+
+    // Manage the open trade first: only the time stop; stop-loss and take-profit are set at entry.
+    if (ctx.openPositions.length > 0) {
+      if (maxHold > 0) {
+        const pos = ctx.openPositions[0];
+        if ((bar.time - pos.entryTime) / 3600 >= maxHold) ctx.close(pos.ticket);
+      }
+      return;
+    }
+
+    const n = ctx.barIndex;
+    if (n < trendP + slopeBars + 2) return;
+
+    const sma = (period, off) => {
+      if (typeof ctx.sma === "function") return ctx.sma(period, off);
+      const idx = n - off;
+      if (idx < period - 1) return null;
+      let s = 0;
+      for (let j = idx - period + 1; j <= idx; j++) s += ctx.data[j].close;
+      return s / period;
+    };
+    const rsi = (period, off) => {
+      if (typeof ctx.rsi === "function") return ctx.rsi(period, off);
+      const idx = n - off;
+      if (idx < period) return null;
+      let gains = 0, losses = 0;
+      for (let j = idx - period + 1; j <= idx; j++) {
+        const d = ctx.data[j].close - ctx.data[j - 1].close;
+        if (d >= 0) gains += d; else losses -= d;
+      }
+      if (losses === 0) return 100;
+      return 100 - 100 / (1 + gains / losses);
+    };
+    const atrFn = (period, off) => {
+      if (typeof ctx.atr === "function") return ctx.atr(period, off);
+      const idx = n - off;
+      if (idx < period || idx <= 0) return null;
+      let sum = 0;
+      for (let j = idx - period + 1; j <= idx; j++) {
+        const c = ctx.data[j];
+        const pc = ctx.data[j - 1].close;
+        sum += Math.max(c.high - c.low, Math.abs(c.high - pc), Math.abs(c.low - pc));
+      }
+      return sum / period;
+    };
+
+    const smaNow = sma(trendP, 0);
+    const smaOld = sma(trendP, slopeBars);
+    const rsiNow = rsi(rsiP, 0);
+    const rsiPrev = rsi(rsiP, 1);
+    const atr = atrFn(atrP, 0);
+    if (smaNow === null || smaOld === null || rsiNow === null || rsiPrev === null || atr === null) return;
+    if (!(atr > 0) || atr / bar.close < minAtrPct) return;
+
+    const stopDist = stopMult * atr;
+    const up = bar.close > smaNow && smaNow > smaOld;
+    const down = bar.close < smaNow && smaNow < smaOld;
+    const sellLevel = 100 - pullback;
+
+    if (up && rsiPrev < pullback && rsiNow >= pullback && bar.close > bar.open) {
+      ctx.buy(undefined, bar.close - stopDist, bar.close + rr * stopDist, "Trend Pullback Long");
+    } else if (down && rsiPrev > sellLevel && rsiNow <= sellLevel && bar.close < bar.open) {
+      ctx.sell(undefined, bar.close + stopDist, bar.close - rr * stopDist, "Trend Pullback Short");
+    }
+  }
+};
+`,
+    createdAt: '2026-10-28T00:00:00.000Z',
+  },
 ];
 
 export interface StrategyContract {
   name: string;
   version: string;
+  paramsSchema?: Strategy['paramsSchema'];
   init?: (ctx: any) => void;
   onBar: (ctx: any, bar: Candle) => void;
 }
@@ -398,11 +534,147 @@ export const donchianBreakoutContract: StrategyContract = {
   },
 };
 
+
+
+/** Liquidity-sweep / reclaim contract for saved strategies named "Liquidity Hunt".
+ * It looks for a wick beyond the prior range followed by a close back inside it.
+ * This is a deterministic research implementation, not a claim of profitability.
+ */
+export const liquidityHuntContract: StrategyContract = {
+  name: 'Liquidity Hunt',
+  version: '1.0.0',
+  paramsSchema: [
+    { name: 'lookback', type: 'number', default: 20, min: 5, max: 100, step: 1, description: 'Prior bars used to define liquidity levels' },
+    { name: 'stopBufferPips', type: 'number', default: 2, min: 0, max: 20, step: 1, description: 'Stop buffer beyond the sweep wick' },
+    { name: 'riskReward', type: 'number', default: 2, min: 1, max: 5, step: 0.5, description: 'Target distance as a multiple of risk' },
+  ],
+  init(ctx) { ctx.warmupPeriod = 25; },
+  onBar(ctx, bar) {
+    const lookback = Math.max(5, Math.min(100, Math.floor(Number(ctx.params?.lookback) || 20)));
+    const bufferPips = Math.max(0, Number(ctx.params?.stopBufferPips) || 0);
+    const riskReward = Math.max(1, Math.min(5, Number(ctx.params?.riskReward) || 2));
+    if (ctx.data.length < lookback + 2 || ctx.openPositions.length > 0) return;
+
+    // Exclude the current bar from the reference range to avoid look-ahead bias.
+    const prior = ctx.data.slice(-(lookback + 1), -1);
+    if (prior.length < lookback) return;
+    const rangeHigh = Math.max(...prior.map((c: Candle) => c.high));
+    const rangeLow = Math.min(...prior.map((c: Candle) => c.low));
+    const pip = bar.close > 500 ? 1 : (bar.close > 50 ? 0.01 : 0.0001);
+    const buffer = bufferPips * pip;
+
+    // Sweep above the prior high and close back below it => fade the buy-side sweep.
+    if (bar.high > rangeHigh && bar.close < rangeHigh && bar.close < bar.open) {
+      const sl = bar.high + buffer;
+      const risk = sl - bar.close;
+      if (risk > 0) ctx.sell(0.1, sl, bar.close - risk * riskReward, 'Liquidity Hunt: buy-side sweep reclaimed');
+      return;
+    }
+    // Sweep below the prior low and close back above it => fade the sell-side sweep.
+    if (bar.low < rangeLow && bar.close > rangeLow && bar.close > bar.open) {
+      const sl = bar.low - buffer;
+      const risk = bar.close - sl;
+      if (risk > 0) ctx.buy(0.1, sl, bar.close + risk * riskReward, 'Liquidity Hunt: sell-side sweep reclaimed');
+    }
+  },
+};
+
+/** ATR Trend Pullback. Same logic as the saved source of 'strat_trend_pullback' above; keep the two in sync
+ * (src/engine/__tests__/trendPullback.test.ts runs both on the same candles and compares the trades).
+ * Research strategy: no profitability claim; validate on held-out data.
+ */
+export const trendPullbackContract: StrategyContract = {
+  name: 'ATR Trend Pullback',
+  version: '1.0.0',
+  init(ctx) {
+    ctx.warmupPeriod = 120;
+  },
+  onBar(ctx, bar) {
+    const p = ctx.params || {};
+    const trendP = Math.max(20, Math.floor(Number(p.trendPeriod) || 100));
+    const slopeBars = Math.max(2, Math.floor(Number(p.slopeBars) || 10));
+    const rsiP = Math.max(2, Math.floor(Number(p.rsiPeriod) || 14));
+    const pullback = Number(p.pullbackLevel) || 40;
+    const atrP = Math.max(2, Math.floor(Number(p.atrPeriod) || 14));
+    const stopMult = Math.max(0.5, Number(p.atrStopMult) || 1.5);
+    const rr = Math.max(1, Number(p.riskReward) || 2);
+    const minAtrPct = p.minAtrPct === undefined ? 0.0003 : Math.max(0, Number(p.minAtrPct) || 0);
+    const maxHold = p.maxHoldHours === undefined ? 48 : Math.max(0, Number(p.maxHoldHours) || 0);
+
+    if (ctx.openPositions.length > 0) {
+      if (maxHold > 0) {
+        const pos = ctx.openPositions[0];
+        if ((bar.time - pos.entryTime) / 3600 >= maxHold) ctx.close(pos.ticket);
+      }
+      return;
+    }
+
+    const n = ctx.barIndex;
+    if (n < trendP + slopeBars + 2) return;
+
+    const sma = (period: number, off: number): number | null => {
+      if (typeof ctx.sma === 'function') return ctx.sma(period, off);
+      const idx = n - off;
+      if (idx < period - 1) return null;
+      let s = 0;
+      for (let j = idx - period + 1; j <= idx; j++) s += ctx.data[j].close;
+      return s / period;
+    };
+    const rsi = (period: number, off: number): number | null => {
+      if (typeof ctx.rsi === 'function') return ctx.rsi(period, off);
+      const idx = n - off;
+      if (idx < period) return null;
+      let gains = 0, losses = 0;
+      for (let j = idx - period + 1; j <= idx; j++) {
+        const d = ctx.data[j].close - ctx.data[j - 1].close;
+        if (d >= 0) gains += d; else losses -= d;
+      }
+      if (losses === 0) return 100;
+      return 100 - 100 / (1 + gains / losses);
+    };
+    const atrFn = (period: number, off: number): number | null => {
+      if (typeof ctx.atr === 'function') return ctx.atr(period, off);
+      const idx = n - off;
+      if (idx < period || idx <= 0) return null;
+      let sum = 0;
+      for (let j = idx - period + 1; j <= idx; j++) {
+        const c = ctx.data[j];
+        const pc = ctx.data[j - 1].close;
+        sum += Math.max(c.high - c.low, Math.abs(c.high - pc), Math.abs(c.low - pc));
+      }
+      return sum / period;
+    };
+
+    const smaNow = sma(trendP, 0);
+    const smaOld = sma(trendP, slopeBars);
+    const rsiNow = rsi(rsiP, 0);
+    const rsiPrev = rsi(rsiP, 1);
+    const atr = atrFn(atrP, 0);
+    if (smaNow === null || smaOld === null || rsiNow === null || rsiPrev === null || atr === null) return;
+    if (!(atr > 0) || atr / bar.close < minAtrPct) return;
+
+    const stopDist = stopMult * atr;
+    const up = bar.close > smaNow && smaNow > smaOld;
+    const down = bar.close < smaNow && smaNow < smaOld;
+    const sellLevel = 100 - pullback;
+
+    if (up && rsiPrev < pullback && rsiNow >= pullback && bar.close > bar.open) {
+      ctx.buy(undefined, bar.close - stopDist, bar.close + rr * stopDist, 'Trend Pullback Long');
+    } else if (down && rsiPrev > sellLevel && rsiNow <= sellLevel && bar.close < bar.open) {
+      ctx.sell(undefined, bar.close + stopDist, bar.close - rr * stopDist, 'Trend Pullback Short');
+    }
+  },
+};
+
 export const STRATEGY_CONTRACT_REGISTRY: Record<string, StrategyContract> = {
   strat_sma_cross: smaCrossoverContract,
   strat_rsi_reversion: rsiReversionContract,
   strat_bollinger_breakout: bollingerBreakoutContract,
   strat_donchian_breakout: donchianBreakoutContract,
+  strat_trend_pullback: trendPullbackContract,
+  strat_liquidity_hunt: liquidityHuntContract,
+  'Liquidity Hunt': liquidityHuntContract,
+  liquidity_hunt: liquidityHuntContract,
 };
 
 export function registerStrategyContract(id: string, contract: StrategyContract): void {
@@ -410,10 +682,16 @@ export function registerStrategyContract(id: string, contract: StrategyContract)
 }
 
 export function getStrategyExecutor(strategyId: string, customContract?: StrategyContract) {
-  let contract: StrategyContract | undefined = customContract || STRATEGY_CONTRACT_REGISTRY[strategyId];
+  const key = String(strategyId || '').trim();
+  const normalised = key.toLowerCase().replace(/[\s-]+/g, '_');
+  let contract: StrategyContract | undefined = customContract || STRATEGY_CONTRACT_REGISTRY[key] || STRATEGY_CONTRACT_REGISTRY[normalised];
+
+  if (!contract && ['liquidity_hunt', 'strat_liquidity_hunt'].includes(normalised)) {
+    contract = liquidityHuntContract;
+  }
 
   if (!contract) {
-    const builtIn = BUILT_IN_STRATEGIES.find((s) => s.id === strategyId);
+    const builtIn = BUILT_IN_STRATEGIES.find((s) => s.id === key || s.name.toLowerCase() === key.toLowerCase());
     if (builtIn && STRATEGY_CONTRACT_REGISTRY[builtIn.id]) {
       contract = STRATEGY_CONTRACT_REGISTRY[builtIn.id];
     }

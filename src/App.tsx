@@ -13,7 +13,7 @@ import {
   AuditLogEntry,
   DatasetRecord,
 } from './types/forex';
-import { SYMBOL_SPECS, generateHistoricalCandles } from './services/marketData';
+import { SYMBOL_SPECS } from './services/marketData';
 import { BUILT_IN_STRATEGIES } from './services/builtInStrategies';
 import { Navbar } from './components/Navbar';
 import { Sidebar, ActiveTab } from './components/Sidebar';
@@ -31,12 +31,38 @@ import { OptimizationView } from './components/OptimizationView';
 import { KillSwitchModal } from './components/KillSwitchModal';
 import { RiskDisclaimerModal } from './components/RiskDisclaimerModal';
 
+const TAB_STORAGE_KEY = 'zfx_active_tab';
+const VALID_TABS: ActiveTab[] = [
+  'dashboard', 'markets', 'data', 'strategies', 'pine', 'backtest',
+  'optimizations', 'bots', 'positions', 'journal', 'settings',
+];
+
+// Keeps the open tab across an accidental page reload (form submit, Vite reload, F5).
+function loadSavedTab(): ActiveTab {
+  try {
+    const saved = sessionStorage.getItem(TAB_STORAGE_KEY);
+    if (saved && (VALID_TABS as string[]).includes(saved)) return saved as ActiveTab;
+  } catch {
+    /* storage unavailable: fall back to the dashboard */
+  }
+  return 'dashboard';
+}
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(loadSavedTab);
   const [currentSymbol, setCurrentSymbol] = useState<SymbolName>('EURUSD');
   const [currentTimeframe, setCurrentTimeframe] = useState<Timeframe>('H1');
   const [isKillSwitchOpen, setIsKillSwitchOpen] = useState(false);
+  const [activeDownloadJobId, setActiveDownloadJobId] = useState<string | null>(null);
   const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(TAB_STORAGE_KEY, activeTab);
+    } catch {
+      /* ignore */
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     const accepted = localStorage.getItem('zfx_disclaimer_accepted');
@@ -45,52 +71,60 @@ export default function App() {
     }
   }, []);
 
-  // Benchmark datasets initialized for immediate quantitative evaluation in AI Studio
-  const [datasets, setDatasets] = useState<DatasetRecord[]>(() => {
-    const eurCandles = generateHistoricalCandles('EURUSD', 'H1', 500);
-    const goldCandles = generateHistoricalCandles('XAUUSD', 'H1', 500);
+  // Active datasets are a runtime view of persistent SQLite candles. Restore them on startup.
+  const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
 
-    return [
-      {
-        id: 'ds_benchmark_eurusd_h1',
-        symbol: 'EURUSD',
-        timeframe: 'H1',
-        rowCount: eurCandles.length,
-        fileSizeKB: Math.round(eurCandles.length * 0.045),
-        firstDate: new Date(eurCandles[0].time * 1000).toISOString().slice(0, 10),
-        lastDate: new Date(eurCandles[eurCandles.length - 1].time * 1000).toISOString().slice(0, 10),
-        provenance: {
-          source: 'SIMULATED',
-          label: 'SIMULATED',
-          details: 'Standard research benchmark generated via GBM with weekend gap modeling & realistic tick spread.',
-          isResearchEligible: true,
-          utcOffsetHours: 2,
-        },
-        candles: eurCandles,
-        qualityScore: 99,
-        lastUpdated: new Date().toISOString(),
-      },
-      {
-        id: 'ds_benchmark_xauusd_h1',
-        symbol: 'XAUUSD',
-        timeframe: 'H1',
-        rowCount: goldCandles.length,
-        fileSizeKB: Math.round(goldCandles.length * 0.045),
-        firstDate: new Date(goldCandles[0].time * 1000).toISOString().slice(0, 10),
-        lastDate: new Date(goldCandles[goldCandles.length - 1].time * 1000).toISOString().slice(0, 10),
-        provenance: {
-          source: 'SIMULATED',
-          label: 'SIMULATED',
-          details: 'Precious Metals volatility benchmark simulation with broker swap & slippage.',
-          isResearchEligible: true,
-          utcOffsetHours: 2,
-        },
-        candles: goldCandles,
-        qualityScore: 98,
-        lastUpdated: new Date().toISOString(),
-      },
-    ];
-  });
+  const loadStoredDataset = async (symbol: string, timeframe: Timeframe, verifiedMt5 = false): Promise<boolean> => {
+    const canonicalSymbol = symbol.toUpperCase().endsWith('M') ? symbol.slice(0, -1) : symbol;
+    try {
+      const q = new URLSearchParams({ symbol, timeframe, limit: '200000' });
+      const response = await fetch(`/api/data/load?${q.toString()}`);
+      const payload = await response.json().catch(() => null);
+      if (!response.ok || !Array.isArray(payload?.candles) || payload.candles.length === 0) return false;
+      const candles: Candle[] = payload.candles.map((c: any) => ({
+        ...c, time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
+        tickVolume: Number(c.tickVolume ?? c.tick_volume ?? 0), spread: Number(c.spread ?? 0),
+      }));
+      const auditResponse = await fetch(`/api/data/audit?${new URLSearchParams({ symbol, timeframe }).toString()}`);
+      const audit = auditResponse.ok ? await auditResponse.json().catch(() => null) : null;
+      const firstDate = new Date(candles[0].time * 1000).toISOString().slice(0, 10);
+      const lastDate = new Date(candles[candles.length - 1].time * 1000).toISOString().slice(0, 10);
+      const provenance: DatasetRecord['provenance'] = verifiedMt5
+        ? { source: 'MT5_BRIDGE', label: 'MT5 BRIDGE', details: 'Downloaded from the configured MT5 bridge in this session.', isResearchEligible: true, utcOffsetHours: 0 }
+        : { source: 'STORED_UNVERIFIED', label: 'STORED DATA (SOURCE UNVERIFIED)', details: 'Loaded from persistent SQLite storage. Original source/provenance was not persisted, so research eligibility is not assumed.', isResearchEligible: false, utcOffsetHours: 0 };
+      const record: DatasetRecord = {
+        id: `ds_stored_${canonicalSymbol.toLowerCase()}_${timeframe.toLowerCase()}`, symbol: canonicalSymbol as SymbolName, timeframe,
+        rowCount: candles.length, fileSizeKB: Math.round(candles.length * 0.045), firstDate, lastDate, provenance, candles,
+        qualityScore: typeof audit?.qualityScore === 'number' ? audit.qualityScore : 0, lastUpdated: new Date().toISOString(),
+      };
+      setDatasets(prev => [record, ...prev.filter(d => !(d.symbol.toUpperCase() === canonicalSymbol.toUpperCase() && d.timeframe === timeframe))]);
+      return true;
+    } catch (error) {
+      console.error('[Research dataset activation] Failed to load stored candles', { symbol, timeframe, error });
+      return false;
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/data/catalog');
+        if (!response.ok) throw new Error(`Catalog request failed (${response.status})`);
+        const catalog = await response.json();
+        const entries: Array<{ symbol: string; timeframe: Timeframe; count?: number }> = Array.isArray(catalog.datasets) ? catalog.datasets : [];
+        for (const entry of entries) {
+          if (cancelled) return;
+          if (entry.symbol && entry.timeframe && (entry.count ?? 0) > 0) await loadStoredDataset(entry.symbol, entry.timeframe, false);
+        }
+      } catch (error) {
+        console.error('[Research dataset activation] Startup catalog restore failed', error);
+      }
+    })();
+    return () => { cancelled = true; };
+    // Restore once at mount; setDatasets is stable and the API routes are fixed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // MT5 Bridge live status
   const [bridgeStatus, setBridgeStatus] = useState<{
@@ -159,82 +193,120 @@ export default function App() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
 
   // Probe Bridge function
-  const handleTestBridge = async (url: string, token: string): Promise<boolean> => {
+  const handleTestBridge = async (_url: string, _token: string): Promise<boolean> => {
+    // D6: the browser never sees or sends the bridge token; the server calls the bridge.
     try {
-      const res = await fetch(`${url}/health`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setBridgeToken(token);
+      const res = await fetch('/api/bridge/status');
+      const data = await res.json();
+      if (data.online) {
         setBridgeStatus({
           isOnline: true,
-          serverName: data.server_name || 'Exness-MT5Trial9',
-          accountType: data.account_type || 'DEMO',
+          serverName: data.serverName,
+          accountType: data.accountType,
         });
         setAccount((prev) => ({
           ...prev,
           isConnected: true,
           isSimulated: false,
-          server: data.server_name || prev.server,
-          utcOffsetHours: data.broker_utc_offset_hours || 2,
+          server: data.serverName || prev.server,
+          mode: data.accountType || prev.mode,
+          balance: data.account?.balance ?? prev.balance,
+          equity: data.account?.equity ?? prev.equity,
+          margin: data.account?.margin ?? prev.margin,
+          freeMargin: data.account?.freeMargin ?? prev.freeMargin,
+          leverage: data.account?.leverage ?? prev.leverage,
+          utcOffsetHours: data.utcOffsetHours ?? prev.utcOffsetHours,
         }));
         return true;
       }
+      setBridgeStatus({ isOnline: false, error: data.reason || 'Bridge offline' });
     } catch {
-      // Unreachable
+      setBridgeStatus({ isOnline: false, error: 'Portal server unreachable.' });
     }
-    setBridgeStatus({
-      isOnline: false,
-      error: 'Connection refused. mt5-bridge is not running on 127.0.0.1:8001.',
-    });
+    setAccount((prev) => ({ ...prev, isConnected: false, isSimulated: true }));
     return false;
   };
 
-  const [bridgeToken, setBridgeToken] = useState<string>('');
-
   // Fetch dataset from MT5 Bridge
-  const handleFetchFromBridge = async (symbol: SymbolName, tf: Timeframe): Promise<boolean> => {
+  const handleFetchFromBridge = async (symbol: string, tf: Timeframe): Promise<boolean> => {
     try {
-      const headers: Record<string, string> = {};
-      if (bridgeToken) {
-        headers['Authorization'] = `Bearer ${bridgeToken}`;
-      }
-      const res = await fetch(`http://127.0.0.1:8001/candles?symbol=${symbol}&timeframe=${tf}&count=400`, {
-        headers,
+      const start = await fetch('/api/data/bulk-download', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, timeframe: tf, allTimeframes: true }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.candles && data.candles.length > 0) {
-          const newDs: DatasetRecord = {
-            id: `ds_bridge_${Date.now()}`,
-            symbol,
+      const started = await start.json();
+      if (!start.ok || !started.jobId) {
+        setBridgeStatus((prev) => ({ ...prev, isOnline: false, error: started.error || 'Historical download could not start' }));
+        return false;
+      }
+      setActiveDownloadJobId(started.jobId);
+      // Poll the persistent download job; the bridge response is stored in SQLite, not only in React memory.
+      for (let i = 0; i < 1800; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const response = await fetch(`/api/jobs/${encodeURIComponent(started.jobId)}`);
+        const job = await response.json();
+        if (job.status === 'COMPLETED') {
+          setActiveDownloadJobId(null);
+          // Hydrate the downloaded SQLite candles into React state so Backtesting Lab
+          // can immediately select the persisted dataset without a page reload.
+          const canonicalSymbol = symbol.toUpperCase().endsWith('M') ? symbol.slice(0, -1) : symbol;
+          const q = `symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(tf)}`;
+          const loadedResponse = await fetch(`/api/data/load?${q}&limit=200000`);
+          const loaded = await loadedResponse.json().catch(() => null);
+          if (!loadedResponse.ok || !Array.isArray(loaded?.candles) || loaded.candles.length === 0) {
+            setBridgeStatus((prev) => ({ ...prev, error: `Download completed, but stored candles could not be loaded for ${symbol} ${tf}. Check Data Manager.` }));
+            return false;
+          }
+          const candles: Candle[] = loaded.candles.map((c: any) => ({
+            ...c,
+            time: Number(c.time),
+            open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
+            tickVolume: Number(c.tickVolume ?? c.tick_volume ?? 0), spread: Number(c.spread ?? 0),
+          }));
+          const first = candles[0];
+          const last = candles[candles.length - 1];
+          const dataset: DatasetRecord = {
+            id: `ds_mt5_${canonicalSymbol.toLowerCase()}_${tf.toLowerCase()}_${Date.now()}`,
+            symbol: canonicalSymbol as SymbolName,
             timeframe: tf,
-            rowCount: data.candles.length,
-            fileSizeKB: Math.round(data.candles.length * 0.045),
-            firstDate: new Date(data.candles[0].time * 1000).toISOString().slice(0, 10),
-            lastDate: new Date(data.candles[data.candles.length - 1].time * 1000).toISOString().slice(0, 10),
+            rowCount: candles.length,
+            fileSizeKB: Math.round(candles.length * 0.06),
+            firstDate: first ? new Date(first.time * 1000).toISOString().slice(0, 10) : '',
+            lastDate: last ? new Date(last.time * 1000).toISOString().slice(0, 10) : '',
             provenance: {
-              source: 'MT5_BRIDGE',
-              label: 'MT5 BRIDGE',
-              details: `Exness MT5 Server: ${bridgeStatus.serverName || 'Exness-MT5Trial9'} (${bridgeStatus.accountType || 'DEMO'})`,
-              brokerServer: bridgeStatus.serverName || 'Exness-MT5Trial9',
-              accountType: (bridgeStatus.accountType as any) || 'DEMO',
-              utcOffsetHours: data.utc_offset_hours || 2,
-              isResearchEligible: true,
+              source: 'MT5_BRIDGE', label: 'MT5 BRIDGE',
+              details: `Persisted historical candles fetched from the configured MT5 bridge; ${loaded.totalStored ?? candles.length} bars in storage.`,
+              brokerServer: account.server, accountType: account.mode === 'LIVE' ? 'REAL' : 'DEMO',
+              utcOffsetHours: account.utcOffsetHours ?? 0, isResearchEligible: true,
             },
-            candles: data.candles,
-            qualityScore: 100,
-            lastUpdated: new Date().toISOString(),
+            candles, qualityScore: 0, lastUpdated: new Date().toISOString(),
           };
-          setDatasets((prev) => [newDs, ...prev.filter((d) => !(d.symbol === symbol && d.timeframe === tf))]);
+          setDatasets((prev) => [dataset, ...prev.filter((d) => !(d.symbol.toUpperCase() === canonicalSymbol.toUpperCase() && d.timeframe === tf))]);
           return true;
         }
+        if (job.status === 'FAILED' || job.status === 'CANCELLED') {
+          setActiveDownloadJobId(null);
+          setBridgeStatus((prev) => ({ ...prev, isOnline: false, error: job.error || job.error_message || `Download ${job.status.toLowerCase()}` }));
+          return false;
+        }
       }
-    } catch {
-      // Bridge not reachable
+      setBridgeStatus((prev) => ({ ...prev, error: 'Historical download is still running; check the job status shortly.' }));
+      return false;
+    } catch (error: any) {
+      setActiveDownloadJobId(null);
+      setBridgeStatus((prev) => ({ ...prev, isOnline: false, error: error?.message || 'Portal server unreachable' }));
+      return false;
     }
-    return false;
+  };
+
+  const handleCancelDownload = async () => {
+    const jobId = activeDownloadJobId;
+    if (!jobId) return;
+    try {
+      await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
+    } finally {
+      setActiveDownloadJobId(null);
+    }
   };
 
   // Initial system health and bots fetch
@@ -272,7 +344,7 @@ export default function App() {
       .then((res) => res.json())
       .then((savedPositions) => {
         if (Array.isArray(savedPositions)) {
-          setPositions(savedPositions);
+          setPositions(savedPositions.map(mapServerPosition));
         }
       })
       .catch(() => {});
@@ -314,85 +386,100 @@ export default function App() {
     ]);
   };
 
-  const handleClosePosition = (ticket: number) => {
-    const pos = positions.find((p) => p.ticket === ticket);
-    if (!pos) return;
-
-    setPositions((prev) => prev.filter((p) => p.ticket !== ticket));
-    setAccount((prev) => ({
-      ...prev,
-      balance: Number((prev.balance + pos.pnl).toFixed(2)),
-      margin: Math.max(0, prev.margin - 80),
-    }));
-
-    setAuditLogs((prev) => [
-      {
-        id: `aud_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        actor: 'Trader',
-        action: 'ORDER_CLOSE',
-        entity: `${pos.symbol} #${pos.ticket}`,
-        details: `Closed at ${pos.currentPrice} with P&L: $${pos.pnl.toFixed(2)} (${pos.pips} pips).`,
-        status: 'SUCCESS',
-      },
-      ...prev,
-    ]);
+  const refreshPositions = async () => {
+    try {
+      const r = await fetch('/api/positions');
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data)) setPositions(data.map(mapServerPosition));
+      }
+    } catch {
+      /* keep last known state; never invent positions */
+    }
   };
 
-  const handleModifyPosition = (ticket: number, sl?: number, tp?: number) => {
-    setPositions((prev) =>
-      prev.map((p) => (p.ticket === ticket ? { ...p, sl, tp } : p))
-    );
+  // Server positions may come from the bridge (snake_case) or SQLite (camelCase).
+  const mapServerPosition = (p: any): Position => ({
+    id: p.id ?? `pos_${p.ticket}`,
+    ticket: p.ticket,
+    symbol: p.symbol,
+    side: p.side ?? (p.type === 1 ? 'SELL' : 'BUY'),
+    volume: p.volume,
+    openPrice: p.openPrice ?? p.price_open ?? 0,
+    currentPrice: p.currentPrice ?? p.price_current ?? 0,
+    sl: p.sl || undefined,
+    tp: p.tp || undefined,
+    pnl: p.pnl ?? p.profit ?? 0,
+    pips: p.pips ?? 0,
+    openTime: p.openTime ?? p.time ?? 0,
+    swap: p.swap ?? 0,
+    commission: p.commission ?? 0,
+    comment: p.comment ?? '',
+  });
+
+  const handleClosePosition = async (ticket: number) => {
+    try {
+      const r = await fetch(`/api/positions/${ticket}/close`, { method: 'POST' });
+      const data = await r.json();
+      if (!r.ok || !data.success) {
+        window.alert(`Close failed: ${data.error || 'unknown error'}`);
+        return;
+      }
+      await refreshPositions(); // state comes from the server, not from local guesses
+    } catch {
+      window.alert('Close failed: portal server unreachable. Nothing was closed.');
+    }
   };
 
-  const handlePlaceOrder = (order: {
+  // The bridge has no modify endpoint yet. Changing SL/TP only on screen would show protection that does not exist.
+  const handleModifyPosition = (_ticket: number, _sl?: number, _tp?: number) => {
+    window.alert('Modifying SL/TP is not supported by the bridge yet. Nothing was changed at the broker.');
+  };
+
+  const handlePlaceOrder = async (order: {
     symbol: SymbolName;
     side: 'BUY' | 'SELL';
     volume: number;
     sl?: number;
     tp?: number;
-  }) => {
-    const spec = SYMBOL_SPECS[order.symbol];
-    const price = order.side === 'BUY' ? spec.ask : spec.bid;
-    const ticket = Math.floor(10000 + Math.random() * 90000);
-
-    const newPos: Position = {
-      id: `pos_${Date.now()}`,
-      ticket,
-      symbol: order.symbol,
-      side: order.side,
-      volume: order.volume,
-      openPrice: price,
-      currentPrice: price,
-      sl: order.sl,
-      tp: order.tp,
-      pnl: 0,
-      pips: 0,
-      openTime: Math.floor(Date.now() / 1000),
-      swap: 0,
-      commission: -(order.volume * 7.0),
-      comment: 'Manual market execution',
-    };
-
-    setPositions((prev) => [newPos, ...prev]);
-    setAccount((prev) => ({
-      ...prev,
-      margin: prev.margin + 75,
-    }));
+  }): Promise<{ ok: boolean; message: string; simulated?: boolean }> => {
+    try {
+      const r = await fetch('/api/broker/order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...order, mode: 'DEMO', botId: 'manual' }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (data.status === 'UNKNOWN') {
+        // The bridge did not confirm the outcome. Never present this as a plain failure.
+        return { ok: false, message: 'Outcome UNKNOWN: the bridge did not confirm this order. Check Positions before sending it again.' };
+      }
+      if (!r.ok || !data.success) {
+        return { ok: false, message: `Order rejected: ${data.error || data.status || 'unknown error'}` };
+      }
+      if (data.simulation) {
+        return { ok: false, simulated: true, message: 'SIMULATION: no bridge connected. No real order was placed.' };
+      }
+      await refreshPositions();
+      return { ok: true, message: `Order filled: ticket #${data.ticket ?? '?'} at ${data.fillPrice ?? '?'}` };
+    } catch {
+      return { ok: false, message: 'Order failed: portal server unreachable. Nothing was placed.' };
+    }
   };
 
-  const handleExecuteKillSwitch = () => {
-    const realized = positions.reduce((sum, p) => sum + p.pnl, 0);
-    setAccount((prev) => ({
-      ...prev,
-      balance: Number((prev.balance + realized).toFixed(2)),
-      equity: Number((prev.balance + realized).toFixed(2)),
-      margin: 0,
-      freeMargin: Number((prev.balance + realized).toFixed(2)),
-    }));
-    setPositions([]);
+  // Called by KillSwitchModal ONLY after the server confirmed all positions are flat.
+  const handleExecuteKillSwitch = async () => {
+    await refreshPositions();
     setPendingOrders([]);
-    setBots((prev) => prev.map((b) => ({ ...b, status: 'STOPPED' })));
+    try {
+      const r = await fetch('/api/bots');
+      if (r.ok) {
+        const data = await r.json();
+        if (Array.isArray(data)) setBots(data);
+      }
+    } catch {
+      /* ignore */
+    }
   };
 
   // Load strategies & bots from SQLite on startup
@@ -416,7 +503,26 @@ export default function App() {
       .catch(() => {});
   }, []);
 
-  const handleSaveStrategy = (strat: Strategy) => {
+  // Saves to the database FIRST. The screen and the tab only change after the server confirms,
+  // so a failed save is never shown as a success. `goTo` is applied in the same update as the
+  // strategy list, so the target view mounts with the new strategy already present.
+  const handleSaveStrategy = async (strat: Strategy, goTo?: ActiveTab): Promise<boolean> => {
+    try {
+      const r = await fetch('/api/strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ strategy: strat }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        window.alert(`Strategy was NOT saved to the database: ${d.error || `HTTP ${r.status}`}`);
+        return false;
+      }
+    } catch {
+      window.alert('Strategy was NOT saved: portal server unreachable.');
+      return false;
+    }
+
     setStrategies((prev) => {
       const idx = prev.findIndex((s) => s.id === strat.id);
       if (idx >= 0) {
@@ -426,12 +532,8 @@ export default function App() {
       }
       return [strat, ...prev];
     });
-
-    fetch('/api/strategies', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ strategy: strat }),
-    }).catch(() => {});
+    if (goTo) setActiveTab(goTo);
+    return true;
   };
 
   const [botErrorBanner, setBotErrorBanner] = useState<string | null>(null);
@@ -464,20 +566,61 @@ export default function App() {
     }).catch(() => {});
   };
 
-  // Generate fallback display candles for chart if no dataset loaded yet
-  const activeDataset = datasets.find(
-    (d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe
-  );
-  const chartCandles: Candle[] = activeDataset?.candles || [
-    { time: 1700000000, open: 1.0845, high: 1.0860, low: 1.0840, close: 1.0852, tickVolume: 420, spread: 0.8 },
-    { time: 1700003600, open: 1.0852, high: 1.0875, low: 1.0848, close: 1.0868, tickVolume: 510, spread: 0.8 },
-    { time: 1700007200, open: 1.0868, high: 1.0882, low: 1.0860, close: 1.0874, tickVolume: 490, spread: 0.8 },
-  ];
+  // Stored candles (UTC) from the server catalog. Tried with the broker suffix first, then without.
+  const [stored, setStored] = useState<{ candles: Candle[]; info: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const names = Array.from(new Set([`${currentSymbol}${account.symbolSuffix || ''}`, currentSymbol]));
+      for (const name of names) {
+        try {
+          const q = `symbol=${encodeURIComponent(name)}&timeframe=${encodeURIComponent(currentTimeframe)}`;
+          const r = await fetch(`/api/data/load?${q}&limit=2000`);
+          if (!r.ok) continue;
+          const d = await r.json();
+          if (!Array.isArray(d.candles) || d.candles.length === 0) continue;
+          let info = `${name} ${currentTimeframe} · ${d.totalStored} stored bars`;
+          try {
+            const ar = await fetch(`/api/data/audit?${q}`);
+            if (ar.ok) {
+              const a = await ar.json();
+              info += ` · quality ${a.qualityScore} · ${a.gapCount} gaps · ${a.duplicateCount} duplicates`;
+            }
+          } catch {
+            /* audit is extra detail only */
+          }
+          if (alive) {
+            setStored({
+              candles: d.candles.map((c: any) => ({ ...c, tickVolume: c.tickVolume ?? 0, spread: c.spread ?? 0 })),
+              info,
+            });
+          }
+          return;
+        } catch {
+          /* try the next name */
+        }
+      }
+      if (alive) setStored(null);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [currentSymbol, currentTimeframe, account.symbolSuffix]);
+
+  // Never invent candles: stored data first, then an in-memory dataset (labelled), otherwise nothing.
+  const activeDataset = datasets.find((d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe);
+  const chartCandles: Candle[] = stored?.candles ?? activeDataset?.candles ?? [];
+  const chartLabel: string = stored
+    ? `STORED DATA (UTC) · ${stored.info}`
+    : activeDataset
+      ? `${activeDataset.provenance.label}: ${activeDataset.provenance.details}`
+      : '';
 
   return (
     <div className="min-h-screen bg-[#090D16] flex flex-col font-sans">
       <Navbar
         account={account}
+        bridgeAccountType={bridgeStatus.isOnline ? (bridgeStatus.accountType || 'UNKNOWN') : 'UNKNOWN'}
         onToggleAccountMode={handleToggleAccountMode}
         activeBotsCount={bots.filter((b) => b.status === 'RUNNING').length}
         onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
@@ -526,6 +669,7 @@ export default function App() {
               currentSymbol={currentSymbol}
               currentTimeframe={currentTimeframe}
               candles={chartCandles}
+              dataLabel={chartLabel}
               onSelectSymbol={setCurrentSymbol}
               onSelectTimeframe={setCurrentTimeframe}
               onPlaceOrder={handlePlaceOrder}
@@ -536,12 +680,32 @@ export default function App() {
             <DataManagerView
               datasets={datasets}
               onAddDataset={(ds) => setDatasets((prev) => [ds, ...prev])}
-              onAutoFixAnomalies={(id) => {
-                setDatasets((prev) =>
-                  prev.map((d) => (d.id === id ? { ...d, qualityScore: 100 } : d))
-                );
+              onAutoFixAnomalies={async (id) => {
+                const ds = datasets.find((d) => d.id === id);
+                if (!ds) return;
+                const q = `symbol=${encodeURIComponent(ds.symbol)}&timeframe=${encodeURIComponent(ds.timeframe)}`;
+                try {
+                  const fixRes = await fetch('/api/data/autofix', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ symbol: ds.symbol, timeframe: ds.timeframe }),
+                  });
+                  const fix = await fixRes.json().catch(() => ({}));
+                  const auditRes = await fetch(`/api/data/audit?${q}`);
+                  const audit = await auditRes.json().catch(() => ({}));
+                  if (!auditRes.ok || !audit.totalBars) {
+                    window.alert(`No stored data for ${ds.symbol} ${ds.timeframe}: nothing was fixed. Download it first.`);
+                    return;
+                  }
+                  setDatasets((prev) => prev.map((d) => (d.id === id ? { ...d, qualityScore: audit.qualityScore } : d)));
+                  window.alert(fix.changed ? `Fixed ordering/duplicates (${fix.before} to ${fix.after} bars). Quality now ${audit.qualityScore}.` : `Nothing to fix. Quality ${audit.qualityScore}. Prices are never altered.`);
+                } catch {
+                  window.alert('Auto-fix failed: portal server unreachable. Nothing was changed.');
+                }
               }}
+              onLoadStoredData={(symbol, tf) => loadStoredDataset(symbol, tf, false)}
               onFetchFromBridge={handleFetchFromBridge}
+              onCancelDownload={handleCancelDownload}
               bridgeStatus={bridgeStatus}
             />
           )}
@@ -557,13 +721,9 @@ export default function App() {
 
           {activeTab === 'pine' && (
             <PineConverterView
-              onSaveConvertedStrategy={(strat) => {
-                handleSaveStrategy(strat);
-                setActiveTab('strategies');
-              }}
+              onSaveConvertedStrategy={(strat) => handleSaveStrategy(strat, 'strategies')}
               onLaunchBacktest={(strat) => {
-                handleSaveStrategy(strat);
-                setActiveTab('backtest');
+                void handleSaveStrategy(strat, 'backtest');
               }}
             />
           )}
@@ -583,6 +743,12 @@ export default function App() {
               strategies={strategies}
               currentSymbol={currentSymbol}
               currentTimeframe={currentTimeframe}
+              historicalCandles={datasets
+                .filter((d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe && d.provenance?.isResearchEligible === true && d.provenance.source !== 'SIMULATED')
+                .flatMap((d) => d.candles)
+                .sort((a, b) => a.time - b.time)
+                .filter((c, i, arr) => i === 0 || c.time !== arr[i - 1].time)}
+              researchProvenance={datasets.find((d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe && d.provenance?.isResearchEligible === true && d.provenance.source !== 'SIMULATED')?.provenance}
             />
           )}
 

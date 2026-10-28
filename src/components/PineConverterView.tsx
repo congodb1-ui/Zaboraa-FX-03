@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 interface PineConverterViewProps {
-  onSaveConvertedStrategy: (strat: Strategy) => void;
+  onSaveConvertedStrategy: (strat: Strategy) => Promise<boolean> | boolean | void;
   onLaunchBacktest: (strat: Strategy) => void;
 }
 
@@ -85,6 +85,7 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
   const [isApprovalModalOpen, setIsApprovalModalOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleConvert = async () => {
     setIsConverting(true);
@@ -152,8 +153,8 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
     reader.readAsText(file);
   };
 
-  const handleConfirmSave = () => {
-    if (!conversionResult) return;
+  const handleConfirmSave = async () => {
+    if (!conversionResult || isSaving) return;
 
     // Fast AST pre-pass validation before saving
     const astCheck = validateStrategyAST(conversionResult.typescriptCode);
@@ -191,11 +192,21 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
       createdAt: new Date().toISOString(),
     };
 
-    onSaveConvertedStrategy(newStrat);
-    setSaveStatus(`Strategy "${newStrat.name}" approved and saved to database.`);
-    setIsApprovalModalOpen(false);
-
-    setTimeout(() => setSaveStatus(null), 4000);
+    setIsSaving(true);
+    try {
+      // The parent saves to the database and only then moves to the next view.
+      const ok = await onSaveConvertedStrategy(newStrat);
+      setIsApprovalModalOpen(false);
+      if (ok === false) {
+        setErrorMsg(`Strategy "${newStrat.name}" was NOT saved to the database. Check the portal server log, then try again.`);
+        return;
+      }
+      setErrorMsg(null);
+      setSaveStatus(`Strategy "${newStrat.name}" approved and saved to database.`);
+      setTimeout(() => setSaveStatus(null), 4000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -220,7 +231,7 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-mono">Sample:</span>
             {SAMPLE_PINE_SCRIPTS.map((s, idx) => (
-              <button
+              <button type="button"
                 key={idx}
                 onClick={() => {
                   setScriptTitle(s.title);
@@ -316,8 +327,11 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
           </div>
 
           <div className="mt-3">
-            <button
-              onClick={handleConvert}
+            <button type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                void handleConvert();
+              }}
               disabled={isConverting}
               className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-950 cursor-pointer"
             >
@@ -394,7 +408,7 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
               <div className="text-xs text-slate-400">
                 Requires user approval before saving
               </div>
-              <button
+              <button type="button"
                 onClick={() => setIsApprovalModalOpen(true)}
                 className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 transition-colors cursor-pointer"
               >
@@ -482,17 +496,18 @@ export const PineConverterView: React.FC<PineConverterViewProps> = ({
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
-              <button
+              <button type="button"
                 onClick={() => setIsApprovalModalOpen(false)}
                 className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
               >
                 Back to Review
               </button>
-              <button
+              <button type="button"
                 onClick={handleConfirmSave}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg"
+                disabled={isSaving}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-xs font-bold rounded-lg"
               >
-                Approve & Save Strategy
+                {isSaving ? 'Saving...' : 'Approve & Save Strategy'}
               </button>
             </div>
           </div>

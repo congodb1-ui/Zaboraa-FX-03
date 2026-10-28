@@ -48,7 +48,7 @@ export interface BotCycleResult {
 export interface BotRunnerConfig {
   riskSettings: RiskSettings;
   bridgeClient?: BridgeClient;
-  authoritativeAccountMode?: 'DEMO' | 'REAL' | 'CONTEST';
+  authoritativeAccountMode?: 'DEMO' | 'REAL' | 'CONTEST' | 'UNKNOWN';
   reconciliationExecuted: boolean;
   getAccountSnapshot: () => {
     balance: number;
@@ -245,9 +245,36 @@ export class BotRunner {
     const targetSignal = emittedSignal as { action: 'BUY' | 'SELL'; price: number; reason: string };
     const targetParams = orderParams as { size: number; sl: number; tp?: number; comment?: string };
 
-    // 4. Evaluate through Risk Manager
+    // 4. Evaluate through Risk Manager & D19 Live Spread Filter Check
     const accountSnap = this.config.getAccountSnapshot();
     const effectiveSpread = currentSpreadPips ?? SYMBOL_SPECS[bot.symbol]?.spreadPips ?? 1.0;
+
+    // D19 Spread Filter explicit check prior to risk manager dispatch
+    if (bot.riskLimits && bot.riskLimits.maxSpreadPips && effectiveSpread > bot.riskLimits.maxSpreadPips) {
+      insertRiskEvent({
+        id: `risk_spread_${Date.now()}_${bot.id}`,
+        timestamp: new Date().toISOString(),
+        actor: 'BotRunner',
+        action: 'SPREAD_FILTER_BLOCKED',
+        entity: `${bot.symbol} (Bot: ${bot.id})`,
+        details: `Blocked order: Live tick spread (${effectiveSpread} pips) exceeds bot max allowed spread (${bot.riskLimits.maxSpreadPips} pips).`,
+        severity: 'WARN',
+        status: 'REJECTED',
+      });
+
+      return {
+        botId: bot.id,
+        status: 'PROCESSED',
+        newBarProcessed: true,
+        barTime: latestClosedBar.time,
+        signal: targetSignal,
+        orderResult: {
+          success: false,
+          status: 'BLOCKED_BY_SPREAD_FILTER',
+          error: `SPREAD_EXCEEDED: Live spread ${effectiveSpread} > max allowed ${bot.riskLimits.maxSpreadPips}`,
+        },
+      };
+    }
 
     const riskContext: RiskEvaluationContext = {
       account: {
@@ -290,9 +317,44 @@ export class BotRunner {
       };
     }
 
-    // 5. Order Route & Idempotency Key
-    // Include closed bar time in idempotency key to prevent double executions on the same bar
-    const idempotencyKey = hashContent(`${bot.id}:${bot.symbol}:${latestClosedBar.time}:${targetSignal.action}`);
+    // 5. Verify Account Type Before Order Routing
+    // Fail closed: a DEMO_LIVE bot must only execute against an authoritative DEMO account.
+    if (bot.mode === 'DEMO_LIVE') {
+      const authoritativeAccountType = this.config.authoritativeAccountMode;
+
+      if (authoritativeAccountType !== 'DEMO') {
+        insertRiskEvent({
+          id: `risk_demo_refusal_${Date.now()}_${bot.id}`,
+          timestamp: new Date().toISOString(),
+          actor: 'BotRunner',
+          action: 'DEMO_BOT_REFUSED_NON_DEMO',
+          entity: `${bot.symbol} (Bot: ${bot.id})`,
+          details: `Refused order: Bot is configured for DEMO_LIVE but authoritative broker account is ${authoritativeAccountType ?? 'UNKNOWN'}.`,
+          severity: 'CRITICAL',
+          status: 'REJECTED',
+        });
+
+        return {
+          botId: bot.id,
+          status: 'PROCESSED',
+          newBarProcessed: true,
+          barTime: latestClosedBar.time,
+          signal: targetSignal,
+          orderResult: {
+            success: false,
+            status: 'REJECTED',
+            error: `ACCOUNT_TYPE_MISMATCH: Authoritative broker account is ${authoritativeAccountType ?? 'UNKNOWN'}`,
+          },
+        };
+      }
+    }
+
+    // 6. Order Route & Idempotency Key
+    // Include closed bar time in idempotency key to prevent double executions on the same bar.
+    const idempotencyKey = hashContent(
+      `${bot.id}:${bot.symbol}:${latestClosedBar.time}:${targetSignal.action}`
+    );
+
     const orderId = `ord_bot_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 
     const orderRecord: OrderRecord = {
@@ -311,7 +373,7 @@ export class BotRunner {
       createdAt: new Date().toISOString(),
     };
 
-    // Attempt to log order intent in SQLite
+    // Attempt to log order intent in SQLite.
     try {
       logOrderIntent(orderRecord);
     } catch (err: any) {
@@ -329,6 +391,7 @@ export class BotRunner {
           },
         };
       }
+
       throw err;
     }
 
@@ -363,37 +426,6 @@ export class BotRunner {
     }
 
     if (bot.mode === 'DEMO_LIVE') {
-      // DEMO mode: authoritatively verify that broker account is DEMO
-      const authorAccountType = this.config.authoritativeAccountMode || 'DEMO';
-      if (authorAccountType !== 'DEMO') {
-        updateOrderStatus(orderId, 'REJECTED', undefined, undefined, 'DEMO bot refused non-demo account');
-
-        insertRiskEvent({
-          id: `risk_demo_refusal_${Date.now()}`,
-          timestamp: new Date().toISOString(),
-          actor: 'BotRunner',
-          action: 'DEMO_BOT_REFUSED_NON_DEMO',
-          entity: `${bot.symbol} (Bot: ${bot.id})`,
-          details: `Refused order: Bot is configured for DEMO_LIVE but authoritative broker account is ${authorAccountType}.`,
-          severity: 'CRITICAL',
-          status: 'REJECTED',
-        });
-
-        return {
-          botId: bot.id,
-          status: 'PROCESSED',
-          newBarProcessed: true,
-          barTime: latestClosedBar.time,
-          signal: targetSignal,
-          orderResult: {
-            success: false,
-            orderId,
-            status: 'REJECTED',
-            error: `ACCOUNT_TYPE_MISMATCH: Authoritative broker account is ${authorAccountType}`,
-          },
-        };
-      }
-
       // If bridge client is configured, dispatch through bridge
       if (this.config.bridgeClient) {
         const execution = await executeOrderThroughBridge(this.config.bridgeClient, orderRecord, {

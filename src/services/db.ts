@@ -215,6 +215,31 @@ function initSchema(db: DatabaseSync) {
     );
   `);
 
+  // Canonical append-only OHLC storage. Timestamp is UTC epoch seconds.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS candles (
+      symbol TEXT NOT NULL, timeframe TEXT NOT NULL, time INTEGER NOT NULL,
+      open REAL NOT NULL, high REAL NOT NULL, low REAL NOT NULL, close REAL NOT NULL,
+      tick_volume REAL NOT NULL DEFAULT 0, spread REAL NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY(symbol, timeframe, time)
+    );
+    CREATE INDEX IF NOT EXISTS idx_candles_range ON candles(symbol, timeframe, time);
+    CREATE TABLE IF NOT EXISTS stored_backtests (
+      id TEXT PRIMARY KEY, strategy_id TEXT NOT NULL, symbol TEXT NOT NULL,
+      timeframe TEXT NOT NULL, period_start TEXT, period_end TEXT,
+      strategy_code TEXT, parameters_json TEXT, dataset_hash TEXT,
+      result_json TEXT NOT NULL, created_at TEXT NOT NULL
+    );
+  `);
+
+  // Backtest report snapshots are persisted alongside legacy backtest result columns.
+  for (const column of [
+    'strategy_code TEXT', 'parameters_json TEXT', 'dataset_hash TEXT', 'result_json TEXT'
+  ]) {
+    try { db.exec(`ALTER TABLE backtest_results ADD COLUMN ${column}`); } catch { /* already migrated */ }
+  }
+
   // Data Catalog with SHA-256 Hashes
   db.exec(`
     CREATE TABLE IF NOT EXISTS data_catalog (
