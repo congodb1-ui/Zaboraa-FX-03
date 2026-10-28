@@ -440,3 +440,49 @@ Regarding your inquiry: **"${lastUserMsg}"**
 `,
   };
 }
+
+/**
+ * 5. Explain an existing Smart Money Footprint signal.
+ * Hard Rule: The engine computes the signal. The LLM never does.
+ * Prompt restriction: Explain only what the numbers show. Do not change the direction or score.
+ * Do not predict prices. Do not claim profitability.
+ */
+export async function explainSmartMoneySignalWithAi(signal: any): Promise<{ explanation: string }> {
+  if (!aiClient) {
+    throw new Error('Gemini client not initialized: GEMINI_API_KEY is not configured in the environment.');
+  }
+
+  const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+  const prompt = `You are a quantitative research analyst for Zaboraa FX reviewing a generated Smart Money Footprint signal.
+Explain only what the numbers show. Do not change the direction or score. Do not predict prices. Do not claim profitability.
+
+Signal Record:
+- Symbol: ${signal.symbol}
+- Closed Bar Time: ${new Date(signal.bar_time * 1000).toISOString()}
+- Direction: ${signal.direction}
+- Score: ${signal.score} (Threshold: 50)
+- Confidence: ${signal.confidence}%
+- COT Component (cCot): ${signal.c_cot} (Follow-change / weekly institutional futures bias)
+- Activity Component (cAct): ${signal.c_act} (${signal.event_type}, Vol-Z: ${signal.vol_z})
+- Trend Component (cTrend): ${signal.c_trend} (H4 completed bars EMA50/200 slope alignment)
+- Flags: Crowded=${Boolean(signal.is_crowded)}, Stale=${Boolean(signal.is_stale)}, BaselineFallback=${Boolean(signal.is_baseline_fallback)}
+- Invalidation Level: ${signal.invalidation_price}
+
+Provide a concise 3-paragraph plain-language explanation of what these quantitative evidence layers show, how the minimum-agreement rule was satisfied, and what the invalidation level signifies.`;
+
+  const response = await withTimeout(
+    aiClient.models.generateContent({
+      model,
+      contents: prompt,
+    }),
+    6000
+  );
+
+  const explanation = response.text || '';
+  if (!explanation) {
+    throw new Error('Empty response received from AI model.');
+  }
+
+  return { explanation };
+}
+

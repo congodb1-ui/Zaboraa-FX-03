@@ -56,6 +56,33 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
   // AI Data Review state
   const [aiReview, setAiReview] = useState<any | null>(null);
   const [isAiReviewing, setIsAiReviewing] = useState<boolean>(false);
+  const [isSeedingData, setIsSeedingData] = useState<boolean>(false);
+
+  const handleSeedHistorical = async () => {
+    setIsSeedingData(true);
+    try {
+      const res = await fetch('/api/data/seed-historical', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFetchStatusMessage({
+          success: true,
+          message: data.message || `Seeded ${data.totalCandles} historical candles across all 4 symbols into SQLite.`,
+        });
+        await loadCatalogFromBackend();
+      }
+    } catch (err: any) {
+      setFetchStatusMessage({
+        success: false,
+        message: `Failed to seed data: ${err.message}`,
+      });
+    } finally {
+      setIsSeedingData(false);
+    }
+  };
 
   const handleRunAiAudit = async () => {
     const active = catalog.find((c) => c.id === selectedDatasetId);
@@ -276,6 +303,15 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             >
               <Server className="w-3.5 h-3.5" />
               Fetch from MT5 Bridge
+            </button>
+            <button
+              type="button"
+              onClick={handleSeedHistorical}
+              disabled={isSeedingData}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Database className={`w-3.5 h-3.5 ${isSeedingData ? 'animate-spin' : ''}`} />
+              {isSeedingData ? 'Seeding...' : 'Seed 6-Month Historical Data'}
             </button>
             <button
               type="button"

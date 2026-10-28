@@ -15,6 +15,7 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Code2,
 } from 'lucide-react';
 import { BacktestReport, DatasetRecord, TradeRecord } from '../types/forex';
 import { BUILT_IN_STRATEGIES, StrategyDefinition } from '../engine/workerSandbox';
@@ -31,6 +32,7 @@ interface BacktestViewProps {
   savedReports: BacktestReport[];
   onSaveReport: (report: BacktestReport) => void;
   onDeleteReport: (id: string) => void;
+  onNavigateToStrategyStudio?: (strategyId?: string) => void;
 }
 
 export const BacktestView: React.FC<BacktestViewProps> = ({
@@ -41,6 +43,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
   savedReports,
   onSaveReport,
   onDeleteReport,
+  onNavigateToStrategyStudio,
 }) => {
   const [selectedDatasetId, setSelectedDatasetId] = useState<string>(
     datasets[0]?.id || ''
@@ -56,6 +59,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
   const [chartViewMode, setChartViewMode] = useState<'both' | 'candles' | 'timeline'>('both');
   const [aiAdvice, setAiAdvice] = useState<any | null>(null);
   const [isAdvising, setIsAdvising] = useState<boolean>(false);
+  const [saveToast, setSaveToast] = useState<string | null>(null);
+
+  const handleSaveReportClick = () => {
+    if (!activeReport) return;
+    onSaveReport(activeReport);
+    setSaveToast(`Report "${activeReport.strategyName} - ${activeReport.symbol}" saved to SQLite database.`);
+    setTimeout(() => setSaveToast(null), 3500);
+  };
 
   const handleConsultAiDoctor = async () => {
     if (!activeReport) return;
@@ -145,7 +156,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <>
                 <button
                   type="button"
-                  onClick={() => onSaveReport(activeReport)}
+                  onClick={handleSaveReportClick}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
                 >
                   <Download className="w-3.5 h-3.5 text-blue-400" />
@@ -173,6 +184,22 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
         </div>
 
+        {saveToast && (
+          <div className="mt-3 px-3 py-2 rounded bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 text-xs flex items-center justify-between animate-in fade-in duration-200">
+            <span className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              {saveToast}
+            </span>
+            <button
+              type="button"
+              onClick={() => setSaveToast(null)}
+              className="text-emerald-400 hover:text-emerald-200 text-xs font-bold ml-3"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Parameter Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 text-xs font-mono">
           <div>
@@ -193,9 +220,22 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
-              Strategy Algorithm
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-slate-400 text-[11px] font-sans">
+                Strategy Algorithm
+              </label>
+              {onNavigateToStrategyStudio && (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToStrategyStudio(selectedStrategyId)}
+                  className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-sans cursor-pointer hover:underline"
+                  title="Edit strategy code and parameters in Strategy Studio"
+                >
+                  <Code2 className="w-3 h-3" />
+                  Edit in Studio
+                </button>
+              )}
+            </div>
             <select
               value={selectedStrategyId}
               onChange={(e) => setSelectedStrategyId(e.target.value)}
@@ -728,14 +768,25 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <span className="text-white font-bold">{r.profitFactor.toFixed(2)}</span>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-2 flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => setActiveReport(r)}
-                    className="w-full py-1 rounded text-[11px] font-sans font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 transition-colors"
+                    className="flex-1 py-1 rounded text-[11px] font-sans font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 transition-colors"
                   >
                     Load Report
                   </button>
+                  {onNavigateToStrategyStudio && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToStrategyStudio(r.strategyId)}
+                      className="px-2.5 py-1 rounded text-[11px] font-sans font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 flex items-center gap-1 transition-colors"
+                      title="Edit this strategy in Strategy Studio"
+                    >
+                      <Code2 className="w-3 h-3 text-blue-400" />
+                      Edit Strategy
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

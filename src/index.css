@@ -31,3 +31,12 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
+
+/* Utility to hide scrollbar track while maintaining full touch/wheel/keyboard scrollability */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

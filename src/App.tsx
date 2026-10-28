@@ -13,6 +13,7 @@ import { AIAnalysisView } from './components/AIAnalysisView';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsView } from './components/SettingsView';
 import { KillSwitchModal } from './components/KillSwitchModal';
+import { SmartMoneyFootprintView } from './components/SmartMoneyFootprintView';
 
 import {
   BacktestReport,
@@ -33,6 +34,7 @@ import { ShieldCheck, TrendingUp } from 'lucide-react';
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('markets');
   const [isKillSwitchOpen, setIsKillSwitchOpen] = useState<boolean>(false);
+  const [studioSelectedStrategyId, setStudioSelectedStrategyId] = useState<string | undefined>(undefined);
 
   // Broker State (Connected to Exness MT5 Demo Terminal)
   const [brokerState, setBrokerState] = useState<BrokerState>({
@@ -93,6 +95,21 @@ export const App: React.FC = () => {
           if (loaded.length > 0) {
             setDatasets(loaded);
           }
+        }
+      })
+      .catch(() => {});
+
+    // 3. Sync saved backtest reports from SQLite
+    fetch('/api/backtests')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.reports && data.reports.length > 0) {
+          setSavedReports((prev) => {
+            const map = new Map<string, BacktestReport>();
+            prev.forEach((r) => map.set(r.id, r));
+            data.reports.forEach((r: BacktestReport) => map.set(r.id, r));
+            return Array.from(map.values());
+          });
         }
       })
       .catch(() => {});
@@ -407,21 +424,37 @@ export const App: React.FC = () => {
     setIsKillSwitchOpen(false);
   };
 
-  // Saved reports handlers
-  const handleSaveReport = (report: BacktestReport) => {
+  // Saved reports handlers (persisted to SQLite and localStorage)
+  const handleSaveReport = async (report: BacktestReport) => {
     const updated = [report, ...savedReports.filter((r) => r.id !== report.id)];
     setSavedReports(updated);
     try {
       localStorage.setItem('zaboraa_saved_reports', JSON.stringify(updated));
     } catch {}
+
+    try {
+      await fetch('/api/backtests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(report),
+      });
+    } catch (e) {
+      console.error('Failed to persist backtest to SQLite:', e);
+    }
   };
 
-  const handleDeleteReport = (id: string) => {
+  const handleDeleteReport = async (id: string) => {
     const updated = savedReports.filter((r) => r.id !== id);
     setSavedReports(updated);
     try {
       localStorage.setItem('zaboraa_saved_reports', JSON.stringify(updated));
     } catch {}
+
+    try {
+      await fetch(`/api/backtests/${id}`, { method: 'DELETE' });
+    } catch (e) {
+      console.error('Failed to delete backtest from SQLite:', e);
+    }
   };
 
   return (
@@ -447,6 +480,12 @@ export const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'smartmoney' && (
+            <ErrorBoundary fallbackTitle="Smart Money Footprint">
+              <SmartMoneyFootprintView />
+            </ErrorBoundary>
+          )}
+
           {activeTab === 'ai-analyst' && (
             <AIAnalysisView
               onNavigateToTab={(tab) => setActiveTab(tab)}
@@ -464,6 +503,10 @@ export const App: React.FC = () => {
               savedReports={savedReports}
               onSaveReport={handleSaveReport}
               onDeleteReport={handleDeleteReport}
+              onNavigateToStrategyStudio={(stratId) => {
+                if (stratId) setStudioSelectedStrategyId(stratId);
+                setActiveTab('strategies');
+              }}
             />
           )}
 
@@ -471,6 +514,7 @@ export const App: React.FC = () => {
             <StrategyStudioView
               datasets={datasets}
               strategies={strategies}
+              initialStrategyId={studioSelectedStrategyId}
               onSaveStrategy={handleSaveStrategy}
               onCreateStrategy={handleCreateStrategy}
               onDeleteStrategy={handleDeleteStrategy}

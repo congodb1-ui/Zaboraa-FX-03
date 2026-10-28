@@ -28,6 +28,7 @@ import { DatasetRecord } from '../types/forex';
 interface StrategyStudioViewProps {
   datasets: DatasetRecord[];
   strategies?: StrategyDefinition[];
+  initialStrategyId?: string;
   onSaveStrategy: (strategy: StrategyDefinition) => void;
   onCreateStrategy?: (strategy: StrategyDefinition) => void;
   onDeleteStrategy?: (id: string) => void;
@@ -36,14 +37,17 @@ interface StrategyStudioViewProps {
 export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
   datasets,
   strategies = BUILT_IN_STRATEGIES,
+  initialStrategyId,
   onSaveStrategy,
   onCreateStrategy,
   onDeleteStrategy,
 }) => {
   const [strategyList, setStrategyList] = useState<StrategyDefinition[]>(strategies);
-  const [selectedStrategy, setSelectedStrategy] = useState<StrategyDefinition>(
-    strategies[0] || BUILT_IN_STRATEGIES[0]
-  );
+  const initialStrat =
+    (initialStrategyId && strategies.find((s) => s.id === initialStrategyId)) ||
+    strategies[0] ||
+    BUILT_IN_STRATEGIES[0];
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategyDefinition>(initialStrat);
 
   // Editable Form State
   const [editName, setEditName] = useState<string>(selectedStrategy.name);
@@ -82,6 +86,16 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
     setSmokeOutput(null);
     setSaveSuccessMsg(null);
   };
+
+  // Sync when initialStrategyId changes
+  useEffect(() => {
+    if (initialStrategyId) {
+      const match = strategies.find((s) => s.id === initialStrategyId);
+      if (match) {
+        handleSelectStrategy(match);
+      }
+    }
+  }, [initialStrategyId]);
 
   // Sync when external strategies prop updates
   useEffect(() => {

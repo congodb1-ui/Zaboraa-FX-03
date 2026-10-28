@@ -9,6 +9,7 @@ import {
   PositionRecord,
   OrderRecord,
   RiskEvent,
+  BacktestReport,
 } from '../types/forex';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -167,6 +168,81 @@ db.exec(`
     impact TEXT NOT NULL,
     bias TEXT NOT NULL,
     updated_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS smartmoney_cot (
+    market TEXT NOT NULL,
+    report_date TEXT NOT NULL,
+    open_interest REAL NOT NULL,
+    long REAL NOT NULL,
+    short REAL NOT NULL,
+    net REAL NOT NULL,
+    net_pct_oi REAL NOT NULL,
+    source TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    effective_at TEXT NOT NULL,
+    PRIMARY KEY (market, report_date)
+  );
+
+  CREATE TABLE IF NOT EXISTS smartmoney_signals (
+    id TEXT PRIMARY KEY,
+    symbol TEXT NOT NULL,
+    bar_time INTEGER NOT NULL,
+    direction TEXT NOT NULL,
+    score REAL NOT NULL,
+    confidence REAL NOT NULL,
+    c_cot REAL NOT NULL,
+    c_act REAL NOT NULL,
+    c_trend REAL NOT NULL,
+    event_type TEXT NOT NULL,
+    vol_z REAL NOT NULL,
+    range_atr REAL NOT NULL,
+    close_loc REAL NOT NULL,
+    is_crowded INTEGER NOT NULL,
+    is_stale INTEGER NOT NULL,
+    is_baseline_fallback INTEGER NOT NULL,
+    invalidation_price REAL NOT NULL,
+    expires_at INTEGER NOT NULL,
+    config_hash TEXT NOT NULL,
+    strategy_version TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    disclaimer TEXT NOT NULL,
+    UNIQUE(symbol, bar_time, strategy_version)
+  );
+
+  CREATE TABLE IF NOT EXISTS smartmoney_outcomes (
+    id TEXT PRIMARY KEY,
+    signal_id TEXT NOT NULL,
+    horizon_hours INTEGER NOT NULL,
+    entry_price REAL NOT NULL,
+    exit_price REAL NOT NULL,
+    return_pips_or_points REAL NOT NULL,
+    return_atr REAL NOT NULL,
+    cost_applied REAL NOT NULL,
+    computed_at TEXT NOT NULL,
+    UNIQUE(signal_id, horizon_hours)
+  );
+
+  CREATE TABLE IF NOT EXISTS smartmoney_bars (
+    symbol TEXT NOT NULL,
+    bar_time INTEGER NOT NULL,
+    c_cot REAL NOT NULL,
+    c_act REAL NOT NULL,
+    c_trend REAL NOT NULL,
+    score REAL NOT NULL,
+    direction TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (symbol, bar_time)
+  );
+
+  CREATE TABLE IF NOT EXISTS external_fetch_log (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    completed_at TEXT,
+    ok INTEGER NOT NULL,
+    rows_ingested INTEGER NOT NULL,
+    error TEXT
   );
 `);
 
@@ -388,3 +464,327 @@ export function deleteStrategyFromDb(id: string): void {
   const stmt = db.prepare('DELETE FROM strategies WHERE id = ?');
   stmt.run(id);
 }
+
+// ==========================================
+// BACKTEST RESULTS PERSISTENCE
+// ==========================================
+
+export function saveBacktestResultToDb(report: BacktestReport): void {
+  const stmt = db.prepare(`
+    INSERT INTO backtest_results (
+      id, strategy_id, strategy_name, symbol, timeframe, period_start, period_end,
+      bar_count, provenance, report_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      report_json = excluded.report_json,
+      created_at = excluded.created_at
+  `);
+
+  stmt.run(
+    report.id,
+    report.strategyId,
+    report.strategyName,
+    report.symbol,
+    report.timeframe,
+    report.periodStart,
+    report.periodEnd,
+    report.barCount,
+    report.provenance,
+    JSON.stringify(report),
+    new Date().toISOString()
+  );
+}
+
+export function getBacktestResultsFromDb(): BacktestReport[] {
+  const stmt = db.prepare('SELECT report_json FROM backtest_results ORDER BY created_at DESC');
+  const rows = stmt.all() as Array<{ report_json: string }>;
+  const reports: BacktestReport[] = [];
+  for (const r of rows) {
+    try {
+      reports.push(JSON.parse(r.report_json));
+    } catch {}
+  }
+  return reports;
+}
+
+export function deleteBacktestResultFromDb(id: string): void {
+  const stmt = db.prepare('DELETE FROM backtest_results WHERE id = ?');
+  stmt.run(id);
+}
+
+// ==========================================
+// SMART MONEY FOOTPRINT PERSISTENCE
+// ==========================================
+
+export interface SmartMoneyCotRow {
+  market: string;
+  report_date: string;
+  open_interest: number;
+  long: number;
+  short: number;
+  net: number;
+  net_pct_oi: number;
+  source: string;
+  fetched_at: string;
+  effective_at: string;
+}
+
+export function upsertSmartMoneyCot(rows: SmartMoneyCotRow[]): number {
+  if (rows.length === 0) return 0;
+  const insert = db.prepare(`
+    INSERT INTO smartmoney_cot (
+      market, report_date, open_interest, long, short, net, net_pct_oi, source, fetched_at, effective_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(market, report_date) DO UPDATE SET
+      open_interest = excluded.open_interest,
+      long = excluded.long,
+      short = excluded.short,
+      net = excluded.net,
+      net_pct_oi = excluded.net_pct_oi,
+      source = excluded.source,
+      fetched_at = excluded.fetched_at,
+      effective_at = excluded.effective_at
+  `);
+
+  const tx = db.transaction((items: SmartMoneyCotRow[]) => {
+    let count = 0;
+    for (const r of items) {
+      insert.run(
+        r.market,
+        r.report_date,
+        r.open_interest,
+        r.long,
+        r.short,
+        r.net,
+        r.net_pct_oi,
+        r.source,
+        r.fetched_at,
+        r.effective_at
+      );
+      count++;
+    }
+    return count;
+  });
+
+  return tx(rows);
+}
+
+export function getSmartMoneyCotRows(market: string, asOfTimeUtc?: string): SmartMoneyCotRow[] {
+  let query = 'SELECT * FROM smartmoney_cot WHERE market = ?';
+  const params: any[] = [market];
+  if (asOfTimeUtc) {
+    query += ' AND effective_at <= ?';
+    params.push(asOfTimeUtc);
+  }
+  query += ' ORDER BY report_date ASC';
+  const stmt = db.prepare(query);
+  return stmt.all(...params) as SmartMoneyCotRow[];
+}
+
+export function saveSmartMoneySignal(signal: {
+  id: string;
+  symbol: string;
+  bar_time: number;
+  direction: 'BUY' | 'SELL' | 'NEUTRAL';
+  score: number;
+  confidence: number;
+  c_cot: number;
+  c_act: number;
+  c_trend: number;
+  event_type: string;
+  vol_z: number;
+  range_atr: number;
+  close_loc: number;
+  is_crowded: boolean | number;
+  is_stale: boolean | number;
+  is_baseline_fallback: boolean | number;
+  invalidation_price: number;
+  expires_at: number;
+  config_hash: string;
+  strategy_version: string;
+  created_at: string;
+  disclaimer: string;
+}): void {
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO smartmoney_signals (
+      id, symbol, bar_time, direction, score, confidence, c_cot, c_act, c_trend,
+      event_type, vol_z, range_atr, close_loc, is_crowded, is_stale, is_baseline_fallback,
+      invalidation_price, expires_at, config_hash, strategy_version, created_at, disclaimer
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  stmt.run(
+    signal.id,
+    signal.symbol,
+    signal.bar_time,
+    signal.direction,
+    signal.score,
+    signal.confidence,
+    signal.c_cot,
+    signal.c_act,
+    signal.c_trend,
+    signal.event_type,
+    signal.vol_z,
+    signal.range_atr,
+    signal.close_loc,
+    signal.is_crowded ? 1 : 0,
+    signal.is_stale ? 1 : 0,
+    signal.is_baseline_fallback ? 1 : 0,
+    signal.invalidation_price,
+    signal.expires_at,
+    signal.config_hash,
+    signal.strategy_version,
+    signal.created_at,
+    signal.disclaimer
+  );
+}
+
+export function getSmartMoneySignals(options: {
+  symbol?: string;
+  limit?: number;
+  from?: number;
+  to?: number;
+}): any[] {
+  let query = 'SELECT * FROM smartmoney_signals WHERE 1=1';
+  const params: any[] = [];
+  if (options.symbol) {
+    query += ' AND symbol = ?';
+    params.push(options.symbol);
+  }
+  if (options.from !== undefined) {
+    query += ' AND bar_time >= ?';
+    params.push(options.from);
+  }
+  if (options.to !== undefined) {
+    query += ' AND bar_time <= ?';
+    params.push(options.to);
+  }
+  query += ' ORDER BY bar_time DESC';
+  if (options.limit) {
+    query += ' LIMIT ?';
+    params.push(options.limit);
+  }
+  const stmt = db.prepare(query);
+  return stmt.all(...params);
+}
+
+export function getSmartMoneySignalById(id: string): any {
+  const stmt = db.prepare('SELECT * FROM smartmoney_signals WHERE id = ?');
+  return stmt.get(id);
+}
+
+export function saveSmartMoneyOutcome(outcome: {
+  id: string;
+  signal_id: string;
+  horizon_hours: number;
+  entry_price: number;
+  exit_price: number;
+  return_pips_or_points: number;
+  return_atr: number;
+  cost_applied: number;
+  computed_at: string;
+}): void {
+  const stmt = db.prepare(`
+    INSERT INTO smartmoney_outcomes (
+      id, signal_id, horizon_hours, entry_price, exit_price, return_pips_or_points,
+      return_atr, cost_applied, computed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(signal_id, horizon_hours) DO UPDATE SET
+      entry_price = excluded.entry_price,
+      exit_price = excluded.exit_price,
+      return_pips_or_points = excluded.return_pips_or_points,
+      return_atr = excluded.return_atr,
+      cost_applied = excluded.cost_applied,
+      computed_at = excluded.computed_at
+  `);
+
+  stmt.run(
+    outcome.id,
+    outcome.signal_id,
+    outcome.horizon_hours,
+    outcome.entry_price,
+    outcome.exit_price,
+    outcome.return_pips_or_points,
+    outcome.return_atr,
+    outcome.cost_applied,
+    outcome.computed_at
+  );
+}
+
+export function getSmartMoneyOutcomes(signalIds?: string[]): any[] {
+  if (!signalIds || signalIds.length === 0) {
+    const stmt = db.prepare('SELECT * FROM smartmoney_outcomes');
+    return stmt.all();
+  }
+  const placeholders = signalIds.map(() => '?').join(',');
+  const stmt = db.prepare(`SELECT * FROM smartmoney_outcomes WHERE signal_id IN (${placeholders})`);
+  return stmt.all(...signalIds);
+}
+
+export function saveSmartMoneyBar(bar: {
+  symbol: string;
+  bar_time: number;
+  c_cot: number;
+  c_act: number;
+  c_trend: number;
+  score: number;
+  direction: string;
+  created_at: string;
+}): void {
+  const stmt = db.prepare(`
+    INSERT INTO smartmoney_bars (symbol, bar_time, c_cot, c_act, c_trend, score, direction, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(symbol, bar_time) DO UPDATE SET
+      c_cot = excluded.c_cot,
+      c_act = excluded.c_act,
+      c_trend = excluded.c_trend,
+      score = excluded.score,
+      direction = excluded.direction
+  `);
+
+  stmt.run(
+    bar.symbol,
+    bar.bar_time,
+    bar.c_cot,
+    bar.c_act,
+    bar.c_trend,
+    bar.score,
+    bar.direction,
+    bar.created_at
+  );
+}
+
+export function getSmartMoneyBars(symbol: string, limit = 500): any[] {
+  const stmt = db.prepare('SELECT * FROM smartmoney_bars WHERE symbol = ? ORDER BY bar_time DESC LIMIT ?');
+  return stmt.all(symbol, limit);
+}
+
+export function logExternalFetch(entry: {
+  id: string;
+  source: string;
+  started_at: string;
+  completed_at?: string;
+  ok: boolean;
+  rows_ingested: number;
+  error?: string;
+}): void {
+  const stmt = db.prepare(`
+    INSERT INTO external_fetch_log (id, source, started_at, completed_at, ok, rows_ingested, error)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `);
+  stmt.run(
+    entry.id,
+    entry.source,
+    entry.started_at,
+    entry.completed_at || new Date().toISOString(),
+    entry.ok ? 1 : 0,
+    entry.rows_ingested,
+    entry.error || null
+  );
+}
+
+export function getExternalFetchStatus(source = 'CFTC_COT'): any {
+  const stmt = db.prepare('SELECT * FROM external_fetch_log WHERE source = ? ORDER BY started_at DESC LIMIT 1');
+  return stmt.get(source);
+}
+

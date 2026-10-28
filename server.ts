@@ -12,14 +12,44 @@ import {
   getStrategiesFromDb,
   saveStrategyToDb,
   deleteStrategyFromDb,
+  saveBacktestResultToDb,
+  getBacktestResultsFromDb,
+  deleteBacktestResultFromDb,
+  getSmartMoneyCotRows,
+  saveSmartMoneySignal,
+  getSmartMoneySignals,
+  getSmartMoneySignalById,
+  saveSmartMoneyOutcome,
+  getSmartMoneyOutcomes,
+  saveSmartMoneyBar,
+  getSmartMoneyBars,
+  getExternalFetchStatus,
 } from './src/db/sqlite';
 import { auditCandles, fixCandles } from './src/engine/data/candleQuality';
 import { candleCsvLines, importCandlesCsv } from './src/engine/data/candleCsv';
+import { seedHistoricalDatasets } from './src/engine/data/seedHistoricalData';
+import {
+  COT_MARKETS,
+  TICK_VOLUME_LABEL,
+  COT_LABEL,
+  DISCLAIMER_TEXT,
+  SUPPORTED_SYMBOLS,
+  DEFAULT_SMART_MONEY_CONFIG,
+  isSmartMoneySymbol,
+  SmartMoneySymbol,
+} from './src/engine/smartMoney/cotConfig';
+import { computeCotFeatures } from './src/engine/smartMoney/cotFeatures';
+import { refreshCotData } from './src/engine/smartMoney/cotIngest';
+import { detectActivityEvent } from './src/engine/smartMoney/activityEvents';
+import { computeTrendContext } from './src/engine/smartMoney/trendContext';
+import { scoreSmartMoneySignal } from './src/engine/smartMoney/scorer';
+import { runSmartMoneyEventStudy } from './src/engine/smartMoney/eventStudy';
 import {
   analyzeMarketWithAi,
   reviewDataWithAi,
   adviseStrategyWithAi,
   quantChatWithAi,
+  explainSmartMoneySignalWithAi,
 } from './src/services/aiAdvisorService';
 import { ForexSymbol, Timeframe, DatasetRecord } from './src/types/forex';
 
@@ -773,6 +803,372 @@ async function startServer() {
   });
 
   // ==========================================
+  // 3E. HISTORICAL BACKTEST PERSISTENCE
+  // ==========================================
+
+  app.get('/api/backtests', (req: Request, res: Response) => {
+    try {
+      const reports = getBacktestResultsFromDb();
+      return res.json({ reports });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_LOAD_BACKTESTS', message: e.message });
+    }
+  });
+
+  app.post('/api/backtests', (req: Request, res: Response) => {
+    try {
+      const report = req.body?.report || req.body;
+      if (!report || !report.id || !report.strategyId) {
+        return res.status(400).json({ error: 'INVALID_BACKTEST_PAYLOAD' });
+      }
+      saveBacktestResultToDb(report);
+      return res.json({ success: true, id: report.id });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_SAVE_BACKTEST', message: e.message });
+    }
+  });
+
+  app.delete('/api/backtests/:id', (req: Request, res: Response) => {
+    try {
+      const id = String(req.params.id);
+      deleteBacktestResultFromDb(id);
+      return res.json({ success: true, deletedId: id });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_DELETE_BACKTEST', message: e.message });
+    }
+  });
+
+  // ==========================================
+  // 3F. SEED 6-MONTH HISTORICAL DATASETS
+  // ==========================================
+
+  app.post('/api/data/seed-historical', (req: Request, res: Response) => {
+    try {
+      const force = Boolean(req.body?.force);
+      const result = seedHistoricalDatasets(force);
+      return res.json({
+        success: true,
+        ...result,
+        message: '6-month historical datasets for EURUSD, GBPUSD, USDJPY, and XAUUSD are stored in SQLite.',
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_SEED_HISTORICAL_DATA', message: e.message });
+    }
+  });
+
+  // ==========================================
+  // 3G. SMART MONEY FOOTPRINT (Spec v2)
+  // ==========================================
+
+  // Canonical symbol resolver (strips broker suffix like 'm' if needed)
+  function resolveSmartMoneySymbol(raw: string): SmartMoneySymbol | null {
+    if (!raw || typeof raw !== 'string') return null;
+    const clean = raw.trim().toUpperCase().replace(/M$/, '');
+    return isSmartMoneySymbol(clean) ? clean : null;
+  }
+
+  app.get('/api/smartmoney/status', (req: Request, res: Response) => {
+    try {
+      const fetchLog = getExternalFetchStatus('CFTC_COT');
+      const cotXau = getSmartMoneyCotRows(COT_MARKETS.XAUUSD.market);
+      const cotEur = getSmartMoneyCotRows(COT_MARKETS.EURUSD.market);
+
+      const latestXauCot = cotXau[cotXau.length - 1];
+      const latestEurCot = cotEur[cotEur.length - 1];
+
+      const signalsXau = getSmartMoneySignals({ symbol: 'XAUUSD', limit: 1 });
+      const signalsEur = getSmartMoneySignals({ symbol: 'EURUSD', limit: 1 });
+
+      const xauCandles = loadCandlesFromDb('XAUUSD', 'H1');
+      const eurCandles = loadCandlesFromDb('EURUSD', 'H1');
+
+      return res.json({
+        moduleName: 'Smart Money Footprint',
+        version: 'smart_money_footprint_v1',
+        supportedSymbols: SUPPORTED_SYMBOLS,
+        signalTimeframe: 'H1',
+        trendTimeframe: 'H4',
+        biasTimeframe: 'Weekly',
+        cotFreshness: {
+          lastReportDate: latestXauCot?.report_date || 'N/A',
+          effectiveAt: latestXauCot?.effective_at || 'N/A',
+          totalWeeksXau: cotXau.length,
+          totalWeeksEur: cotEur.length,
+          lastFetch: fetchLog?.completed_at || fetchLog?.started_at || 'N/A',
+          lastFetchOk: Boolean(fetchLog?.ok),
+          lastError: fetchLog?.error || null,
+        },
+        candleFreshness: {
+          xauH1Bars: xauCandles.length,
+          xauLastBarTime: xauCandles[xauCandles.length - 1]?.time || null,
+          eurH1Bars: eurCandles.length,
+          eurLastBarTime: eurCandles[eurCandles.length - 1]?.time || null,
+        },
+        recentSignals: {
+          xauLatest: signalsXau[0] || null,
+          eurLatest: signalsEur[0] || null,
+        },
+        labels: {
+          tickVolumeLabel: TICK_VOLUME_LABEL,
+          cotLabel: COT_LABEL,
+          disclaimer: DISCLAIMER_TEXT,
+        },
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'SMART_MONEY_STATUS_FAILED', message: e.message });
+    }
+  });
+
+  app.get('/api/smartmoney/latest', (req: Request, res: Response) => {
+    try {
+      const rawSym = String(req.query.symbol || 'XAUUSD');
+      const sym = resolveSmartMoneySymbol(rawSym);
+      if (!sym) {
+        return res.status(400).json({
+          error: 'INVALID_SYMBOL',
+          message: 'Smart Money Footprint only supports XAUUSD and EURUSD.',
+        });
+      }
+
+      const h1Candles = loadCandlesFromDb(sym, 'H1');
+      if (h1Candles.length < 30) {
+        return res.status(422).json({
+          error: 'INSUFFICIENT_H1_DATA',
+          message: `Need at least 30 closed H1 bars for ${sym}. Found ${h1Candles.length}.`,
+        });
+      }
+
+      const lastClosedIndex = h1Candles.length - 1;
+      const lastClosedBar = h1Candles[lastClosedIndex];
+
+      const cotConfig = COT_MARKETS[sym];
+      const cotRows = getSmartMoneyCotRows(cotConfig.market);
+
+      const cotRes = computeCotFeatures(cotRows, lastClosedBar.time, 'follow_change', cotConfig.inverted);
+      const actRes = detectActivityEvent(h1Candles, lastClosedIndex);
+      const trendRes = computeTrendContext(h1Candles, lastClosedIndex);
+
+      const signal = scoreSmartMoneySignal(sym, lastClosedBar, cotRes, actRes, trendRes);
+
+      // Save heartbeat state
+      saveSmartMoneyBar({
+        symbol: sym,
+        bar_time: lastClosedBar.time,
+        c_cot: signal.c_cot,
+        c_act: signal.c_act,
+        c_trend: signal.c_trend,
+        score: signal.score,
+        direction: signal.direction,
+        created_at: new Date().toISOString(),
+      });
+
+      return res.json({
+        symbol: sym,
+        signal,
+        cotFeatures: cotRes,
+        activityEvent: actRes,
+        trendContext: trendRes,
+        labels: {
+          tickVolumeLabel: TICK_VOLUME_LABEL,
+          cotLabel: COT_LABEL,
+          disclaimer: DISCLAIMER_TEXT,
+        },
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'SMART_MONEY_LATEST_FAILED', message: e.message });
+    }
+  });
+
+  app.get('/api/smartmoney/signals', (req: Request, res: Response) => {
+    try {
+      const rawSym = req.query.symbol ? resolveSmartMoneySymbol(String(req.query.symbol)) : undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+      const from = req.query.from ? parseInt(String(req.query.from), 10) : undefined;
+      const to = req.query.to ? parseInt(String(req.query.to), 10) : undefined;
+
+      const signals = getSmartMoneySignals({ symbol: rawSym || undefined, limit, from, to });
+      const signalIds = signals.map((s) => s.id);
+      const outcomes = getSmartMoneyOutcomes(signalIds);
+
+      // Join outcomes to signals
+      const enriched = signals.map((s) => ({
+        ...s,
+        outcomes: outcomes.filter((o) => o.signal_id === s.id),
+      }));
+
+      return res.json({ signals: enriched });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_LOAD_SIGNALS', message: e.message });
+    }
+  });
+
+  app.post('/api/smartmoney/cot/refresh', async (req: Request, res: Response) => {
+    try {
+      const r = await refreshCotData();
+      return res.json(r);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'COT_REFRESH_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/smartmoney/compute', (req: Request, res: Response) => {
+    try {
+      const symbolsToProcess = req.body?.symbol ? [resolveSmartMoneySymbol(req.body.symbol)].filter(Boolean) as SmartMoneySymbol[] : ['XAUUSD', 'EURUSD'] as SmartMoneySymbol[];
+      let totalComputed = 0;
+      let totalSignalsLogged = 0;
+
+      for (const sym of symbolsToProcess) {
+        const h1Candles = loadCandlesFromDb(sym, 'H1');
+        if (h1Candles.length < 35) continue;
+
+        const cotConfig = COT_MARKETS[sym];
+        const cotRows = getSmartMoneyCotRows(cotConfig.market);
+
+        // Process last 100 closed bars (excluding forming bar)
+        const startIndex = Math.max(30, h1Candles.length - 100);
+        for (let i = startIndex; i < h1Candles.length; i++) {
+          const bar = h1Candles[i];
+          const cotRes = computeCotFeatures(cotRows, bar.time, 'follow_change', cotConfig.inverted);
+          const actRes = detectActivityEvent(h1Candles, i);
+          const trendRes = computeTrendContext(h1Candles, i);
+          const sig = scoreSmartMoneySignal(sym, bar, cotRes, actRes, trendRes);
+
+          saveSmartMoneyBar({
+            symbol: sym,
+            bar_time: bar.time,
+            c_cot: sig.c_cot,
+            c_act: sig.c_act,
+            c_trend: sig.c_trend,
+            score: sig.score,
+            direction: sig.direction,
+            created_at: new Date().toISOString(),
+          });
+
+          if (sig.direction === 'BUY' || sig.direction === 'SELL') {
+            saveSmartMoneySignal(sig);
+            totalSignalsLogged++;
+          }
+          totalComputed++;
+        }
+      }
+
+      return res.json({
+        success: true,
+        barsEvaluated: totalComputed,
+        signalsLogged: totalSignalsLogged,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'SMART_MONEY_COMPUTE_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/smartmoney/outcomes/update', (req: Request, res: Response) => {
+    try {
+      const signals = getSmartMoneySignals({ limit: 500 });
+      let updatedCount = 0;
+
+      for (const sig of signals) {
+        const sym = sig.symbol as ForexSymbol;
+        const h1Candles = loadCandlesFromDb(sym, 'H1');
+        const sigBarIndex = h1Candles.findIndex((c) => c.time === sig.bar_time);
+        if (sigBarIndex === -1 || sigBarIndex >= h1Candles.length - 1) continue;
+
+        // Entry at next bar's OPEN (no lookahead)
+        const entryBar = h1Candles[sigBarIndex + 1];
+        const entryPrice = entryBar.open;
+        const dir = sig.direction === 'BUY' ? 1 : -1;
+        const pipScale = sym === 'USDJPY' ? 0.01 : sym === 'XAUUSD' ? 0.1 : 0.0001;
+        const spreadCostPips = sym === 'XAUUSD' ? 25.0 : 1.2;
+
+        for (const h of [4, 24, 72]) {
+          const exitIndex = sigBarIndex + 1 + h;
+          if (exitIndex < h1Candles.length) {
+            const exitBar = h1Candles[exitIndex];
+            const rawReturn = (exitBar.open - entryPrice) * dir;
+            const returnPips = rawReturn / pipScale - (spreadCostPips + 0.4);
+            const atr = sig.range_atr > 0 ? sig.range_atr : 1.0;
+            const returnAtr = returnPips / (atr * 10);
+
+            saveSmartMoneyOutcome({
+              id: `out-${sig.id}-${h}h`,
+              signal_id: sig.id,
+              horizon_hours: h,
+              entry_price: entryPrice,
+              exit_price: exitBar.open,
+              return_pips_or_points: Number(returnPips.toFixed(2)),
+              return_atr: Number(returnAtr.toFixed(3)),
+              cost_applied: spreadCostPips + 0.4,
+              computed_at: new Date().toISOString(),
+            });
+            updatedCount++;
+          }
+        }
+      }
+
+      return res.json({ success: true, outcomesUpdated: updatedCount });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'OUTCOMES_UPDATE_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/smartmoney/eval', (req: Request, res: Response) => {
+    try {
+      const rawSym = String(req.body?.symbol || 'XAUUSD');
+      const sym = resolveSmartMoneySymbol(rawSym);
+      if (!sym) {
+        return res.status(400).json({
+          error: 'INVALID_SYMBOL',
+          message: 'Evaluation only supports XAUUSD and EURUSD.',
+        });
+      }
+
+      const confirmHeldOut = Boolean(req.body?.confirmHeldOut);
+      const h1Candles = loadCandlesFromDb(sym, 'H1');
+      if (h1Candles.length < 100) {
+        return res.status(422).json({
+          error: 'INSUFFICIENT_DATA_FOR_EVAL',
+          message: `Need at least 100 H1 candles for event study. Found ${h1Candles.length}. Please fetch from bridge or seed 6-month historical data.`,
+        });
+      }
+
+      const cotConfig = COT_MARKETS[sym];
+      const cotRows = getSmartMoneyCotRows(cotConfig.market);
+
+      const report = runSmartMoneyEventStudy(sym, h1Candles, cotRows, {
+        confirmHeldOut,
+        config: {
+          ...DEFAULT_SMART_MONEY_CONFIG,
+          cotMode: req.body?.cotMode || 'follow_change',
+        },
+      });
+
+      return res.json(report);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'EVENT_STUDY_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/smartmoney/explain', async (req: Request, res: Response) => {
+    try {
+      const signalId = req.body?.signalId;
+      let signalRecord = req.body?.signal;
+
+      if (!signalRecord && signalId) {
+        signalRecord = getSmartMoneySignalById(signalId);
+      }
+
+      if (!signalRecord) {
+        return res.status(404).json({ error: 'SIGNAL_NOT_FOUND' });
+      }
+
+      const explanation = await explainSmartMoneySignalWithAi(signalRecord);
+      return res.json(explanation);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'EXPLANATION_FAILED', message: e.message });
+    }
+  });
+
+  // ==========================================
   // 4. FRONTEND VITE INTEGRATION
   // ==========================================
 
@@ -789,6 +1185,17 @@ async function startServer() {
     app.get('*', (req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
     });
+  }
+
+  // Initialize 6-month historical datasets & COT baseline if not present
+  try {
+    const seedRes = seedHistoricalDatasets(false);
+    if (seedRes.seeded) {
+      console.log(`[Zaboraa FX] Seeded ${seedRes.totalCandles} historical candles across 4 symbols.`);
+    }
+    refreshCotData().catch(() => {});
+  } catch (err: any) {
+    console.warn('[Zaboraa FX] Non-fatal startup initialization:', err.message);
   }
 
   app.listen(PORT, HOST, () => {
