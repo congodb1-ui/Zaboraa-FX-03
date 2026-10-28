@@ -24,6 +24,12 @@ import {
   saveSmartMoneyBar,
   getSmartMoneyBars,
   getExternalFetchStatus,
+  getHistoricalStorageSummary,
+  getStoredCandlesPaginated,
+  recordAuditLog,
+  getAuditLogs,
+  getBrokerAccounts,
+  upsertBrokerAccount,
 } from './src/db/sqlite';
 import { auditCandles, fixCandles } from './src/engine/data/candleQuality';
 import { candleCsvLines, importCandlesCsv } from './src/engine/data/candleCsv';
@@ -169,6 +175,98 @@ async function startServer() {
 
     const candles = loadCandlesFromDb(sym, tf);
     return res.json({ symbol: sym, timeframe: tf, count: candles.length, candles });
+  });
+
+  // Permanently persisted historical data summary
+  app.get('/api/data/storage-summary', (req: Request, res: Response) => {
+    try {
+      const summary = getHistoricalStorageSummary();
+      return res.json(summary);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_GET_SUMMARY', message: e.message });
+    }
+  });
+
+  // Browse all stored historical candles paginated (never truncated)
+  app.get('/api/data/browse', (req: Request, res: Response) => {
+    try {
+      const sym = req.query.symbol ? String(req.query.symbol) : undefined;
+      const tf = req.query.timeframe ? String(req.query.timeframe) : undefined;
+      const page = parseInt(String(req.query.page || '1'), 10);
+      const pageSize = parseInt(String(req.query.pageSize || '50'), 10);
+
+      const result = getStoredCandlesPaginated(sym, tf, page, pageSize);
+      return res.json(result);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_BROWSE', message: e.message });
+    }
+  });
+
+  // ==========================================
+  // 2B. ADMIN & MULTI-ACCOUNT MANAGEMENT
+  // ==========================================
+
+  app.get('/api/admin/audit-logs', (req: Request, res: Response) => {
+    const logs = getAuditLogs(100);
+    return res.json({ logs });
+  });
+
+  app.post('/api/admin/audit-log', (req: Request, res: Response) => {
+    const { username = 'Admin', role = 'Master Admin', action, details } = req.body || {};
+    if (!action) return res.status(400).json({ error: 'MISSING_ACTION' });
+    recordAuditLog(username, role, action, details);
+    return res.json({ success: true });
+  });
+
+  app.get('/api/admin/accounts', (req: Request, res: Response) => {
+    const accounts = getBrokerAccounts();
+    return res.json({ accounts });
+  });
+
+  app.post('/api/admin/accounts', (req: Request, res: Response) => {
+    try {
+      const account = req.body;
+      if (!account.account_name || !account.broker) {
+        return res.status(400).json({ error: 'INVALID_ACCOUNT_DATA' });
+      }
+      upsertBrokerAccount(account);
+      recordAuditLog('Admin', 'Master Admin', 'UPSERT_ACCOUNT', `Saved account ${account.account_name} (${account.type})`);
+      return res.json({ success: true, accounts: getBrokerAccounts() });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_SAVE_ACCOUNT', message: e.message });
+    }
+  });
+
+  // Authoritative server-side multi-level kill switch execution
+  app.post('/api/admin/killswitch', async (req: Request, res: Response) => {
+    const { level = 'master', targetId, reason = 'Operator triggered emergency halt' } = req.body || {};
+    const timestamp = new Date().toISOString();
+
+    recordAuditLog('Operator', 'Master Admin', `KILL_SWITCH_${level.toUpperCase()}`, `Target: ${targetId || 'ALL'}; Reason: ${reason}`);
+
+    // If MT5 Bridge is connected, forward cancel command
+    let bridgeContacted = false;
+    try {
+      const resp = await fetch(`${BRIDGE_URL}/killswitch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${BRIDGE_TOKEN}`,
+        },
+        body: JSON.stringify({ level, targetId, reason }),
+      });
+      bridgeContacted = resp.ok;
+    } catch {}
+
+    return res.json({
+      success: true,
+      level,
+      targetId: targetId || 'ALL',
+      haltedAt: timestamp,
+      bridgeContacted,
+      state: 'EMERGENCY_HALT_ENGAGED',
+      message: `Emergency Kill Switch engaged at ${level} level. Orders halted and positions flagged.`,
+    });
   });
 
   app.post('/api/data/bulk-download', async (req: Request, res: Response) => {

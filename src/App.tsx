@@ -14,6 +14,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { SettingsView } from './components/SettingsView';
 import { KillSwitchModal } from './components/KillSwitchModal';
 import { SmartMoneyFootprintView } from './components/SmartMoneyFootprintView';
+import { AdminAccountsView } from './components/AdminAccountsView';
 
 import {
   BacktestReport,
@@ -29,12 +30,13 @@ import {
 } from './types/forex';
 import { BUILT_IN_STRATEGIES, StrategyDefinition } from './engine/workerSandbox';
 import { globalRiskManager } from './engine/riskManager';
-import { ShieldCheck, TrendingUp } from 'lucide-react';
+import { ShieldCheck, TrendingUp, CheckCircle2 } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<NavTab>('markets');
   const [isKillSwitchOpen, setIsKillSwitchOpen] = useState<boolean>(false);
   const [studioSelectedStrategyId, setStudioSelectedStrategyId] = useState<string | undefined>(undefined);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Broker State (Connected to Exness MT5 Demo Terminal)
   const [brokerState, setBrokerState] = useState<BrokerState>({
@@ -172,6 +174,12 @@ export const App: React.FC = () => {
       } catch {}
       return copy;
     });
+
+    fetch('/api/strategies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updated),
+    }).catch(() => {});
   };
 
   const handleCreateStrategy = (newStrat: StrategyDefinition) => {
@@ -182,6 +190,12 @@ export const App: React.FC = () => {
       } catch {}
       return copy;
     });
+
+    fetch('/api/strategies', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newStrat),
+    }).catch(() => {});
   };
 
   const handleDeleteStrategy = (id: string) => {
@@ -192,6 +206,8 @@ export const App: React.FC = () => {
       } catch {}
       return filtered;
     });
+
+    fetch(`/api/strategies/${id}`, { method: 'DELETE' }).catch(() => {});
   };
 
   // Active Positions
@@ -529,7 +545,8 @@ export const App: React.FC = () => {
             <PineConverterView
               onAddConvertedStrategy={(strat) => {
                 handleCreateStrategy(strat);
-                alert(`Pine strategy "${strat.name}" added to Strategy Studio.`);
+                setToastMessage(`Pine strategy "${strat.name}" added to Strategy Studio.`);
+                setTimeout(() => setToastMessage(null), 4000);
                 setActiveTab('strategies');
               }}
             />
@@ -568,6 +585,13 @@ export const App: React.FC = () => {
             />
           )}
 
+          {activeTab === 'accounts' && (
+            <AdminAccountsView
+              brokerState={brokerState}
+              onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
+            />
+          )}
+
           {activeTab === 'settings' && (
             <SettingsView
               brokerState={brokerState}
@@ -578,6 +602,21 @@ export const App: React.FC = () => {
           )}
         </main>
       </div>
+
+      {/* Floating System Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg bg-[#0F1B2F] border border-blue-500/50 text-slate-100 text-xs shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-slate-400 hover:text-white font-bold ml-2 cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Global Emergency Kill Switch Modal */}
       <KillSwitchModal

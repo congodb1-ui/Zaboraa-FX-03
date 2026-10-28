@@ -11,8 +11,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { DatasetRecord, OverfittingReport } from '../types/forex';
-import { BUILT_IN_STRATEGIES } from '../engine/workerSandbox';
-import { generateParameterHeatmap } from '../engine/backtester';
+import { BUILT_IN_STRATEGIES, StrategyDefinition } from '../engine/workerSandbox';
+import { generateParameterHeatmap, runBacktest } from '../engine/backtester';
 import { calculateOverfittingScore, runMonteCarloAnalysis } from '../engine/engineMath';
 
 interface OptimizationViewProps {
@@ -57,20 +57,46 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
       // Overfitting Score Calculation
       const sharpeScores = res.matrix.map((m) => m.sharpe);
       const bestSharpe = Math.max(...sharpeScores);
+      
+      // Find the optimal parameter combination
+      const bestCell = res.matrix.reduce((prev, curr) => (curr.sharpe > prev.sharpe ? curr : prev), res.matrix[0]);
+      let realPnls: number[] = [];
+      let optimalTradeCount = 0;
+
+      if (bestCell) {
+        try {
+          const optimalStrategy: StrategyDefinition = {
+            ...selectedStrategy,
+            params: {
+              ...selectedStrategy.params,
+              channelPeriod: bestCell.p1,
+              exitPeriod: bestCell.p2,
+            },
+          };
+          const bestReport = runBacktest(optimalStrategy, selectedDataset);
+          optimalTradeCount = bestReport.trades.length;
+          realPnls = bestReport.trades.map((t) => t.pnl);
+        } catch {}
+      }
+
       const overfit = calculateOverfittingScore({
         sharpeInSample: bestSharpe > 0 ? bestSharpe : 1.45,
         sharpeOutOfSample: bestSharpe > 0 ? bestSharpe * 0.82 : 1.15,
         paramSharpeNeighbors: sharpeScores.slice(0, 5),
-        tradesInSample: 45,
+        tradesInSample: optimalTradeCount > 0 ? optimalTradeCount : 45,
         paramCount: 2,
         trialsCount: 25,
       });
       setOverfittingResult(overfit);
 
-      // Monte Carlo Reshuffling & Bootstrapping
-      const samplePnl = [120, -45, 80, -30, 210, -90, 65, 140, -50, 110, -75, 95];
-      const mc = runMonteCarloAnalysis(samplePnl, 10000, 42, 1000);
-      setMonteCarloResult(mc);
+      // Monte Carlo Reshuffling & Bootstrapping using REAL trade PnLs
+      const tradePnlSeries = realPnls.length >= 3 ? realPnls : [120, -45, 80, -30, 210, -90, 65, 140, -50, 110, -75, 95];
+      const mc = runMonteCarloAnalysis(tradePnlSeries, 10000, 42, 1000);
+      setMonteCarloResult({
+        ...mc,
+        isRealTrades: realPnls.length >= 3,
+        tradeCount: realPnls.length,
+      } as any);
     } catch (err) {
       console.error(err);
     } finally {
@@ -272,10 +298,15 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
 
             {monteCarloResult && (
               <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">
-                  <Shuffle className="w-3.5 h-3.5 text-blue-400" />
-                  Seeded Monte Carlo (Mulberry32)
-                </h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                    <Shuffle className="w-3.5 h-3.5 text-blue-400" />
+                    Seeded Monte Carlo (Mulberry32)
+                  </h3>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${(monteCarloResult as any).isRealTrades ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                    {(monteCarloResult as any).isRealTrades ? `From ${(monteCarloResult as any).tradeCount} Real Trades` : 'Simulated Sample'}
+                  </span>
+                </div>
                 <div className="space-y-2 text-xs font-mono">
                   <div className="flex justify-between">
                     <span className="text-slate-400">Reshuffled Worst DD:</span>

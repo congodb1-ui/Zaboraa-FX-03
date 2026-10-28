@@ -53,6 +53,37 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
   // Autofix logs
   const [autofixLogs, setAutofixLogs] = useState<string[]>([]);
 
+  // View mode switcher: Catalog Datasets vs Complete SQLite Historical Vault
+  const [activeTabMode, setActiveTabMode] = useState<'catalog' | 'vault'>('catalog');
+  const [storageSummary, setStorageSummary] = useState<{
+    totalCandles: number;
+    datasets: Array<{
+      symbol: string;
+      timeframe: string;
+      candleCount: number;
+      minTime: number;
+      maxTime: number;
+      minDateIso: string;
+      maxDateIso: string;
+    }>;
+    persisted: boolean;
+    message: string;
+  } | null>(null);
+
+  // Vault Browser State
+  const [vaultSymbol, setVaultSymbol] = useState<string>('ALL');
+  const [vaultTimeframe, setVaultTimeframe] = useState<string>('ALL');
+  const [vaultPage, setVaultPage] = useState<number>(1);
+  const [vaultPageSize, setVaultPageSize] = useState<number>(50);
+  const [vaultCandles, setVaultCandles] = useState<Candle[]>([]);
+  const [vaultTotal, setVaultTotal] = useState<number>(0);
+  const [vaultTotalPages, setVaultTotalPages] = useState<number>(1);
+  const [isLoadingVault, setIsLoadingVault] = useState<boolean>(false);
+
+  // Catalog Table Pagination
+  const [catalogPage, setCatalogPage] = useState<number>(1);
+  const [catalogPageSize, setCatalogPageSize] = useState<number>(50);
+
   // AI Data Review state
   const [aiReview, setAiReview] = useState<any | null>(null);
   const [isAiReviewing, setIsAiReviewing] = useState<boolean>(false);
@@ -113,7 +144,43 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
     }
   };
 
-  // Load catalog from SQLite database
+  // Load catalog and permanent storage summary from SQLite database
+  const loadStorageSummary = async () => {
+    try {
+      const res = await fetch('/api/data/storage-summary');
+      if (res.ok) {
+        const data = await res.json();
+        setStorageSummary(data);
+      }
+    } catch {}
+  };
+
+  const loadVaultData = async (
+    page = vaultPage,
+    sym = vaultSymbol,
+    tf = vaultTimeframe,
+    size = vaultPageSize
+  ) => {
+    setIsLoadingVault(true);
+    try {
+      let url = `/api/data/browse?page=${page}&pageSize=${size}`;
+      if (sym !== 'ALL') url += `&symbol=${sym}`;
+      if (tf !== 'ALL') url += `&timeframe=${tf}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        setVaultCandles(data.candles || []);
+        setVaultTotal(data.total || 0);
+        setVaultTotalPages(data.totalPages || 1);
+        setVaultPage(data.page || 1);
+      }
+    } catch (e) {
+      console.error('Failed to browse vault candles:', e);
+    } finally {
+      setIsLoadingVault(false);
+    }
+  };
+
   const loadCatalogFromBackend = async () => {
     try {
       const res = await fetch('/api/data/catalog');
@@ -125,6 +192,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           setSelectedDatasetId(records[0].id);
         }
       }
+      loadStorageSummary();
     } catch (err) {
       console.error('Failed to load catalog:', err);
     }
@@ -132,6 +200,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
   useEffect(() => {
     loadCatalogFromBackend();
+    loadStorageSummary();
+    loadVaultData(1, 'ALL', 'ALL', 50);
   }, []);
 
   // When selected dataset changes, load candles from SQLite
@@ -353,6 +423,44 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           </div>
         </div>
 
+        {/* Navigation Switcher: Catalog vs Complete Stored Historical Vault */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveTabMode('catalog')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                activeTabMode === 'catalog'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              Catalog Datasets ({catalog.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTabMode('vault');
+                loadVaultData(1, vaultSymbol, vaultTimeframe, vaultPageSize);
+                loadStorageSummary();
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeTabMode === 'vault'
+                  ? 'bg-emerald-600 text-white shadow-md'
+                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              Complete Stored Historical Vault ({storageSummary?.totalCandles?.toLocaleString() || '...'} Total Bars)
+            </button>
+          </div>
+
+          <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            SQLite Storage: 100% Permanent & Append-Only (Zero Deletions)
+          </div>
+        </div>
+
         {/* Catalog List / Tabs */}
         {catalog.length === 0 ? (
           <div className="mt-6 py-10 text-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 p-6">
@@ -537,13 +645,51 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
           {/* Stored OHLC Table */}
           <div className="lg:col-span-2 rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
-                Stored OHLC Market Bars ({loadedCandles.length} Loaded)
-              </h3>
-              <span className="text-xs font-mono text-slate-400">
-                UTC Epoch Normalized
-              </span>
+            <div className="flex flex-wrap items-center justify-between pb-2 border-b border-slate-800 gap-2">
+              <div>
+                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+                  Stored OHLC Market Bars ({loadedCandles.length} Bars in Dataset)
+                </h3>
+                <span className="text-[10px] text-emerald-400 font-mono">
+                  Showing {loadedCandles.length > 0 ? (catalogPage - 1) * catalogPageSize + 1 : 0} – {Math.min(catalogPage * catalogPageSize, loadedCandles.length)} of {loadedCandles.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={catalogPageSize}
+                  onChange={(e) => {
+                    setCatalogPageSize(Number(e.target.value));
+                    setCatalogPage(1);
+                  }}
+                  className="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300"
+                >
+                  <option value={50}>50 / page</option>
+                  <option value={100}>100 / page</option>
+                  <option value={250}>250 / page</option>
+                  <option value={1000}>1000 / page</option>
+                </select>
+                <div className="flex items-center gap-1 font-mono text-xs">
+                  <button
+                    type="button"
+                    disabled={catalogPage <= 1}
+                    onClick={() => setCatalogPage((p) => Math.max(1, p - 1))}
+                    className="px-2 py-1 rounded bg-slate-900 border border-slate-800 disabled:opacity-40 text-slate-300 hover:text-white cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span className="px-1.5 text-slate-400 text-[11px]">
+                    {catalogPage} / {Math.max(1, Math.ceil(loadedCandles.length / catalogPageSize))}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={catalogPage >= Math.ceil(loadedCandles.length / catalogPageSize)}
+                    onClick={() => setCatalogPage((p) => p + 1)}
+                    className="px-2 py-1 rounded bg-slate-900 border border-slate-800 disabled:opacity-40 text-slate-300 hover:text-white cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
 
             {isLoadingCandles ? (
@@ -570,8 +716,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   </thead>
                   <tbody className="divide-y divide-slate-800/60">
                     {loadedCandles
-                      .slice(-50)
-                      .reverse()
+                      .slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize)
                       .map((c, i) => (
                         <tr key={c.time + '-' + i} className="hover:bg-slate-800/30">
                           <td className="py-1.5 text-slate-400">
@@ -596,6 +741,288 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
         </div>
       </>
     )}
+
+      {/* COMPLETE STORED HISTORICAL DATA VAULT */}
+      {activeTabMode === 'vault' && (
+        <div className="space-y-6">
+          {/* Storage Summary Highlights */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
+              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+                Total Historical Bars in SQLite
+              </span>
+              <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">
+                {storageSummary?.totalCandles?.toLocaleString() || '0'}
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Permanently persisted in data/zaboraa.sqlite
+              </span>
+            </div>
+
+            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
+              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+                Tracked Pair Series
+              </span>
+              <span className="text-2xl font-bold font-mono text-white mt-1 block">
+                {storageSummary?.datasets?.length || 0} Sets
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Unique symbol + timeframe combinations
+              </span>
+            </div>
+
+            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
+              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+                Persistence Policy
+              </span>
+              <span className="text-base font-bold font-mono text-blue-400 mt-1 block">
+                Append-Only
+              </span>
+              <span className="text-[10px] text-emerald-400 mt-1 block">
+                Zero Deletions / No Pruning
+              </span>
+            </div>
+
+            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
+              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+                Disk Integrity
+              </span>
+              <span className="text-base font-bold font-mono text-emerald-400 mt-1 block flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4" />
+                Synchronous WAL
+              </span>
+              <span className="text-[10px] text-slate-500 mt-1 block">
+                Index: (symbol, timeframe, time)
+              </span>
+            </div>
+          </div>
+
+          {/* Stored Datasets Matrix */}
+          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Database className="w-4 h-4 text-emerald-400" />
+                  Stored Historical Series Overview
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  All historical candles stored locally in the database. Select any row to inspect bars in the universal browser.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  loadStorageSummary();
+                  loadVaultData(1, vaultSymbol, vaultTimeframe, vaultPageSize);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                Refresh Vault
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono border-collapse">
+                <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                  <tr>
+                    <th className="p-3">Symbol</th>
+                    <th className="p-3">Timeframe</th>
+                    <th className="p-3">Total Bars Stored</th>
+                    <th className="p-3">Earliest Recorded Bar (UTC)</th>
+                    <th className="p-3">Latest Recorded Bar (UTC)</th>
+                    <th className="p-3">Storage Status</th>
+                    <th className="p-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {storageSummary?.datasets?.map((ds) => (
+                    <tr key={ds.symbol + '-' + ds.timeframe} className="hover:bg-slate-800/20">
+                      <td className="p-3 font-bold text-white font-sans">{ds.symbol}</td>
+                      <td className="p-3 text-slate-300">{ds.timeframe}</td>
+                      <td className="p-3 font-bold text-emerald-400">
+                        {ds.candleCount.toLocaleString()}
+                      </td>
+                      <td className="p-3 text-slate-400 text-[11px]">
+                        {ds.minDateIso ? ds.minDateIso.replace('T', ' ').substring(0, 19) : 'N/A'}
+                      </td>
+                      <td className="p-3 text-slate-400 text-[11px]">
+                        {ds.maxDateIso ? ds.maxDateIso.replace('T', ' ').substring(0, 19) : 'N/A'}
+                      </td>
+                      <td className="p-3">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                          PERMANENT SQLITE
+                        </span>
+                      </td>
+                      <td className="p-3">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setVaultSymbol(ds.symbol);
+                            setVaultTimeframe(ds.timeframe);
+                            loadVaultData(1, ds.symbol, ds.timeframe, vaultPageSize);
+                          }}
+                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-sans font-semibold cursor-pointer"
+                        >
+                          Inspect Bars
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Universal Historical Candle Browser */}
+          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+              <div>
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Search className="w-4 h-4 text-blue-400" />
+                  Universal Historical Candle Explorer
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Browse and verify every single candle persisted in SQLite across all pairs.
+                </p>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
+                <div>
+                  <label className="text-slate-400 mr-1.5 font-sans">Symbol:</label>
+                  <select
+                    value={vaultSymbol}
+                    onChange={(e) => {
+                      setVaultSymbol(e.target.value);
+                      loadVaultData(1, e.target.value, vaultTimeframe, vaultPageSize);
+                    }}
+                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-white"
+                  >
+                    <option value="ALL">ALL SYMBOLS</option>
+                    <option value="EURUSD">EURUSD</option>
+                    <option value="GBPUSD">GBPUSD</option>
+                    <option value="USDJPY">USDJPY</option>
+                    <option value="XAUUSD">XAUUSD</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 mr-1.5 font-sans">Timeframe:</label>
+                  <select
+                    value={vaultTimeframe}
+                    onChange={(e) => {
+                      setVaultTimeframe(e.target.value);
+                      loadVaultData(1, vaultSymbol, e.target.value, vaultPageSize);
+                    }}
+                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-white"
+                  >
+                    <option value="ALL">ALL TIMEFRAMES</option>
+                    <option value="M1">M1</option>
+                    <option value="M5">M5</option>
+                    <option value="M10">M10</option>
+                    <option value="M15">M15</option>
+                    <option value="M30">M30</option>
+                    <option value="H1">H1</option>
+                    <option value="H3">H3</option>
+                    <option value="D1">D1</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-slate-400 mr-1.5 font-sans">Per Page:</label>
+                  <select
+                    value={vaultPageSize}
+                    onChange={(e) => {
+                      const sz = Number(e.target.value);
+                      setVaultPageSize(sz);
+                      loadVaultData(1, vaultSymbol, vaultTimeframe, sz);
+                    }}
+                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-white"
+                  >
+                    <option value={50}>50 bars</option>
+                    <option value={100}>100 bars</option>
+                    <option value={250}>250 bars</option>
+                    <option value={500}>500 bars</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Pagination Controls */}
+            <div className="flex items-center justify-between text-xs font-mono pt-1">
+              <span className="text-slate-400">
+                Found <strong className="text-emerald-400">{vaultTotal.toLocaleString()}</strong> historical bars in SQLite
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={vaultPage <= 1 || isLoadingVault}
+                  onClick={() => loadVaultData(vaultPage - 1, vaultSymbol, vaultTimeframe, vaultPageSize)}
+                  className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 cursor-pointer"
+                >
+                  Previous
+                </button>
+                <span className="px-2 text-slate-300">
+                  Page {vaultPage} of {vaultTotalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={vaultPage >= vaultTotalPages || isLoadingVault}
+                  onClick={() => loadVaultData(vaultPage + 1, vaultSymbol, vaultTimeframe, vaultPageSize)}
+                  className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+            {/* Bars Table */}
+            {isLoadingVault ? (
+              <div className="py-20 text-center text-slate-500 text-xs font-mono">
+                Querying SQLite candle repository...
+              </div>
+            ) : vaultCandles.length === 0 ? (
+              <div className="py-20 text-center text-slate-500 text-xs font-mono">
+                No matching historical candles found in SQLite for current filter.
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                    <tr>
+                      <th className="py-2.5 px-3">Time (UTC)</th>
+                      <th className="py-2.5 px-3">Epoch</th>
+                      <th className="py-2.5 px-3">Open</th>
+                      <th className="py-2.5 px-3">High</th>
+                      <th className="py-2.5 px-3">Low</th>
+                      <th className="py-2.5 px-3">Close</th>
+                      <th className="py-2.5 px-3">Tick Volume</th>
+                      <th className="py-2.5 px-3">Spread (pts)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {vaultCandles.map((c, i) => (
+                      <tr key={c.time + '-' + i} className="hover:bg-slate-800/20">
+                        <td className="py-1.5 px-3 text-slate-300">
+                          {new Date(c.time * 1000).toISOString().replace('T', ' ').substring(0, 19)}
+                        </td>
+                        <td className="py-1.5 px-3 text-slate-500">{c.time}</td>
+                        <td className="py-1.5 px-3 text-white">{c.open}</td>
+                        <td className="py-1.5 px-3 text-emerald-400">{c.high}</td>
+                        <td className="py-1.5 px-3 text-rose-400">{c.low}</td>
+                        <td className="py-1.5 px-3 text-white font-bold">{c.close}</td>
+                        <td className="py-1.5 px-3 text-slate-400">{c.tickVolume}</td>
+                        <td className="py-1.5 px-3 text-blue-400">{c.spread}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Fetch from MT5 Bridge Modal */}
       {isFetchModalOpen && (

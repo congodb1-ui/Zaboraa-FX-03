@@ -244,6 +244,30 @@ db.exec(`
     rows_ingested INTEGER NOT NULL,
     error TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS admin_audit_logs (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    username TEXT NOT NULL,
+    role TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS broker_accounts (
+    id TEXT PRIMARY KEY,
+    account_name TEXT NOT NULL,
+    broker TEXT NOT NULL,
+    server TEXT NOT NULL,
+    login TEXT NOT NULL,
+    type TEXT NOT NULL,
+    status TEXT NOT NULL,
+    last_connection TEXT NOT NULL,
+    max_lots REAL NOT NULL,
+    risk_pct REAL NOT NULL,
+    is_live_approved INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
 `);
 
 /**
@@ -787,4 +811,240 @@ export function getExternalFetchStatus(source = 'CFTC_COT'): any {
   const stmt = db.prepare('SELECT * FROM external_fetch_log WHERE source = ? ORDER BY started_at DESC LIMIT 1');
   return stmt.get(source);
 }
+
+/**
+ * Returns comprehensive statistics of all historical candle data stored in SQLite.
+ * Confirms that all data is permanently persisted and never automatically purged.
+ */
+export function getHistoricalStorageSummary(): {
+  totalCandles: number;
+  datasets: Array<{
+    symbol: string;
+    timeframe: string;
+    candleCount: number;
+    minTime: number;
+    maxTime: number;
+    minDateIso: string;
+    maxDateIso: string;
+  }>;
+  persisted: boolean;
+  message: string;
+} {
+  const countRow = db.prepare('SELECT COUNT(*) as count FROM candles').get() as { count: number };
+  const totalCandles = countRow?.count || 0;
+
+  const datasetRows = db.prepare(`
+    SELECT 
+      symbol, 
+      timeframe, 
+      COUNT(*) as candleCount, 
+      MIN(time) as minTime, 
+      MAX(time) as maxTime 
+    FROM candles 
+    GROUP BY symbol, timeframe 
+    ORDER BY symbol ASC, timeframe ASC
+  `).all() as any[];
+
+  const datasets = datasetRows.map((r) => ({
+    symbol: r.symbol,
+    timeframe: r.timeframe,
+    candleCount: r.candleCount,
+    minTime: r.minTime,
+    maxTime: r.maxTime,
+    minDateIso: r.minTime ? new Date(r.minTime * 1000).toISOString() : '',
+    maxDateIso: r.maxTime ? new Date(r.maxTime * 1000).toISOString() : '',
+  }));
+
+  return {
+    totalCandles,
+    datasets,
+    persisted: true,
+    message: 'All historical market data is permanently stored in SQLite (data/zaboraa.sqlite) and never purged.',
+  };
+}
+
+/**
+ * Loads paginated historical candles across any symbol and timeframe so that
+ * the user can inspect every single candle stored in SQLite.
+ */
+export function getStoredCandlesPaginated(
+  symbol?: string,
+  timeframe?: string,
+  page: number = 1,
+  pageSize: number = 50
+): {
+  candles: Candle[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+} {
+  const safePage = Math.max(1, page);
+  const safePageSize = Math.max(1, Math.min(500, pageSize));
+  const offset = (safePage - 1) * safePageSize;
+
+  let countQuery = 'SELECT COUNT(*) as count FROM candles WHERE 1=1';
+  let dataQuery = 'SELECT time, open, high, low, close, tick_volume as tickVolume, spread FROM candles WHERE 1=1';
+  const params: any[] = [];
+
+  if (symbol && symbol !== 'ALL') {
+    countQuery += ' AND symbol = ?';
+    dataQuery += ' AND symbol = ?';
+    params.push(symbol);
+  }
+
+  if (timeframe && timeframe !== 'ALL') {
+    countQuery += ' AND timeframe = ?';
+    dataQuery += ' AND timeframe = ?';
+    params.push(timeframe);
+  }
+
+  dataQuery += ' ORDER BY time DESC LIMIT ? OFFSET ?';
+  const dataParams = [...params, safePageSize, offset];
+
+  const totalRow = db.prepare(countQuery).get(...params) as { count: number };
+  const total = totalRow?.count || 0;
+  const rows = db.prepare(dataQuery).all(...dataParams) as any[];
+
+  const candles: Candle[] = rows.map((r) => ({
+    time: r.time,
+    open: r.open,
+    high: r.high,
+    low: r.low,
+    close: r.close,
+    tickVolume: r.tickVolume,
+    spread: r.spread,
+  }));
+
+  return {
+    candles,
+    total,
+    page: safePage,
+    pageSize: safePageSize,
+    totalPages: Math.max(1, Math.ceil(total / safePageSize)),
+  };
+}
+
+/**
+ * Record an action to the administrative audit log
+ */
+export function recordAuditLog(username: string, role: string, action: string, details?: string): void {
+  const stmt = db.prepare(`
+    INSERT INTO admin_audit_logs (id, timestamp, username, role, action, details)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `);
+  stmt.run(
+    'audit-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7),
+    new Date().toISOString(),
+    username,
+    role,
+    action,
+    details || ''
+  );
+}
+
+/**
+ * Retrieve recent administrative audit logs
+ */
+export function getAuditLogs(limit: number = 50): any[] {
+  const stmt = db.prepare('SELECT * FROM admin_audit_logs ORDER BY timestamp DESC LIMIT ?');
+  return stmt.all(limit);
+}
+
+/**
+ * Retrieve registered broker accounts
+ */
+export function getBrokerAccounts(): any[] {
+  const stmt = db.prepare('SELECT * FROM broker_accounts ORDER BY created_at DESC');
+  let accounts = stmt.all();
+
+  // Pre-seed default demo account if empty
+  if (accounts.length === 0) {
+    const seedAccount = {
+      id: 'acc-exness-demo-main',
+      account_name: 'Exness Standard Trial 9 (Primary)',
+      broker: 'Exness',
+      server: 'Exness-MT5Trial9',
+      login: '50192834',
+      type: 'DEMO',
+      status: 'CONNECTED',
+      last_connection: new Date().toISOString(),
+      max_lots: 2.0,
+      risk_pct: 1.0,
+      is_live_approved: 0,
+      created_at: new Date().toISOString(),
+    };
+    db.prepare(`
+      INSERT INTO broker_accounts (
+        id, account_name, broker, server, login, type, status, last_connection, max_lots, risk_pct, is_live_approved, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      seedAccount.id,
+      seedAccount.account_name,
+      seedAccount.broker,
+      seedAccount.server,
+      seedAccount.login,
+      seedAccount.type,
+      seedAccount.status,
+      seedAccount.last_connection,
+      seedAccount.max_lots,
+      seedAccount.risk_pct,
+      seedAccount.is_live_approved,
+      seedAccount.created_at
+    );
+    recordAuditLog('System', 'Master Admin', 'INITIALIZE_DEFAULT_ACCOUNT', 'Provisioned Exness Demo Account');
+    accounts = [seedAccount];
+  }
+
+  return accounts;
+}
+
+/**
+ * Create or update broker account
+ */
+export function upsertBrokerAccount(account: {
+  id?: string;
+  account_name: string;
+  broker: string;
+  server: string;
+  login: string;
+  type: string;
+  status: string;
+  max_lots: number;
+  risk_pct: number;
+  is_live_approved: boolean;
+}): void {
+  const id = account.id || 'acc-' + Date.now();
+  const stmt = db.prepare(`
+    INSERT INTO broker_accounts (
+      id, account_name, broker, server, login, type, status, last_connection, max_lots, risk_pct, is_live_approved, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      account_name = excluded.account_name,
+      broker = excluded.broker,
+      server = excluded.server,
+      login = excluded.login,
+      type = excluded.type,
+      status = excluded.status,
+      max_lots = excluded.max_lots,
+      risk_pct = excluded.risk_pct,
+      is_live_approved = excluded.is_live_approved
+  `);
+
+  stmt.run(
+    id,
+    account.account_name,
+    account.broker,
+    account.server,
+    account.login,
+    account.type,
+    account.status,
+    new Date().toISOString(),
+    account.max_lots,
+    account.risk_pct,
+    account.is_live_approved ? 1 : 0,
+    new Date().toISOString()
+  );
+}
+
 
