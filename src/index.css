@@ -2,29 +2,29 @@
 
 @layer base {
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
     background-color: #090D16;
-    color: #F1F5F9;
+    color: #f1f5f9;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   }
 
-  code, pre, .font-mono, [data-mono] {
-    font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
-    font-variant-numeric: tabular-nums;
+  code, kbd, samp, pre, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-feature-settings: "tnum" on, "zero" on;
   }
 }
 
-/* Custom terminal scrollbars */
+/* Custom scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0B101D;
+  background: #0b1120;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1E293B;
+  background: #1e293b;
   border-radius: 3px;
 }
 

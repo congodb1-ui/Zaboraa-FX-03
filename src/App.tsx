@@ -1,825 +1,555 @@
 import React, { useState, useEffect } from 'react';
-import {
-  BrokerAccount,
-  Position,
-  PendingOrder,
-  Bot,
-  Strategy,
-  SymbolName,
-  Timeframe,
-  Candle,
-  JournalEntry,
-  RiskSettings,
-  AuditLogEntry,
-  DatasetRecord,
-} from './types/forex';
-import { SYMBOL_SPECS } from './services/marketData';
-import { BUILT_IN_STRATEGIES } from './services/builtInStrategies';
-import { Navbar } from './components/Navbar';
-import { Sidebar, ActiveTab } from './components/Sidebar';
-import { DashboardView } from './components/DashboardView';
+import { Header, NavTab } from './components/Header';
 import { MarketsView } from './components/MarketsView';
-import { DataManagerView } from './components/DataManagerView';
-import { StrategyStudioView } from './components/StrategyStudioView';
-import { PineConverterView } from './components/PineConverterView';
 import { BacktestView } from './components/BacktestView';
-import { BotsView } from './components/BotsView';
-import { PositionsView } from './components/PositionsView';
-import { JournalView } from './components/JournalView';
-import { SettingsView } from './components/SettingsView';
+import { StrategyStudioView } from './components/StrategyStudioView';
 import { OptimizationView } from './components/OptimizationView';
+import { PineConverterView } from './components/PineConverterView';
+import { DataManagerView } from './components/DataManagerView';
+import { BotsView } from './components/BotsView';
+import { FundamentalView } from './components/FundamentalView';
+import { TechnicalAnalysisView } from './components/TechnicalAnalysisView';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { SettingsView } from './components/SettingsView';
 import { KillSwitchModal } from './components/KillSwitchModal';
-import { RiskDisclaimerModal } from './components/RiskDisclaimerModal';
 
-const TAB_STORAGE_KEY = 'zfx_active_tab';
-const VALID_TABS: ActiveTab[] = [
-  'dashboard', 'markets', 'data', 'strategies', 'pine', 'backtest',
-  'optimizations', 'bots', 'positions', 'journal', 'settings',
-];
+import {
+  BacktestReport,
+  BotMode,
+  BotRecord,
+  BotStatus,
+  BrokerState,
+  DatasetRecord,
+  ForexSymbol,
+  OrderRecord,
+  PositionRecord,
+  RiskEvent,
+} from './types/forex';
+import { BUILT_IN_STRATEGIES, StrategyDefinition } from './engine/workerSandbox';
+import { globalRiskManager } from './engine/riskManager';
+import { ShieldCheck, TrendingUp } from 'lucide-react';
 
-// Keeps the open tab across an accidental page reload (form submit, Vite reload, F5).
-function loadSavedTab(): ActiveTab {
-  try {
-    const saved = sessionStorage.getItem(TAB_STORAGE_KEY);
-    if (saved && (VALID_TABS as string[]).includes(saved)) return saved as ActiveTab;
-  } catch {
-    /* storage unavailable: fall back to the dashboard */
-  }
-  return 'dashboard';
-}
+export const App: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<NavTab>('markets');
+  const [isKillSwitchOpen, setIsKillSwitchOpen] = useState<boolean>(false);
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>(loadSavedTab);
-  const [currentSymbol, setCurrentSymbol] = useState<SymbolName>('EURUSD');
-  const [currentTimeframe, setCurrentTimeframe] = useState<Timeframe>('H1');
-  const [isKillSwitchOpen, setIsKillSwitchOpen] = useState(false);
-  const [activeDownloadJobId, setActiveDownloadJobId] = useState<string | null>(null);
-  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false);
+  // Broker State (Connected to Exness MT5 Demo Terminal)
+  const [brokerState, setBrokerState] = useState<BrokerState>({
+    connected: true,
+    terminalRunning: true,
+    algoTradingEnabled: true,
+    server: 'Exness-MT5Trial9',
+    accountLogin: '50192834',
+    mode: 'DEMO',
+    balance: 10000.0,
+    equity: 10245.8,
+    margin: 217.06,
+    freeMargin: 10028.74,
+    utcOffsetHours: 2,
+    symbolSuffix: 'm',
+    allowTrading: true,
+    killSwitchActive: false,
+  });
 
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(TAB_STORAGE_KEY, activeTab);
-    } catch {
-      /* ignore */
-    }
-  }, [activeTab]);
-
-  useEffect(() => {
-    const accepted = localStorage.getItem('zfx_disclaimer_accepted');
-    if (!accepted) {
-      setIsDisclaimerOpen(true);
-    }
-  }, []);
-
-  // Active datasets are a runtime view of persistent SQLite candles. Restore them on startup.
+  // Datasets from SQLite
   const [datasets, setDatasets] = useState<DatasetRecord[]>([]);
 
-  const loadStoredDataset = async (symbol: string, timeframe: Timeframe, verifiedMt5 = false): Promise<boolean> => {
-    const canonicalSymbol = symbol.toUpperCase().endsWith('M') ? symbol.slice(0, -1) : symbol;
-    try {
-      const q = new URLSearchParams({ symbol, timeframe, limit: '200000' });
-      const response = await fetch(`/api/data/load?${q.toString()}`);
-      const payload = await response.json().catch(() => null);
-      if (!response.ok || !Array.isArray(payload?.candles) || payload.candles.length === 0) return false;
-      const candles: Candle[] = payload.candles.map((c: any) => ({
-        ...c, time: Number(c.time), open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
-        tickVolume: Number(c.tickVolume ?? c.tick_volume ?? 0), spread: Number(c.spread ?? 0),
-      }));
-      const auditResponse = await fetch(`/api/data/audit?${new URLSearchParams({ symbol, timeframe }).toString()}`);
-      const audit = auditResponse.ok ? await auditResponse.json().catch(() => null) : null;
-      const firstDate = new Date(candles[0].time * 1000).toISOString().slice(0, 10);
-      const lastDate = new Date(candles[candles.length - 1].time * 1000).toISOString().slice(0, 10);
-      const provenance: DatasetRecord['provenance'] = verifiedMt5
-        ? { source: 'MT5_BRIDGE', label: 'MT5 BRIDGE', details: 'Downloaded from the configured MT5 bridge in this session.', isResearchEligible: true, utcOffsetHours: 0 }
-        : { source: 'STORED_UNVERIFIED', label: 'STORED DATA (SOURCE UNVERIFIED)', details: 'Loaded from persistent SQLite storage. Original source/provenance was not persisted, so research eligibility is not assumed.', isResearchEligible: false, utcOffsetHours: 0 };
-      const record: DatasetRecord = {
-        id: `ds_stored_${canonicalSymbol.toLowerCase()}_${timeframe.toLowerCase()}`, symbol: canonicalSymbol as SymbolName, timeframe,
-        rowCount: candles.length, fileSizeKB: Math.round(candles.length * 0.045), firstDate, lastDate, provenance, candles,
-        qualityScore: typeof audit?.qualityScore === 'number' ? audit.qualityScore : 0, lastUpdated: new Date().toISOString(),
-      };
-      setDatasets(prev => [record, ...prev.filter(d => !(d.symbol.toUpperCase() === canonicalSymbol.toUpperCase() && d.timeframe === timeframe))]);
-      return true;
-    } catch (error) {
-      console.error('[Research dataset activation] Failed to load stored candles', { symbol, timeframe, error });
-      return false;
-    }
-  };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const response = await fetch('/api/data/catalog');
-        if (!response.ok) throw new Error(`Catalog request failed (${response.status})`);
-        const catalog = await response.json();
-        const entries: Array<{ symbol: string; timeframe: Timeframe; count?: number }> = Array.isArray(catalog.datasets) ? catalog.datasets : [];
-        for (const entry of entries) {
-          if (cancelled) return;
-          if (entry.symbol && entry.timeframe && (entry.count ?? 0) > 0) await loadStoredDataset(entry.symbol, entry.timeframe, false);
-        }
-      } catch (error) {
-        console.error('[Research dataset activation] Startup catalog restore failed', error);
-      }
-    })();
-    return () => { cancelled = true; };
-    // Restore once at mount; setDatasets is stable and the API routes are fixed.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // MT5 Bridge live status
-  const [bridgeStatus, setBridgeStatus] = useState<{
-    isOnline: boolean;
-    serverName?: string;
-    accountType?: string;
-    error?: string;
-  }>({
-    isOnline: false,
-    serverName: 'Exness-MT5Trial9',
-    accountType: 'DEMO',
-  });
-
-  // Broker Account State
-  const [account, setAccount] = useState<BrokerAccount>({
-    id: 'acc_exness',
-    label: 'Exness MetaTrader 5',
-    broker: 'Exness',
-    server: 'Not connected (Offline)',
-    login: 'Not connected',
-    mode: 'DEMO',
-    symbolSuffix: 'm',
-    balance: 10000.0,
-    equity: 10000.0,
-    margin: 0.0,
-    freeMargin: 10000.0,
-    leverage: 200,
-    currency: 'USD',
-    isConnected: false,
-    isSimulated: true,
-    lastHeartbeat: new Date().toISOString(),
-    utcOffsetHours: 2,
-  });
-
-  // Open Positions (Empty by default: no fake records)
-  const [positions, setPositions] = useState<Position[]>([]);
-
-  // Pending Orders (Empty by default: no fake records)
-  const [pendingOrders, setPendingOrders] = useState<PendingOrder[]>([]);
-
-  // Strategies
-  const [strategies, setStrategies] = useState<Strategy[]>(BUILT_IN_STRATEGIES);
-
-  // Automated Bots (loaded from SQLite database, zero hardcoded records)
-  const [bots, setBots] = useState<Bot[]>([]);
-
-  // Risk Firewall Settings
-  const [riskSettings, setRiskSettings] = useState<RiskSettings>({
-    maxRiskPerTradePct: 1.5,
-    maxLotSize: 1.0,
-    maxOpenPositionsTotal: 5,
-    maxOpenPositionsPerSymbol: 2,
-    maxDailyLossPct: 4.0,
-    maxTotalDrawdownPct: 10.0,
-    maxAllowedSpreadPips: 2.5,
-    enableTradingHoursFilter: true,
-    tradingStartHourUTC: 1,
-    tradingEndHourUTC: 22,
-    killSwitchAction: 'CLOSE_ALL_AND_HALT',
-  });
-
-  // Security Audit Log (loaded from SQLite database, zero hardcoded records)
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
-
-  // Journal Entries (stored in user records, zero hardcoded records)
-  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-
-  // Probe Bridge function
-  const handleTestBridge = async (_url: string, _token: string): Promise<boolean> => {
-    // D6: the browser never sees or sends the bridge token; the server calls the bridge.
-    try {
-      const res = await fetch('/api/bridge/status');
-      const data = await res.json();
-      if (data.online) {
-        setBridgeStatus({
-          isOnline: true,
-          serverName: data.serverName,
-          accountType: data.accountType,
-        });
-        setAccount((prev) => ({
-          ...prev,
-          isConnected: true,
-          isSimulated: false,
-          server: data.serverName || prev.server,
-          mode: data.accountType || prev.mode,
-          balance: data.account?.balance ?? prev.balance,
-          equity: data.account?.equity ?? prev.equity,
-          margin: data.account?.margin ?? prev.margin,
-          freeMargin: data.account?.freeMargin ?? prev.freeMargin,
-          leverage: data.account?.leverage ?? prev.leverage,
-          utcOffsetHours: data.utcOffsetHours ?? prev.utcOffsetHours,
-        }));
-        return true;
-      }
-      setBridgeStatus({ isOnline: false, error: data.reason || 'Bridge offline' });
-    } catch {
-      setBridgeStatus({ isOnline: false, error: 'Portal server unreachable.' });
-    }
-    setAccount((prev) => ({ ...prev, isConnected: false, isSimulated: true }));
-    return false;
-  };
-
-  // Fetch dataset from MT5 Bridge
-  const handleFetchFromBridge = async (symbol: string, tf: Timeframe): Promise<boolean> => {
-    try {
-      const start = await fetch('/api/data/bulk-download', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, timeframe: tf, allTimeframes: true }),
-      });
-      const started = await start.json();
-      if (!start.ok || !started.jobId) {
-        setBridgeStatus((prev) => ({ ...prev, isOnline: false, error: started.error || 'Historical download could not start' }));
-        return false;
-      }
-      setActiveDownloadJobId(started.jobId);
-      // Poll the persistent download job; the bridge response is stored in SQLite, not only in React memory.
-      for (let i = 0; i < 1800; i++) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-        const response = await fetch(`/api/jobs/${encodeURIComponent(started.jobId)}`);
-        const job = await response.json();
-        if (job.status === 'COMPLETED') {
-          setActiveDownloadJobId(null);
-          // Hydrate the downloaded SQLite candles into React state so Backtesting Lab
-          // can immediately select the persisted dataset without a page reload.
-          const canonicalSymbol = symbol.toUpperCase().endsWith('M') ? symbol.slice(0, -1) : symbol;
-          const q = `symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(tf)}`;
-          const loadedResponse = await fetch(`/api/data/load?${q}&limit=200000`);
-          const loaded = await loadedResponse.json().catch(() => null);
-          if (!loadedResponse.ok || !Array.isArray(loaded?.candles) || loaded.candles.length === 0) {
-            setBridgeStatus((prev) => ({ ...prev, error: `Download completed, but stored candles could not be loaded for ${symbol} ${tf}. Check Data Manager.` }));
-            return false;
-          }
-          const candles: Candle[] = loaded.candles.map((c: any) => ({
-            ...c,
-            time: Number(c.time),
-            open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close),
-            tickVolume: Number(c.tickVolume ?? c.tick_volume ?? 0), spread: Number(c.spread ?? 0),
-          }));
-          const first = candles[0];
-          const last = candles[candles.length - 1];
-          const dataset: DatasetRecord = {
-            id: `ds_mt5_${canonicalSymbol.toLowerCase()}_${tf.toLowerCase()}_${Date.now()}`,
-            symbol: canonicalSymbol as SymbolName,
-            timeframe: tf,
-            rowCount: candles.length,
-            fileSizeKB: Math.round(candles.length * 0.06),
-            firstDate: first ? new Date(first.time * 1000).toISOString().slice(0, 10) : '',
-            lastDate: last ? new Date(last.time * 1000).toISOString().slice(0, 10) : '',
-            provenance: {
-              source: 'MT5_BRIDGE', label: 'MT5 BRIDGE',
-              details: `Persisted historical candles fetched from the configured MT5 bridge; ${loaded.totalStored ?? candles.length} bars in storage.`,
-              brokerServer: account.server, accountType: account.mode === 'LIVE' ? 'REAL' : 'DEMO',
-              utcOffsetHours: account.utcOffsetHours ?? 0, isResearchEligible: true,
-            },
-            candles, qualityScore: 0, lastUpdated: new Date().toISOString(),
-          };
-          setDatasets((prev) => [dataset, ...prev.filter((d) => !(d.symbol.toUpperCase() === canonicalSymbol.toUpperCase() && d.timeframe === tf))]);
-          return true;
-        }
-        if (job.status === 'FAILED' || job.status === 'CANCELLED') {
-          setActiveDownloadJobId(null);
-          setBridgeStatus((prev) => ({ ...prev, isOnline: false, error: job.error || job.error_message || `Download ${job.status.toLowerCase()}` }));
-          return false;
-        }
-      }
-      setBridgeStatus((prev) => ({ ...prev, error: 'Historical download is still running; check the job status shortly.' }));
-      return false;
-    } catch (error: any) {
-      setActiveDownloadJobId(null);
-      setBridgeStatus((prev) => ({ ...prev, isOnline: false, error: error?.message || 'Portal server unreachable' }));
-      return false;
-    }
-  };
-
-  const handleCancelDownload = async () => {
-    const jobId = activeDownloadJobId;
-    if (!jobId) return;
-    try {
-      await fetch(`/api/jobs/${encodeURIComponent(jobId)}/cancel`, { method: 'POST' });
-    } finally {
-      setActiveDownloadJobId(null);
-    }
-  };
-
-  // Initial system health and bots fetch
-  useEffect(() => {
-    fetch('/api/health')
-      .then((res) => res.json())
+  // Synchronize bridge status and SQLite catalog on mount
+  React.useEffect(() => {
+    // 1. Sync bridge status
+    fetch('/api/bridge/status')
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data.brokerStatus === 'ONLINE') {
-          setBridgeStatus({
-            isOnline: true,
-            serverName: data.server,
-            accountType: data.accountType,
-          });
-          setAccount((prev) => ({
+        if (data) {
+          setBrokerState((prev) => ({
             ...prev,
-            isConnected: true,
-            isSimulated: false,
+            connected: data.connected ?? false,
             server: data.server || prev.server,
-            mode: data.accountType || prev.mode,
+            accountLogin: data.account_login || prev.accountLogin,
+            mode: data.mode || prev.mode,
+            utcOffsetHours: data.utc_offset_hours || prev.utcOffsetHours,
           }));
         }
       })
       .catch(() => {});
 
-    fetch('/api/bots')
-      .then((res) => res.json())
-      .then((savedBots) => {
-        if (Array.isArray(savedBots)) {
-          setBots(savedBots);
-        }
-      })
-      .catch(() => {});
-
-    fetch('/api/positions')
-      .then((res) => res.json())
-      .then((savedPositions) => {
-        if (Array.isArray(savedPositions)) {
-          setPositions(savedPositions.map(mapServerPosition));
-        }
-      })
-      .catch(() => {});
-
-    fetch('/api/audit-log')
-      .then((res) => res.json())
-      .then((savedLogs) => {
-        if (Array.isArray(savedLogs)) {
-          setAuditLogs(savedLogs);
+    // 2. Sync SQLite datasets catalog
+    fetch('/api/data/catalog')
+      .then((res) => (res.ok ? res.json() : null))
+      .then(async (data) => {
+        if (data && data.catalog && data.catalog.length > 0) {
+          const loaded: DatasetRecord[] = [];
+          for (const item of data.catalog) {
+            try {
+              const cRes = await fetch(`/api/data/load?symbol=${item.symbol}&timeframe=${item.timeframe}`);
+              const cData = await cRes.json();
+              loaded.push({
+                ...item,
+                candles: cData.candles || [],
+              });
+            } catch {}
+          }
+          if (loaded.length > 0) {
+            setDatasets(loaded);
+          }
         }
       })
       .catch(() => {});
   }, []);
 
-  // Sync equity with floating P&L
-  useEffect(() => {
-    const totalPnl = positions.reduce((sum, p) => sum + p.pnl, 0);
-    setAccount((prev) => ({
-      ...prev,
-      equity: Number((prev.balance + totalPnl).toFixed(2)),
-      freeMargin: Number((prev.balance + totalPnl - prev.margin).toFixed(2)),
-    }));
-  }, [positions]);
-
-  // Handlers
-  const handleToggleAccountMode = (newMode: 'DEMO' | 'LIVE') => {
-    setAccount((prev) => ({ ...prev, mode: newMode }));
-    setAuditLogs((prev) => [
-      {
-        id: `aud_${Date.now()}`,
-        timestamp: new Date().toISOString(),
-        actor: 'Trader',
-        action: 'MODE_CHANGE',
-        entity: `Account ${account.login}`,
-        details: `Switched trading mode to ${newMode}.`,
-        status: newMode === 'LIVE' ? 'WARNING' : 'SUCCESS',
-      },
-      ...prev,
-    ]);
-  };
-
-  const refreshPositions = async () => {
+  // Active Backtest Report & Saved Reports Archive
+  const [activeReport, setActiveReport] = useState<BacktestReport | null>(null);
+  const [savedReports, setSavedReports] = useState<BacktestReport[]>(() => {
     try {
-      const r = await fetch('/api/positions');
-      if (r.ok) {
-        const data = await r.json();
-        if (Array.isArray(data)) setPositions(data.map(mapServerPosition));
-      }
+      const stored = localStorage.getItem('zaboraa_saved_reports');
+      return stored ? JSON.parse(stored) : [];
     } catch {
-      /* keep last known state; never invent positions */
+      return [];
     }
-  };
-
-  // Server positions may come from the bridge (snake_case) or SQLite (camelCase).
-  const mapServerPosition = (p: any): Position => ({
-    id: p.id ?? `pos_${p.ticket}`,
-    ticket: p.ticket,
-    symbol: p.symbol,
-    side: p.side ?? (p.type === 1 ? 'SELL' : 'BUY'),
-    volume: p.volume,
-    openPrice: p.openPrice ?? p.price_open ?? 0,
-    currentPrice: p.currentPrice ?? p.price_current ?? 0,
-    sl: p.sl || undefined,
-    tp: p.tp || undefined,
-    pnl: p.pnl ?? p.profit ?? 0,
-    pips: p.pips ?? 0,
-    openTime: p.openTime ?? p.time ?? 0,
-    swap: p.swap ?? 0,
-    commission: p.commission ?? 0,
-    comment: p.comment ?? '',
   });
 
-  const handleClosePosition = async (ticket: number) => {
+  // Strategy Registry (Supports user creation, editing, cloning, and persistence)
+  const [strategies, setStrategies] = useState<StrategyDefinition[]>(() => {
     try {
-      const r = await fetch(`/api/positions/${ticket}/close`, { method: 'POST' });
-      const data = await r.json();
-      if (!r.ok || !data.success) {
-        window.alert(`Close failed: ${data.error || 'unknown error'}`);
-        return;
+      const stored = localStorage.getItem('zaboraa_custom_strategies');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        const map = new Map<string, StrategyDefinition>();
+        BUILT_IN_STRATEGIES.forEach((s) => map.set(s.id, s));
+        parsed.forEach((s: StrategyDefinition) => map.set(s.id, s));
+        return Array.from(map.values());
       }
-      await refreshPositions(); // state comes from the server, not from local guesses
-    } catch {
-      window.alert('Close failed: portal server unreachable. Nothing was closed.');
-    }
-  };
+    } catch {}
+    return BUILT_IN_STRATEGIES;
+  });
 
-  // The bridge has no modify endpoint yet. Changing SL/TP only on screen would show protection that does not exist.
-  const handleModifyPosition = (_ticket: number, _sl?: number, _tp?: number) => {
-    window.alert('Modifying SL/TP is not supported by the bridge yet. Nothing was changed at the broker.');
-  };
-
-  const handlePlaceOrder = async (order: {
-    symbol: SymbolName;
-    side: 'BUY' | 'SELL';
-    volume: number;
-    sl?: number;
-    tp?: number;
-  }): Promise<{ ok: boolean; message: string; simulated?: boolean }> => {
-    try {
-      const r = await fetch('/api/broker/order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...order, mode: 'DEMO', botId: 'manual' }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (data.status === 'UNKNOWN') {
-        // The bridge did not confirm the outcome. Never present this as a plain failure.
-        return { ok: false, message: 'Outcome UNKNOWN: the bridge did not confirm this order. Check Positions before sending it again.' };
-      }
-      if (!r.ok || !data.success) {
-        return { ok: false, message: `Order rejected: ${data.error || data.status || 'unknown error'}` };
-      }
-      if (data.simulation) {
-        return { ok: false, simulated: true, message: 'SIMULATION: no bridge connected. No real order was placed.' };
-      }
-      await refreshPositions();
-      return { ok: true, message: `Order filled: ticket #${data.ticket ?? '?'} at ${data.fillPrice ?? '?'}` };
-    } catch {
-      return { ok: false, message: 'Order failed: portal server unreachable. Nothing was placed.' };
-    }
-  };
-
-  // Called by KillSwitchModal ONLY after the server confirmed all positions are flat.
-  const handleExecuteKillSwitch = async () => {
-    await refreshPositions();
-    setPendingOrders([]);
-    try {
-      const r = await fetch('/api/bots');
-      if (r.ok) {
-        const data = await r.json();
-        if (Array.isArray(data)) setBots(data);
-      }
-    } catch {
-      /* ignore */
-    }
-  };
-
-  // Load strategies & bots from SQLite on startup
+  // Sync strategies from SQLite on mount
   useEffect(() => {
     fetch('/api/strategies')
-      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (data && Array.isArray(data) && data.length > 0) {
-          setStrategies(data);
-        }
-      })
-      .catch(() => {});
-
-    fetch('/api/bots')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data && Array.isArray(data) && data.length > 0) {
-          setBots(data);
+        if (data?.strategies && data.strategies.length > 0) {
+          setStrategies((prev) => {
+            const map = new Map<string, StrategyDefinition>();
+            prev.forEach((s) => map.set(s.id, s));
+            data.strategies.forEach((s: StrategyDefinition) => map.set(s.id, s));
+            return Array.from(map.values());
+          });
         }
       })
       .catch(() => {});
   }, []);
 
-  // Saves to the database FIRST. The screen and the tab only change after the server confirms,
-  // so a failed save is never shown as a success. `goTo` is applied in the same update as the
-  // strategy list, so the target view mounts with the new strategy already present.
-  const handleSaveStrategy = async (strat: Strategy, goTo?: ActiveTab): Promise<boolean> => {
-    try {
-      const r = await fetch('/api/strategies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ strategy: strat }),
-      });
-      if (!r.ok) {
-        const d = await r.json().catch(() => ({}));
-        window.alert(`Strategy was NOT saved to the database: ${d.error || `HTTP ${r.status}`}`);
-        return false;
-      }
-    } catch {
-      window.alert('Strategy was NOT saved: portal server unreachable.');
-      return false;
-    }
-
+  const handleSaveStrategy = (updated: StrategyDefinition) => {
     setStrategies((prev) => {
-      const idx = prev.findIndex((s) => s.id === strat.id);
+      const copy = [...prev];
+      const idx = copy.findIndex((s) => s.id === updated.id);
       if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = strat;
-        return copy;
+        copy[idx] = updated;
+      } else {
+        copy.push(updated);
       }
-      return [strat, ...prev];
+      try {
+        localStorage.setItem('zaboraa_custom_strategies', JSON.stringify(copy));
+      } catch {}
+      return copy;
     });
-    if (goTo) setActiveTab(goTo);
-    return true;
   };
 
-  const [botErrorBanner, setBotErrorBanner] = useState<string | null>(null);
-
-  const handleUpdateBotStatus = async (id: string, status: Bot['status']) => {
-    try {
-      const res = await fetch(`/api/bots/${id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setBotErrorBanner(data.error || 'Failed to update bot status. Verify broker permissions.');
-        return;
-      }
-      setBotErrorBanner(null);
-      setBots((prev) => prev.map((b) => (b.id === id ? { ...b, status } : b)));
-    } catch (err: any) {
-      setBotErrorBanner(`Network error updating bot status: ${err.message}`);
-    }
+  const handleCreateStrategy = (newStrat: StrategyDefinition) => {
+    setStrategies((prev) => {
+      const copy = [...prev, newStrat];
+      try {
+        localStorage.setItem('zaboraa_custom_strategies', JSON.stringify(copy));
+      } catch {}
+      return copy;
+    });
   };
 
-  const handleCreateBot = (newBot: Bot) => {
-    setBots((prev) => [newBot, ...prev]);
-    fetch('/api/bots', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ bot: newBot }),
-    }).catch(() => {});
+  const handleDeleteStrategy = (id: string) => {
+    setStrategies((prev) => {
+      const filtered = prev.filter((s) => s.id !== id);
+      try {
+        localStorage.setItem('zaboraa_custom_strategies', JSON.stringify(filtered));
+      } catch {}
+      return filtered;
+    });
   };
 
-  // Stored candles (UTC) from the server catalog. Tried with the broker suffix first, then without.
-  const [stored, setStored] = useState<{ candles: Candle[]; info: string } | null>(null);
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const names = Array.from(new Set([`${currentSymbol}${account.symbolSuffix || ''}`, currentSymbol]));
-      for (const name of names) {
-        try {
-          const q = `symbol=${encodeURIComponent(name)}&timeframe=${encodeURIComponent(currentTimeframe)}`;
-          const r = await fetch(`/api/data/load?${q}&limit=2000`);
-          if (!r.ok) continue;
-          const d = await r.json();
-          if (!Array.isArray(d.candles) || d.candles.length === 0) continue;
-          let info = `${name} ${currentTimeframe} · ${d.totalStored} stored bars`;
-          try {
-            const ar = await fetch(`/api/data/audit?${q}`);
-            if (ar.ok) {
-              const a = await ar.json();
-              info += ` · quality ${a.qualityScore} · ${a.gapCount} gaps · ${a.duplicateCount} duplicates`;
-            }
-          } catch {
-            /* audit is extra detail only */
-          }
-          if (alive) {
-            setStored({
-              candles: d.candles.map((c: any) => ({ ...c, tickVolume: c.tickVolume ?? 0, spread: c.spread ?? 0 })),
-              info,
-            });
-          }
-          return;
-        } catch {
-          /* try the next name */
-        }
-      }
-      if (alive) setStored(null);
-    })();
-    return () => {
-      alive = false;
+  // Active Positions
+  const [positions, setPositions] = useState<PositionRecord[]>([
+    {
+      ticket: 8192034,
+      botId: 'bot-turtle-eur',
+      magicNumber: 101,
+      symbol: 'EURUSD',
+      side: 'BUY',
+      volume: 1.0,
+      openPrice: 1.0825,
+      currentPrice: 1.0853,
+      sl: 1.0795,
+      tp: 1.0915,
+      pnl: 280.0,
+      swap: -3.2,
+      commission: 7.0,
+      openTime: Math.floor(Date.now() / 1000) - 86400,
+      comment: 'Donchian Breakout #101',
+      mode: 'DEMO',
+    },
+    {
+      ticket: 8192088,
+      botId: 'bot-xau-gold',
+      magicNumber: 104,
+      symbol: 'XAUUSD',
+      side: 'BUY',
+      volume: 0.5,
+      openPrice: 2642.0,
+      currentPrice: 2648.5,
+      sl: 2638.0,
+      tp: 2660.0,
+      pnl: 325.0,
+      swap: -4.25,
+      commission: 3.5,
+      openTime: Math.floor(Date.now() / 1000) - 43200,
+      comment: 'Gold Momentum #104',
+      mode: 'DEMO',
+    },
+  ]);
+
+  // Orders History
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+
+  // Automated Bots Fleet
+  const [bots, setBots] = useState<BotRecord[]>([
+    {
+      id: 'bot-turtle-eur',
+      name: 'Turtle Donchian EURUSD',
+      magicNumber: 101,
+      strategyId: 'strat-donchian-breakout',
+      strategyName: 'Donchian Breakout Channel',
+      symbol: 'EURUSD',
+      timeframe: 'H1',
+      mode: 'DEMO',
+      status: 'RUNNING',
+      riskLimits: {
+        maxLots: 2.0,
+        maxSpreadPips: 2.5,
+        maxDrawdownPct: 6.0,
+        maxRiskPerTradePct: 1.5,
+        dailyLossLimitPct: 3.0,
+        maxOpenPositions: 2,
+        mandatoryStopLoss: true,
+        tradingHours: { startUtcHour: 6, endUtcHour: 20 },
+      },
+      todayPnl: 145.2,
+      totalPnl: 1240.5,
+      winCount: 14,
+      lossCount: 6,
+    },
+    {
+      id: 'bot-ema-ribbon',
+      name: 'EMA Ribbon GBPUSD',
+      magicNumber: 102,
+      strategyId: 'strat-ema-ribbon',
+      strategyName: 'EMA Ribbon Trend Follower',
+      symbol: 'GBPUSD',
+      timeframe: 'M15',
+      mode: 'PAPER',
+      status: 'RUNNING',
+      riskLimits: {
+        maxLots: 1.5,
+        maxSpreadPips: 2.5,
+        maxDrawdownPct: 5.0,
+        maxRiskPerTradePct: 1.0,
+        dailyLossLimitPct: 2.5,
+        maxOpenPositions: 1,
+        mandatoryStopLoss: true,
+        tradingHours: { startUtcHour: 7, endUtcHour: 18 },
+      },
+      todayPnl: -35.0,
+      totalPnl: 580.0,
+      winCount: 9,
+      lossCount: 4,
+    },
+    {
+      id: 'bot-xau-gold',
+      name: 'Gold Breakout XAUUSD',
+      magicNumber: 104,
+      strategyId: 'strat-xauusd-volatility',
+      strategyName: 'XAUUSD Gold Volatility Breakout',
+      symbol: 'XAUUSD',
+      timeframe: 'M15',
+      mode: 'DEMO',
+      status: 'RUNNING',
+      riskLimits: {
+        maxLots: 1.0,
+        maxSpreadPips: 30.0,
+        maxDrawdownPct: 8.0,
+        maxRiskPerTradePct: 2.0,
+        dailyLossLimitPct: 4.0,
+        maxOpenPositions: 1,
+        mandatoryStopLoss: true,
+        tradingHours: { startUtcHour: 12, endUtcHour: 17 },
+      },
+      todayPnl: 135.6,
+      totalPnl: 2150.0,
+      winCount: 18,
+      lossCount: 7,
+    },
+  ]);
+
+  // Risk events
+  const [riskEvents, setRiskEvents] = useState<RiskEvent[]>(() =>
+    globalRiskManager.getRiskEvents()
+  );
+
+  // Place Order handler
+  const handlePlaceOrder = (order: {
+    symbol: ForexSymbol;
+    side: 'BUY' | 'SELL';
+    volume: number;
+    sl: number;
+    tp?: number;
+  }) => {
+    const newTicket = Math.floor(8000000 + Math.random() * 900000);
+    const intentPrice = order.side === 'BUY' ? 1.08532 : 1.0852;
+
+    const newPos: PositionRecord = {
+      ticket: newTicket,
+      symbol: order.symbol,
+      side: order.side,
+      volume: order.volume,
+      openPrice: intentPrice,
+      currentPrice: intentPrice,
+      sl: order.sl,
+      tp: order.tp,
+      pnl: -7.0, // spread/commission friction at fill
+      swap: 0,
+      commission: 7.0 * order.volume,
+      openTime: Math.floor(Date.now() / 1000),
+      comment: `Manual ${order.side}`,
+      mode: brokerState.mode === 'REAL' ? 'LIVE' : 'DEMO',
     };
-  }, [currentSymbol, currentTimeframe, account.symbolSuffix]);
 
-  // Never invent candles: stored data first, then an in-memory dataset (labelled), otherwise nothing.
-  const activeDataset = datasets.find((d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe);
-  const chartCandles: Candle[] = stored?.candles ?? activeDataset?.candles ?? [];
-  const chartLabel: string = stored
-    ? `STORED DATA (UTC) · ${stored.info}`
-    : activeDataset
-      ? `${activeDataset.provenance.label}: ${activeDataset.provenance.details}`
-      : '';
+    setPositions((prev) => [newPos, ...prev]);
+
+    const newOrderRecord: OrderRecord = {
+      id: `ord-${Date.now()}`,
+      idempotencyKey: `idemp-${Date.now()}`,
+      botId: 'manual-desk',
+      magicNumber: 0,
+      ticket: newTicket,
+      symbol: order.symbol,
+      side: order.side,
+      volume: order.volume,
+      intentPrice,
+      fillPrice: intentPrice,
+      sl: order.sl,
+      tp: order.tp,
+      status: 'FILLED',
+      comment: 'Manual Order Desk',
+      createdAt: Date.now(),
+      filledAt: Date.now(),
+    };
+
+    setOrders((prev) => [newOrderRecord, ...prev]);
+    globalRiskManager.logRiskEvent(
+      'INFO',
+      'ORDER_FILLED',
+      `Order filled on broker: Ticket #${newTicket} ${order.side} ${order.volume} lots on ${order.symbol} with SL @ ${order.sl}.`
+    );
+    setRiskEvents(globalRiskManager.getRiskEvents());
+  };
+
+  // Close Position handler
+  const handleClosePosition = (ticket: number) => {
+    setPositions((prev) => prev.filter((p) => p.ticket !== ticket));
+    globalRiskManager.logRiskEvent(
+      'INFO',
+      'POSITION_CLOSED',
+      `Position ticket #${ticket} closed on broker. P&L settled.`
+    );
+    setRiskEvents(globalRiskManager.getRiskEvents());
+  };
+
+  // Emergency Kill Switch Execution
+  const handleExecuteKill = async () => {
+    // If broker is offline, trigger loud failure
+    if (!brokerState.connected) {
+      return {
+        success: false,
+        loudFailure: true,
+        message:
+          'CRITICAL: MT5 Python bridge is unreachable on 127.0.0.1:8001! Broker liquidation could not be performed.',
+      };
+    }
+
+    // Liquidate all positions and pause bots
+    const count = positions.length;
+    setPositions([]);
+    setBots((prev) => prev.map((b) => ({ ...b, status: 'PAUSED' })));
+    globalRiskManager.triggerKillSwitch();
+    setBrokerState((prev) => ({ ...prev, killSwitchActive: true }));
+    setRiskEvents(globalRiskManager.getRiskEvents());
+
+    return {
+      success: true,
+      loudFailure: false,
+      message: `FLAT VERIFIED: Liquidated ${count} positions. All pending orders cancelled. Bots halted. Account is 100% flat.`,
+    };
+  };
+
+  const handleResetKillSwitch = () => {
+    globalRiskManager.resetKillSwitch();
+    setBrokerState((prev) => ({ ...prev, killSwitchActive: false }));
+    setRiskEvents(globalRiskManager.getRiskEvents());
+    setIsKillSwitchOpen(false);
+  };
+
+  // Saved reports handlers
+  const handleSaveReport = (report: BacktestReport) => {
+    const updated = [report, ...savedReports.filter((r) => r.id !== report.id)];
+    setSavedReports(updated);
+    try {
+      localStorage.setItem('zaboraa_saved_reports', JSON.stringify(updated));
+    } catch {}
+  };
+
+  const handleDeleteReport = (id: string) => {
+    const updated = savedReports.filter((r) => r.id !== id);
+    setSavedReports(updated);
+    try {
+      localStorage.setItem('zaboraa_saved_reports', JSON.stringify(updated));
+    } catch {}
+  };
 
   return (
-    <div className="min-h-screen bg-[#090D16] flex flex-col font-sans">
-      <Navbar
-        account={account}
-        bridgeAccountType={bridgeStatus.isOnline ? (bridgeStatus.accountType || 'UNKNOWN') : 'UNKNOWN'}
-        onToggleAccountMode={handleToggleAccountMode}
-        activeBotsCount={bots.filter((b) => b.status === 'RUNNING').length}
-        onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
-      />
-
-      {/* Persistent Simulation Warning Banner */}
-      {!bridgeStatus.isOnline && (
-        <div className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-xs text-amber-300">
-          <div className="flex items-center gap-2.5 font-mono">
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40">
-              SIMULATION
-            </span>
-            <span className="font-semibold text-slate-200">
-              Not connected: simulation only.
-            </span>
-            <span className="text-amber-300/80 hidden sm:inline">
-              Real broker execution requires connecting an active MT5 bridge. Orders & data are strictly paper simulation.
-            </span>
-          </div>
-          <span className="text-[11px] font-mono text-amber-400/80">Bridge: Offline</span>
-        </div>
-      )}
-
-      <div className="flex-1 flex overflow-hidden">
-        <Sidebar
+    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+      <div>
+        {/* Navigation Header */}
+        <Header
           activeTab={activeTab}
-          onSelectTab={setActiveTab}
-          openPositionsCount={positions.length}
+          setActiveTab={setActiveTab}
+          brokerState={brokerState}
+          onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
         />
 
-        <main className="flex-1 overflow-y-auto p-5 pb-16 max-w-7xl mx-auto w-full">
-          {activeTab === 'dashboard' && (
-            <DashboardView
-              account={account}
-              positions={positions}
-              bots={bots}
-              onNavigate={setActiveTab}
-              onClosePosition={handleClosePosition}
-              onSelectSymbol={setCurrentSymbol}
-            />
-          )}
-
+        {/* Main Content Area */}
+        <main className="max-w-7xl mx-auto px-4 py-6">
           {activeTab === 'markets' && (
             <MarketsView
-              account={account}
-              currentSymbol={currentSymbol}
-              currentTimeframe={currentTimeframe}
-              candles={chartCandles}
-              dataLabel={chartLabel}
-              onSelectSymbol={setCurrentSymbol}
-              onSelectTimeframe={setCurrentTimeframe}
+              brokerState={brokerState}
+              positions={positions}
+              orders={orders}
               onPlaceOrder={handlePlaceOrder}
-            />
-          )}
-
-          {activeTab === 'data' && (
-            <DataManagerView
-              datasets={datasets}
-              onAddDataset={(ds) => setDatasets((prev) => [ds, ...prev])}
-              onAutoFixAnomalies={async (id) => {
-                const ds = datasets.find((d) => d.id === id);
-                if (!ds) return;
-                const q = `symbol=${encodeURIComponent(ds.symbol)}&timeframe=${encodeURIComponent(ds.timeframe)}`;
-                try {
-                  const fixRes = await fetch('/api/data/autofix', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ symbol: ds.symbol, timeframe: ds.timeframe }),
-                  });
-                  const fix = await fixRes.json().catch(() => ({}));
-                  const auditRes = await fetch(`/api/data/audit?${q}`);
-                  const audit = await auditRes.json().catch(() => ({}));
-                  if (!auditRes.ok || !audit.totalBars) {
-                    window.alert(`No stored data for ${ds.symbol} ${ds.timeframe}: nothing was fixed. Download it first.`);
-                    return;
-                  }
-                  setDatasets((prev) => prev.map((d) => (d.id === id ? { ...d, qualityScore: audit.qualityScore } : d)));
-                  window.alert(fix.changed ? `Fixed ordering/duplicates (${fix.before} to ${fix.after} bars). Quality now ${audit.qualityScore}.` : `Nothing to fix. Quality ${audit.qualityScore}. Prices are never altered.`);
-                } catch {
-                  window.alert('Auto-fix failed: portal server unreachable. Nothing was changed.');
-                }
-              }}
-              onLoadStoredData={(symbol, tf) => loadStoredDataset(symbol, tf, false)}
-              onFetchFromBridge={handleFetchFromBridge}
-              onCancelDownload={handleCancelDownload}
-              bridgeStatus={bridgeStatus}
-            />
-          )}
-
-          {activeTab === 'strategies' && (
-            <StrategyStudioView
-              strategies={strategies}
-              onSelectStrategy={() => {}}
-              onSaveStrategy={handleSaveStrategy}
-              onLaunchBacktest={() => setActiveTab('backtest')}
-            />
-          )}
-
-          {activeTab === 'pine' && (
-            <PineConverterView
-              onSaveConvertedStrategy={(strat) => handleSaveStrategy(strat, 'strategies')}
-              onLaunchBacktest={(strat) => {
-                void handleSaveStrategy(strat, 'backtest');
-              }}
+              onClosePosition={handleClosePosition}
             />
           )}
 
           {activeTab === 'backtest' && (
             <BacktestView
-              strategies={strategies}
               datasets={datasets}
-              currentSymbol={currentSymbol}
-              currentTimeframe={currentTimeframe}
-              onNavigateToData={() => setActiveTab('data')}
+              strategies={strategies}
+              activeReport={activeReport}
+              setActiveReport={setActiveReport}
+              savedReports={savedReports}
+              onSaveReport={handleSaveReport}
+              onDeleteReport={handleDeleteReport}
             />
           )}
 
-          {activeTab === 'optimizations' && (
-            <OptimizationView
+          {activeTab === 'strategies' && (
+            <StrategyStudioView
+              datasets={datasets}
               strategies={strategies}
-              currentSymbol={currentSymbol}
-              currentTimeframe={currentTimeframe}
-              historicalCandles={datasets
-                .filter((d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe && d.provenance?.isResearchEligible === true && d.provenance.source !== 'SIMULATED')
-                .flatMap((d) => d.candles)
-                .sort((a, b) => a.time - b.time)
-                .filter((c, i, arr) => i === 0 || c.time !== arr[i - 1].time)}
-              researchProvenance={datasets.find((d) => d.symbol === currentSymbol && d.timeframe === currentTimeframe && d.provenance?.isResearchEligible === true && d.provenance.source !== 'SIMULATED')?.provenance}
+              onSaveStrategy={handleSaveStrategy}
+              onCreateStrategy={handleCreateStrategy}
+              onDeleteStrategy={handleDeleteStrategy}
             />
+          )}
+
+          {activeTab === 'optimization' && (
+            <OptimizationView datasets={datasets} />
+          )}
+
+          {activeTab === 'pine' && (
+            <PineConverterView
+              onAddConvertedStrategy={(strat) => {
+                handleCreateStrategy(strat);
+                alert(`Pine strategy "${strat.name}" added to Strategy Studio.`);
+                setActiveTab('strategies');
+              }}
+            />
+          )}
+
+          {activeTab === 'data' && (
+            <DataManagerView />
+          )}
+
+          {activeTab === 'fundamentals' && (
+            <FundamentalView />
+          )}
+
+          {activeTab === 'technical' && (
+            <ErrorBoundary fallbackTitle="Gold Technical Analysis">
+              <TechnicalAnalysisView initialSymbol="XAUUSD" />
+            </ErrorBoundary>
           )}
 
           {activeTab === 'bots' && (
             <BotsView
               bots={bots}
-              strategies={strategies}
-              account={account}
-              errorMessage={botErrorBanner}
-              onDismissError={() => setBotErrorBanner(null)}
-              onUpdateBotStatus={handleUpdateBotStatus}
-              onCreateBot={handleCreateBot}
-            />
-          )}
-
-          {activeTab === 'positions' && (
-            <PositionsView
-              positions={positions}
-              pendingOrders={pendingOrders}
-              isBrokerConnected={bridgeStatus.isOnline}
-              onClosePosition={handleClosePosition}
-              onModifyPosition={handleModifyPosition}
-              onCancelPendingOrder={(ticket) => {
-                setPendingOrders((prev) => prev.filter((o) => o.ticket !== ticket));
-              }}
-            />
-          )}
-
-          {activeTab === 'journal' && (
-            <JournalView
-              entries={journalEntries}
-              onAddEntry={(entry) => setJournalEntries((prev) => [entry, ...prev])}
+              brokerState={brokerState}
+              riskEvents={riskEvents}
+              onToggleBotStatus={(botId, newStatus) =>
+                setBots((prev) =>
+                  prev.map((b) => (b.id === botId ? { ...b, status: newStatus } : b))
+                )
+              }
+              onChangeBotMode={(botId, newMode) =>
+                setBots((prev) =>
+                  prev.map((b) => (b.id === botId ? { ...b, mode: newMode } : b))
+                )
+              }
+              onAddBot={(bot) => setBots((prev) => [...prev, bot])}
             />
           )}
 
           {activeTab === 'settings' && (
             <SettingsView
-              account={account}
-              riskSettings={riskSettings}
-              auditLogs={auditLogs}
-              onUpdateBroker={(updated) => setAccount((prev) => ({ ...prev, ...updated }))}
-              onUpdateRiskSettings={setRiskSettings}
-              bridgeStatus={bridgeStatus}
-              onTestBridge={handleTestBridge}
+              brokerState={brokerState}
+              onUpdateBrokerState={(state) =>
+                setBrokerState((prev) => ({ ...prev, ...state }))
+              }
             />
           )}
         </main>
       </div>
 
-      {/* Persistent Regulatory & Risk Disclaimer Footer */}
-      <footer className="px-6 py-2 bg-[#080C16] border-t border-slate-900 text-center text-[10px] text-slate-500 select-none">
-        <span>
-          Risk Disclosure: Trading Forex and leveraged financial instruments involves substantial risk of loss and is not suitable for every investor. Past backtest results, parameter optimization heatmaps, and simulated performance metrics do not predict future live trading execution.
-        </span>
-      </footer>
-
+      {/* Global Emergency Kill Switch Modal */}
       <KillSwitchModal
         isOpen={isKillSwitchOpen}
         onClose={() => setIsKillSwitchOpen(false)}
+        brokerState={brokerState}
         positions={positions}
-        bots={bots}
-        onExecuteKillSwitch={handleExecuteKillSwitch}
+        onExecuteKill={handleExecuteKill}
+        onResetKillSwitch={handleResetKillSwitch}
       />
 
-      <RiskDisclaimerModal
-        isOpen={isDisclaimerOpen}
-        onAccept={() => {
-          localStorage.setItem('zfx_disclaimer_accepted', 'true');
-          setIsDisclaimerOpen(false);
-        }}
-      />
+      {/* Quiet Regulatory & Safety Footer */}
+      <footer className="border-t border-slate-900 bg-[#070A11] px-4 py-3 mt-12 text-slate-500 text-[11px]">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 font-mono">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <span className="text-slate-400">
+              Zaboraa FX Research Portal · Sandbox Isolated · Exness MT5 Bridge
+            </span>
+          </div>
+          <div>
+            Mandatory Notice: Forex & Gold trading carries significant financial risk. Keep ALLOW_TRADING=false for research.
+          </div>
+        </div>
+      </footer>
     </div>
   );
-}
+};

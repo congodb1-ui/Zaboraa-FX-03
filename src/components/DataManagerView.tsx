@@ -1,645 +1,661 @@
-import React, { useState } from 'react';
-import { CandleTableView } from './CandleTableView';
+import React, { useEffect, useState } from 'react';
 import {
-  SymbolName,
-  Timeframe,
-  Candle,
-  DatasetRecord,
-  DataProvenance,
-} from '../types/forex';
-import { auditDataQuality, QualityReport, generateHistoricalCandles } from '../services/marketData';
-import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowDown,
+  CheckCircle,
   Database,
   Download,
-  Upload,
-  CheckCircle,
-  AlertTriangle,
+  FileCheck,
   FileSpreadsheet,
-  HardDrive,
-  ShieldAlert,
+  Plus,
+  RefreshCw,
+  Search,
   Server,
-  FileText,
-  Info,
-  Play,
-  Pause,
-  RefreshCcw,
+  Trash2,
+  Upload,
+  Wrench,
 } from 'lucide-react';
+import { Candle, DatasetRecord, ForexSymbol, Timeframe } from '../types/forex';
 
 interface DataManagerViewProps {
-  datasets: DatasetRecord[];
-  onAddDataset: (dataset: DatasetRecord) => void;
-  onLoadStoredData: (symbol: string, tf: Timeframe) => Promise<boolean>;
-  onAutoFixAnomalies: (datasetId: string) => void;
-  onFetchFromBridge: (symbol: string, tf: Timeframe) => Promise<boolean>;
-  onCancelDownload?: () => Promise<void>;
-  bridgeStatus: { isOnline: boolean; serverName?: string; accountType?: string; error?: string };
+  onSelectDatasetForBacktest?: (dataset: DatasetRecord) => void;
 }
 
 export const DataManagerView: React.FC<DataManagerViewProps> = ({
-  datasets,
-  onAddDataset,
-  onLoadStoredData,
-  onAutoFixAnomalies,
-  onFetchFromBridge,
-  onCancelDownload,
-  bridgeStatus,
+  onSelectDatasetForBacktest,
 }) => {
-  const [selectedSymbol, setSelectedSymbol] = useState<SymbolName | 'XAUUSDm'>('EURUSD');
-  const [selectedTf, setSelectedTf] = useState<Timeframe>('H1');
-  const [dataTab, setDataTab] = useState<'manager' | 'candles'>('manager');
-  const [isSyncingBridge, setIsSyncingBridge] = useState(false);
-  const [checkingStoredData, setCheckingStoredData] = useState(false);
-  const [storedDataStatus, setStoredDataStatus] = useState<string | null>(null);
-  const [activeReport, setActiveReport] = useState<QualityReport | null>(null);
-  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'warn' } | null>(null);
+  const [catalog, setCatalog] = useState<Omit<DatasetRecord, 'candles'>[]>([]);
+  const [selectedDatasetId, setSelectedDatasetId] = useState<string | null>(null);
+  const [loadedCandles, setLoadedCandles] = useState<Candle[]>([]);
+  const [isLoadingCandles, setIsLoadingCandles] = useState<boolean>(false);
 
-  // D28 UI Controls state
-  const [marketClosed, setMarketClosed] = useState<boolean>(false);
-  const [downloadProgress, setDownloadProgress] = useState<number>(0);
-  const [downloadCancelled, setDownloadCancelled] = useState<boolean>(false);
-  const [retryBackoffCount, setRetryBackoffCount] = useState<number>(0);
+  // Fetch from MT5 Bridge Modal State
+  const [isFetchModalOpen, setIsFetchModalOpen] = useState<boolean>(false);
+  const [fetchSymbol, setFetchSymbol] = useState<ForexSymbol>('EURUSD');
+  const [fetchTimeframe, setFetchTimeframe] = useState<Timeframe>('H1');
+  const [fetchCount, setFetchCount] = useState<number>(500);
+  const [isFetchingFromBridge, setIsFetchingFromBridge] = useState<boolean>(false);
+  const [fetchStatusMessage, setFetchStatusMessage] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
-  // CSV Import State
-  const [showCsvModal, setShowCsvModal] = useState(false);
-  const [csvFileName, setCsvFileName] = useState('');
-  const [csvRawText, setCsvRawText] = useState('');
-  const [csvSymbol, setCsvSymbol] = useState<SymbolName>('EURUSD');
-  const [csvTf, setCsvTf] = useState<Timeframe>('H1');
-  const [csvUtcOffset, setCsvUtcOffset] = useState<number>(0);
+  // CSV Import Modal State
+  const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
+  const [importCsvText, setImportCsvText] = useState<string>('');
+  const [importSymbol, setImportSymbol] = useState<ForexSymbol>('EURUSD');
+  const [importTimeframe, setImportTimeframe] = useState<Timeframe>('H1');
+  const [importUtcOffset, setImportUtcOffset] = useState<number>(0);
+  const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
-  const handleCheckStoredData = async () => {
-    setCheckingStoredData(true);
-    setStoredDataStatus(null);
+  // Autofix logs
+  const [autofixLogs, setAutofixLogs] = useState<string[]>([]);
+
+  // Load catalog from SQLite database
+  const loadCatalogFromBackend = async () => {
     try {
-      const q = new URLSearchParams({ symbol: selectedSymbol, timeframe: selectedTf });
-      const response = await fetch(`/api/data/check?${q.toString()}`);
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Data check failed');
-      if (result.exists) {
-        const count = result.candle_count ?? result.barCount ?? 0;
-        setStoredDataStatus(`Stored data found: ${count} bars (${selectedSymbol} ${selectedTf}). Loading into Active Research Datasets…`);
-        const activated = await onLoadStoredData(selectedSymbol, selectedTf);
-        setStoredDataStatus(activated
-          ? `Stored data found and loaded: ${count} bars (${selectedSymbol} ${selectedTf}). Source is marked unverified until provenance is confirmed.`
-          : `Stored data exists (${count} bars), but activation failed. Check the portal API/server logs.`);
-      } else {
-        setStoredDataStatus(`No stored data found for ${selectedSymbol} ${selectedTf}.`);
+      const res = await fetch('/api/data/catalog');
+      if (res.ok) {
+        const data = await res.json();
+        const records = data.catalog || [];
+        setCatalog(records);
+        if (records.length > 0 && !selectedDatasetId) {
+          setSelectedDatasetId(records[0].id);
+        }
       }
     } catch (err) {
-      setStoredDataStatus(err instanceof Error ? err.message : 'Could not check stored data.');
-    } finally {
-      setCheckingStoredData(false);
+      console.error('Failed to load catalog:', err);
     }
   };
 
-  const handleBridgeDownload = async (event?: React.MouseEvent<HTMLButtonElement>) => {
-    event?.preventDefault();
-    event?.stopPropagation();
-    setIsSyncingBridge(true);
-    setDownloadCancelled(false);
-    setDownloadProgress(25);
-    
-    // Check M1 size warning per D28 requirements
-    if (selectedTf === 'M1') {
-      setNotification({
-        message: 'M1 Timeframe download requested: High disk allocation and extended download duration anticipated (>500MB).',
-        type: 'warn',
-      });
-    }
+  useEffect(() => {
+    loadCatalogFromBackend();
+  }, []);
 
-    const success = await onFetchFromBridge(selectedSymbol, selectedTf);
-    setIsSyncingBridge(false);
-    if (success) {
-      setDownloadProgress(100);
-      setNotification({
-        message: `Successfully synchronized ${selectedSymbol} ${selectedTf} from Exness MT5 Bridge (${bridgeStatus.serverName || 'Exness-MT5Trial9'}).`,
-        type: 'success',
-      });
-    } else {
-      setDownloadProgress(0);
-      setNotification({
-        message: `MT5 Bridge unreachable on http://127.0.0.1:8001. Please start mt5-bridge locally or import via CSV.`,
-        type: 'warn',
-      });
-    }
-    setTimeout(() => setNotification(null), 5000);
-  };
-
-  const handleCancelDownload = () => {
-    void onCancelDownload?.();
-    setIsSyncingBridge(false);
-    setDownloadCancelled(true);
-    setDownloadProgress(0);
-    setNotification({
-      message: 'Download cancelled by user.',
-      type: 'warn',
-    });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
-  const handleGenerateBenchmark = () => {
-    const candles = generateHistoricalCandles(selectedSymbol === 'XAUUSDm' ? 'XAUUSD' : selectedSymbol, selectedTf, 500);
-    const newRecord: DatasetRecord = {
-      id: `ds_benchmark_${selectedSymbol.toLowerCase()}_${selectedTf.toLowerCase()}_${Date.now()}`,
-      symbol: selectedSymbol as SymbolName,
-      timeframe: selectedTf,
-      rowCount: candles.length,
-      fileSizeKB: Math.round(candles.length * 0.045),
-      firstDate: new Date(candles[0].time * 1000).toISOString().slice(0, 10),
-      lastDate: new Date(candles[candles.length - 1].time * 1000).toISOString().slice(0, 10),
-      provenance: {
-        source: 'SIMULATED',
-        label: 'SIMULATED',
-        details: 'Simulated high-frequency geometric Brownian motion with realistic tick spreads.',
-        isResearchEligible: false,
-        utcOffsetHours: 2,
-      },
-      candles,
-      qualityScore: 99,
-      lastUpdated: new Date().toISOString(),
-    };
-    onAddDataset(newRecord);
-    setNotification({
-      message: `Generated benchmark dataset for ${selectedSymbol} (${selectedTf}) with 500 bars.`,
-      type: 'success',
-    });
-    setTimeout(() => setNotification(null), 5000);
-  };
-
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setCsvFileName(file.name);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setCsvRawText((event.target?.result as string) || '');
-    };
-    reader.readAsText(file);
-  };
-
-  const handleProcessCsv = () => {
-    if (!csvRawText.trim()) {
-      setNotification({ message: 'Please select or paste a valid CSV file.', type: 'warn' });
+  // When selected dataset changes, load candles from SQLite
+  useEffect(() => {
+    if (!selectedDatasetId) {
+      setLoadedCandles([]);
       return;
     }
 
-    try {
-      const lines = csvRawText.trim().split('\n');
-      if (lines.length < 2) throw new Error('CSV must contain a header and at least one data row.');
+    const ds = catalog.find((c) => c.id === selectedDatasetId);
+    if (!ds) return;
 
-      const header = lines[0].toLowerCase().split(',');
-      const timeIdx = header.findIndex((h) => h.includes('time') || h.includes('date'));
-      const openIdx = header.findIndex((h) => h.includes('open'));
-      const highIdx = header.findIndex((h) => h.includes('high'));
-      const lowIdx = header.findIndex((h) => h.includes('low'));
-      const closeIdx = header.findIndex((h) => h.includes('close'));
-      const volIdx = header.findIndex((h) => h.includes('vol'));
-
-      if (openIdx === -1 || highIdx === -1 || lowIdx === -1 || closeIdx === -1) {
-        throw new Error('CSV is missing required OHLC columns (open, high, low, close).');
-      }
-
-      const parsedCandles: Candle[] = [];
-      const offsetSeconds = csvUtcOffset * 3600;
-
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map((c) => c.trim());
-        if (cols.length <= closeIdx) continue;
-
-        let timeSec = Math.floor(Date.now() / 1000) - (lines.length - i) * 3600;
-        if (timeIdx !== -1) {
-          const parsed = Date.parse(cols[timeIdx]);
-          if (!isNaN(parsed)) {
-            timeSec = Math.floor(parsed / 1000) - offsetSeconds;
-          }
+    setIsLoadingCandles(true);
+    fetch(`/api/data/load?symbol=${ds.symbol}&timeframe=${ds.timeframe}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && data.candles) {
+          setLoadedCandles(data.candles);
+        } else {
+          setLoadedCandles([]);
         }
-
-        const open = parseFloat(cols[openIdx]);
-        const high = parseFloat(cols[highIdx]);
-        const low = parseFloat(cols[lowIdx]);
-        const close = parseFloat(cols[closeIdx]);
-        const tickVolume = volIdx !== -1 ? parseInt(cols[volIdx]) || 100 : 100;
-
-        if (!isNaN(open) && !isNaN(high) && !isNaN(low) && !isNaN(close)) {
-          parsedCandles.push({
-            time: timeSec,
-            open,
-            high,
-            low,
-            close,
-            tickVolume,
-            spread: 1.0,
-          });
-        }
-      }
-
-      parsedCandles.sort((a, b) => a.time - b.time);
-
-      const provenance: DataProvenance = {
-        source: 'USER_CSV',
-        label: 'USER CSV',
-        details: `File: ${csvFileName} (Unverified user import)`,
-        fileName: csvFileName,
-        importDate: new Date().toISOString().slice(0, 10),
-        utcOffsetHours: csvUtcOffset,
-        isResearchEligible: true,
-      };
-
-      const newRecord: DatasetRecord = {
-        id: `ds_csv_${Date.now()}`,
-        symbol: csvSymbol,
-        timeframe: csvTf,
-        rowCount: parsedCandles.length,
-        fileSizeKB: Math.round((csvRawText.length / 1024)),
-        firstDate: parsedCandles.length > 0 ? new Date(parsedCandles[0].time * 1000).toISOString().slice(0, 10) : 'N/A',
-        lastDate: parsedCandles.length > 0 ? new Date(parsedCandles[parsedCandles.length - 1].time * 1000).toISOString().slice(0, 10) : 'N/A',
-        provenance,
-        candles: parsedCandles,
-        qualityScore: 99,
-        lastUpdated: new Date().toISOString(),
-      };
-
-      onAddDataset(newRecord);
-      setShowCsvModal(false);
-      setNotification({
-        message: `Imported ${parsedCandles.length} bars from user CSV '${csvFileName}'. Tagged as USER CSV (unverified).`,
-        type: 'success',
+      })
+      .catch((err) => {
+        console.error('Failed to load candles from SQLite:', err);
+        setLoadedCandles([]);
+      })
+      .finally(() => {
+        setIsLoadingCandles(false);
       });
-      setTimeout(() => setNotification(null), 5000);
+  }, [selectedDatasetId, catalog]);
+
+  // Handle dynamic bulk fetch from MT5 Bridge
+  const handleExecuteBridgeFetch = async () => {
+    setIsFetchingFromBridge(true);
+    setFetchStatusMessage(null);
+
+    try {
+      const res = await fetch('/api/data/bulk-download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: fetchSymbol,
+          timeframe: fetchTimeframe,
+          count: fetchCount,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setFetchStatusMessage({
+          success: true,
+          message: `Successfully downloaded and saved ${data.importedCount} genuine candles for ${data.symbol} ${data.timeframe} into SQLite!`,
+        });
+        await loadCatalogFromBackend();
+        setSelectedDatasetId(
+          `ds-${fetchSymbol.toLowerCase()}-${fetchTimeframe.toLowerCase()}-bridge`
+        );
+      } else {
+        setFetchStatusMessage({
+          success: false,
+          message:
+            data.message ||
+            'Failed to fetch from MT5 bridge. Ensure Exness MT5 and uvicorn bridge are active.',
+        });
+      }
     } catch (err: any) {
-      setNotification({ message: `CSV Import Failed: ${err.message}`, type: 'warn' });
-      setTimeout(() => setNotification(null), 5000);
+      setFetchStatusMessage({
+        success: false,
+        message:
+          'Bridge unreachable: Could not contact backend or MT5 bridge on 127.0.0.1:8001.',
+      });
+    } finally {
+      setIsFetchingFromBridge(false);
     }
   };
 
+  // Handle CSV Import
+  const handleCommitImport = async () => {
+    if (!importCsvText.trim()) return;
+
+    try {
+      const res = await fetch('/api/data/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          'x-import-options': JSON.stringify({
+            symbol: importSymbol,
+            timeframe: importTimeframe,
+            utcOffsetHours: importUtcOffset,
+          }),
+        },
+        body: importCsvText,
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setImportFeedback(
+          `Imported ${data.imported} candles. Quality score: ${data.qualityScore}%.`
+        );
+        await loadCatalogFromBackend();
+        setTimeout(() => {
+          setIsImportOpen(false);
+          setImportCsvText('');
+          setImportFeedback(null);
+        }, 1500);
+      } else {
+        setImportFeedback(`Import error: ${data.error || 'Failed'}`);
+      }
+    } catch (err: any) {
+      setImportFeedback(`Failed to import CSV: ${err.message}`);
+    }
+  };
+
+  // Handle Run Autofix
+  const handleRunAutofix = async () => {
+    const active = catalog.find((c) => c.id === selectedDatasetId);
+    if (!active) return;
+
+    try {
+      const res = await fetch('/api/data/autofix', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: active.symbol,
+          timeframe: active.timeframe,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAutofixLogs(data.log?.map((l: any) => `${l.timeIso}: ${l.details}`) || []);
+        await loadCatalogFromBackend();
+      }
+    } catch (err) {
+      console.error('Autofix error:', err);
+    }
+  };
+
+  // Handle Export CSV
+  const handleExportCsv = () => {
+    const active = catalog.find((c) => c.id === selectedDatasetId);
+    if (!active) return;
+    window.location.href = `/api/data/export?symbol=${active.symbol}&timeframe=${active.timeframe}`;
+  };
+
+  const activeDs = catalog.find((c) => c.id === selectedDatasetId);
+
   return (
     <div className="space-y-6">
-      <div className="flex gap-2"><button onClick={() => setDataTab('manager')} className={`px-3 py-2 rounded-lg text-xs font-semibold ${dataTab === 'manager' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Data Manager</button><button onClick={() => setDataTab('candles')} className={`px-3 py-2 rounded-lg text-xs font-semibold ${dataTab === 'candles' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300'}`}>Stored OHLC Table</button></div>
-      {dataTab === 'candles' ? <CandleTableView symbol={selectedSymbol as SymbolName} timeframe={selectedTf} /> : <>
-      {/* Top Banner / Ingestion Box */}
-      <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800/80 pb-3 mb-4">
+      {/* Top Action Bar */}
+      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <Database className="w-4 h-4 text-blue-400" />
-              Historical Market Data Catalog & Provenance Manager
+              Historical Market Data Catalog (SQLite Local Source of Truth)
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Strict research data integrity: Backtests only run on authentic MT5 Bridge or User CSV datasets
+              Strict 3-tier provenance tracking (<code className="text-emerald-400">MT5 BRIDGE</code>, <code className="text-blue-400">USER CSV</code>, <code className="text-amber-400">SIMULATED</code>) across all 8 broker timeframes.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* D28 Market Closed Indicator Toggle */}
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setMarketClosed(!marketClosed)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors flex items-center gap-1.5 ${
-                marketClosed ? 'bg-red-950/60 border-red-500 text-red-300' : 'bg-emerald-950/60 border-emerald-500 text-emerald-300'
-              }`}
+              type="button"
+              onClick={() => setIsFetchModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all"
             >
-              <span className={`w-2 h-2 rounded-full ${marketClosed ? 'bg-red-400' : 'bg-emerald-400 animate-pulse'}`}></span>
-              <span>{marketClosed ? 'Market Closed' : 'Market Open'}</span>
-            </button>
-
-            <button
-              onClick={handleGenerateBenchmark}
-              className="px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-blue-500/40"
-              title="Generate 500 benchmark bars for active pair/timeframe"
-            >
-              <Database className="w-3.5 h-3.5 text-blue-400" />
-              <span>Generate Benchmark ({selectedSymbol} {selectedTf})</span>
+              <Server className="w-3.5 h-3.5" />
+              Fetch from MT5 Bridge
             </button>
             <button
-              onClick={() => setShowCsvModal(true)}
-              className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors border border-slate-700"
+              type="button"
+              onClick={() => setIsImportOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all"
             >
-              <Upload className="w-3.5 h-3.5 text-blue-400" />
-              <span>Import User CSV</span>
+              <Upload className="w-3.5 h-3.5" />
+              Import Custom CSV
             </button>
-          </div>
-        </div>
-
-        {notification && (
-          <div className={`mb-4 p-3 rounded-lg text-xs font-mono flex items-center gap-2 ${
-            notification.type === 'success'
-              ? 'bg-emerald-950/60 border border-emerald-500/50 text-emerald-300'
-              : 'bg-amber-950/60 border border-amber-500/50 text-amber-300'
-          }`}>
-            {notification.type === 'success' ? <CheckCircle className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
-            <span>{notification.message}</span>
-          </div>
-        )}
-
-        {/* Sync Controls & D28 Download Progress/Controls */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Target Pair</label>
-            <select
-              value={selectedSymbol}
-              onChange={(e) => setSelectedSymbol(e.target.value as SymbolName)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="EURUSD">EURUSD (EURUSDm)</option>
-              <option value="GBPUSD">GBPUSD (GBPUSDm)</option>
-              <option value="USDJPY">USDJPY (USDJPYm)</option>
-              <option value="XAUUSD">XAUUSD (Gold / US Dollar)</option>
-              <option value="XAUUSDm">XAUUSDm (Exness suffix)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Timeframe</label>
-            <select
-              value={selectedTf}
-              onChange={(e) => setSelectedTf(e.target.value as Timeframe)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-white focus:outline-none focus:border-blue-500"
-            >
-              <option value="M1">M1 (1 Minute - High Disk Size Warning)</option>
-              <option value="M5">M5 (5 Minutes)</option>
-              <option value="M10">M10 (10 Minutes)</option>
-              <option value="M15">M15 (15 Minutes)</option>
-              <option value="M30">M30 (30 Minutes)</option>
-              <option value="H1">H1 (1 Hour - Recommended)</option>
-              <option value="H3">H3 (3 Hours)</option>
-              <option value="D1">D1 (Daily)</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-xs text-slate-400 mb-1">Data Source</label>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs font-mono text-slate-300 flex items-center justify-between">
-              <span>Local MT5 Bridge</span>
-              <span className={`text-[10px] px-1.5 rounded ${bridgeStatus.isOnline ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
-                {bridgeStatus.isOnline ? 'ONLINE' : 'OFFLINE'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex gap-2 mb-2">
-            <button
-              onClick={handleCheckStoredData}
-              disabled={checkingStoredData || isSyncingBridge}
-              className="w-full py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-semibold text-xs rounded-lg transition-all"
-            >
-              {checkingStoredData ? 'Checking stored data…' : 'Check Stored Data'}
-            </button>
-          </div>
-          {storedDataStatus && <p role="status" className="mb-2 text-xs text-slate-300">{storedDataStatus}</p>}
-          <div className="flex gap-2">
-            {isSyncingBridge ? (
-              <button
-                type="button"
-                onClick={handleCancelDownload}
-                className="w-full py-2 bg-red-600 hover:bg-red-500 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md"
-              >
-                <Pause className="w-3.5 h-3.5" />
-                <span>Cancel Download</span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleBridgeDownload}
-                className="w-full py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/30"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Fetch from MT5 Bridge</span>
-              </button>
+            {activeDs && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleExportCsv}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Export CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRunAutofix}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-all"
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  Run Integrity Autofix
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        {/* D28 Download Progress bar & Earliest Bar status */}
-        {isSyncingBridge && (
-          <div className="mt-4 pt-3 border-t border-slate-800 space-y-1.5">
-            <div className="flex justify-between text-[11px] font-mono text-slate-400">
-              <span>Downloading historical stream for {selectedSymbol} ({selectedTf})...</span>
-              <span>{downloadProgress}%</span>
-            </div>
-            <div className="w-full bg-slate-900 rounded-full h-1.5 overflow-hidden">
-              <div className="bg-blue-500 h-full transition-all duration-300" style={{ width: `${downloadProgress}%` }}></div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Datasets Table */}
-      <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3 border-b border-slate-800/80 pb-2">
-          <div className="flex items-center gap-2">
-            <HardDrive className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-sm font-bold text-white">Active Research Datasets ({datasets.length})</h3>
-          </div>
-          <span className="text-xs text-slate-500 font-mono">Normalized to UTC</span>
-        </div>
-
-        {datasets.length === 0 ? (
-          <div className="text-center py-12 text-slate-500 space-y-2">
-            <Database className="w-10 h-10 text-slate-600 mx-auto" />
-            <p className="text-xs text-slate-300 font-semibold">Data Catalog is Empty</p>
-            <p className="text-[11px] text-slate-500 max-w-md mx-auto">
-              Zaboraa FX enforces research honesty. No fake or unverified data is pre-seeded. Please <strong>Import a CSV</strong> from TradingView/MetaTrader or <strong>Fetch from MT5 Bridge</strong> above to begin backtesting.
+        {/* Catalog List / Tabs */}
+        {catalog.length === 0 ? (
+          <div className="mt-6 py-10 text-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 p-6">
+            <Database className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-slate-300">Catalog is Currently Empty</h3>
+            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+              No historical datasets are stored in SQLite yet. Click <strong>"Fetch from MT5 Bridge"</strong> to dynamically download genuine broker candles from Exness MT5, or <strong>"Import Custom CSV"</strong> to load your own data.
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="border-b border-slate-800 text-slate-400 font-mono text-[11px]">
-                  <th className="py-2.5 px-3">Symbol</th>
-                  <th className="py-2.5 px-3">Timeframe</th>
-                  <th className="py-2.5 px-3">Provenance Source</th>
-                  <th className="py-2.5 px-3">Bars</th>
-                  <th className="py-2.5 px-3">UTC Offset</th>
-                  <th className="py-2.5 px-3">Date Span</th>
-                  <th className="py-2.5 px-3">Quality</th>
-                  <th className="py-2.5 px-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
-                {datasets.map((ds) => {
-                  const prov = ds.provenance;
-                  const isBridge = prov.source === 'MT5_BRIDGE';
-                  const isCsv = prov.source === 'USER_CSV';
-
-                  return (
-                    <tr key={ds.id} className="hover:bg-slate-800/30 transition-colors">
-                      <td className="py-2.5 px-3 font-bold text-white">{ds.symbol}</td>
-                      <td className="py-2.5 px-3">
-                        <span className="px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 text-[10px]">
-                          {ds.timeframe}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isBridge
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : isCsv
-                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                            : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                        }`}>
-                          {prov.label}
-                        </span>
-                        <div className="text-[10px] text-slate-500 mt-0.5">{prov.details}</div>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-300">{ds.rowCount.toLocaleString()}</td>
-                      <td className="py-2.5 px-3 text-slate-400">UTC{prov.utcOffsetHours >= 0 ? `+${prov.utcOffsetHours}` : prov.utcOffsetHours}</td>
-                      <td className="py-2.5 px-3 text-slate-400 text-[11px]">
-                        {ds.firstDate} → {ds.lastDate}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <span className="text-emerald-400 font-bold">{ds.qualityScore}%</span>
-                      </td>
-                      <td className="py-2.5 px-3 text-right space-x-1.5">
-                        <button
-                          onClick={() => {
-                            const rep = auditDataQuality(ds.candles, ds.symbol, ds.timeframe);
-                            setActiveReport(rep);
-                          }}
-                          className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10px] transition-colors"
-                        >
-                          Audit
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {catalog.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => setSelectedDatasetId(d.id)}
+                className={`px-3 py-2 rounded-lg border text-xs font-mono whitespace-nowrap text-left transition-all ${
+                  selectedDatasetId === d.id
+                    ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
+                    : 'border-slate-800 bg-slate-950 hover:bg-slate-900'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-white">{d.symbol}</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+                    {d.timeframe}
+                  </span>
+                  <span
+                    className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                      d.provenance === 'MT5 BRIDGE'
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : d.provenance === 'USER CSV'
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-amber-500/20 text-amber-400'
+                    }`}
+                  >
+                    {d.provenance}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-400 mt-1">
+                  {d.candleCount} bars · Score: {d.qualityScore}%
+                </div>
+              </button>
+            ))}
           </div>
         )}
       </div>
 
-      {/* CSV Import Modal */}
-      {showCsvModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0F172A] border border-slate-700 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Upload className="w-4 h-4 text-blue-400" />
-                Import User CSV Dataset
-              </h3>
-              <button onClick={() => setShowCsvModal(false)} className="text-xs text-slate-400 hover:text-white">
-                Cancel
-              </button>
+      {/* Dataset Details & Stored OHLC Inspection */}
+      {activeDs && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Metadata Card */}
+          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-3 font-mono text-xs">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+              Dataset Provenance & Verification
+            </h3>
+
+            <div className="p-3 rounded bg-slate-950 border border-slate-800 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Symbol & Timeframe:</span>
+                <strong className="text-white">
+                  {activeDs.symbol} {activeDs.timeframe}
+                </strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Provenance Tier:</span>
+                <strong
+                  className={
+                    activeDs.provenance === 'MT5 BRIDGE'
+                      ? 'text-emerald-400'
+                      : 'text-blue-400'
+                  }
+                >
+                  {activeDs.provenance}
+                </strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Research Eligibility:</span>
+                <strong
+                  className={
+                    activeDs.isResearchEligible ? 'text-emerald-400' : 'text-rose-400'
+                  }
+                >
+                  {activeDs.isResearchEligible ? 'RESEARCH READY' : 'BLOCKED'}
+                </strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Candle Count:</span>
+                <strong className="text-white">{activeDs.candleCount}</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Broker Server:</span>
+                <strong className="text-slate-300">
+                  {activeDs.brokerServer || 'Local Import'}
+                </strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Quality Score:</span>
+                <strong className="text-emerald-400">{activeDs.qualityScore}%</strong>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Gaps Detected:</span>
+                <strong className="text-slate-300">{activeDs.gapCount}</strong>
+              </div>
+              <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-500 break-all">
+                SHA-256: {activeDs.sha256}
+              </div>
             </div>
 
-            <div className="p-2.5 bg-blue-950/30 border border-blue-500/30 rounded-lg text-[11px] text-blue-300 flex items-start gap-2">
-              <Info className="w-4 h-4 shrink-0 mt-0.5" />
-              <span>
-                Imported CSV data will be tagged honestly as <strong>USER CSV</strong> (unverified). Expects headers containing <code>time/date</code>, <code>open</code>, <code>high</code>, <code>low</code>, <code>close</code>.
+            {/* Autofix Logs */}
+            {autofixLogs.length > 0 && (
+              <div className="p-3 rounded bg-slate-950 border border-slate-800 space-y-1 text-[11px]">
+                <strong className="text-amber-400 block font-sans">
+                  Autofix Actions Executed:
+                </strong>
+                {autofixLogs.map((log, i) => (
+                  <div key={i} className="text-slate-400">• {log}</div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Stored OHLC Table */}
+          <div className="lg:col-span-2 rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+                Stored OHLC Market Bars ({loadedCandles.length} Loaded)
+              </h3>
+              <span className="text-xs font-mono text-slate-400">
+                UTC Epoch Normalized
               </span>
             </div>
 
-            <div className="space-y-3 text-xs">
+            {isLoadingCandles ? (
+              <div className="py-20 text-center text-slate-500 text-xs">
+                Loading candles from SQLite database...
+              </div>
+            ) : loadedCandles.length === 0 ? (
+              <div className="py-20 text-center text-slate-500 text-xs">
+                No candle records found in SQLite for this dataset.
+              </div>
+            ) : (
+              <div className="overflow-x-auto max-h-96 overflow-y-auto mt-2">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                    <tr>
+                      <th className="py-2">Time (UTC)</th>
+                      <th>Open</th>
+                      <th>High</th>
+                      <th>Low</th>
+                      <th>Close</th>
+                      <th>Tick Volume</th>
+                      <th>Spread</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60">
+                    {loadedCandles
+                      .slice(-50)
+                      .reverse()
+                      .map((c, i) => (
+                        <tr key={c.time + '-' + i} className="hover:bg-slate-800/30">
+                          <td className="py-1.5 text-slate-400">
+                            {new Date(c.time * 1000)
+                              .toISOString()
+                              .replace('T', ' ')
+                              .substring(0, 19)}
+                          </td>
+                          <td className="text-white">{c.open}</td>
+                          <td className="text-emerald-400">{c.high}</td>
+                          <td className="text-rose-400">{c.low}</td>
+                          <td className="text-white">{c.close}</td>
+                          <td className="text-slate-400">{c.tickVolume}</td>
+                          <td className="text-blue-400">{c.spread}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fetch from MT5 Bridge Modal */}
+      {isFetchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Server className="w-4 h-4 text-emerald-400" />
+                Fetch Data from Local MT5 Bridge
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsFetchModalOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Connects to the local Python FastAPI bridge on <code className="text-slate-100">127.0.0.1:8001</code>. Automatically appends broker suffix (<code className="text-emerald-400">EURUSDm</code>, <code className="text-emerald-400">XAUUSDm</code>) for Exness demo terminals, excludes the forming bar, and stores canonical data in SQLite.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3 text-xs font-mono">
               <div>
-                <label className="block text-slate-400 mb-1">Select CSV File</label>
-                <input
-                  type="file"
-                  accept=".csv,.txt"
-                  onChange={handleFileUpload}
-                  className="w-full text-slate-400 text-xs file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:bg-blue-600 file:text-white file:text-xs"
-                />
+                <label className="block text-slate-400 mb-1 font-sans">Symbol</label>
+                <select
+                  value={fetchSymbol}
+                  onChange={(e) => setFetchSymbol(e.target.value as ForexSymbol)}
+                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                >
+                  <option value="EURUSD">EURUSD</option>
+                  <option value="GBPUSD">GBPUSD</option>
+                  <option value="USDJPY">USDJPY</option>
+                  <option value="XAUUSD">XAUUSD (Gold)</option>
+                </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="block text-slate-400 mb-1">Pair</label>
-                  <select
-                    value={csvSymbol}
-                    onChange={(e) => setCsvSymbol(e.target.value as SymbolName)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-white font-mono"
-                  >
-                    <option value="EURUSD">EURUSD</option>
-                    <option value="GBPUSD">GBPUSD</option>
-                    <option value="USDJPY">USDJPY</option>
-                    <option value="XAUUSD">XAUUSD</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1">Timeframe</label>
-                  <select
-                    value={csvTf}
-                    onChange={(e) => setCsvTf(e.target.value as Timeframe)}
-                    className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-white font-mono"
-                  >
-                    <option value="M1">M1</option>
-                    <option value="M5">M5</option>
-                    <option value="M10">M10</option>
-                    <option value="M15">M15</option>
-                    <option value="M30">M30</option>
-                    <option value="H1">H1</option>
-                    <option value="H3">H3</option>
-                    <option value="H3">H3</option>
-                    <option value="D1">D1</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-slate-400 mb-1">Source UTC Offset</label>
-                  <input
-                    type="number"
-                    value={csvUtcOffset}
-                    onChange={(e) => setCsvUtcOffset(parseInt(e.target.value) || 0)}
-                    placeholder="e.g. 2 for broker"
-                    className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 text-white font-mono"
-                  />
-                </div>
+              <div>
+                <label className="block text-slate-400 mb-1 font-sans">Timeframe</label>
+                <select
+                  value={fetchTimeframe}
+                  onChange={(e) => setFetchTimeframe(e.target.value as Timeframe)}
+                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                >
+                  <option value="M1">M1 (1 Minute)</option>
+                  <option value="M5">M5 (5 Minutes)</option>
+                  <option value="M10">M10 (10 Minutes)</option>
+                  <option value="M15">M15 (15 Minutes)</option>
+                  <option value="M30">M30 (30 Minutes)</option>
+                  <option value="H1">H1 (1 Hour)</option>
+                  <option value="H3">H3 (3 Hours)</option>
+                  <option value="D1">D1 (1 Day)</option>
+                </select>
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end gap-2">
+            <div>
+              <label className="block text-slate-400 text-xs mb-1 font-sans">
+                Bar Count Depth
+              </label>
+              <select
+                value={fetchCount}
+                onChange={(e) => setFetchCount(parseInt(e.target.value))}
+                className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white font-mono text-xs"
+              >
+                <option value={100}>100 Bars</option>
+                <option value={300}>300 Bars</option>
+                <option value={500}>500 Bars</option>
+                <option value={1000}>1,000 Bars</option>
+                <option value={2000}>2,000 Bars</option>
+                <option value={5000}>5,000 Bars (Max Page)</option>
+              </select>
+            </div>
+
+            {fetchStatusMessage && (
+              <div
+                className={`p-2.5 rounded text-xs border ${
+                  fetchStatusMessage.success
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                }`}
+              >
+                {fetchStatusMessage.message}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
               <button
-                onClick={() => setShowCsvModal(false)}
-                className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+                type="button"
+                onClick={() => setIsFetchModalOpen(false)}
+                className="px-4 py-2 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                disabled={isFetchingFromBridge}
+                onClick={handleExecuteBridgeFetch}
+                className="px-4 py-2 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {isFetchingFromBridge ? 'Fetching from MT5...' : 'Execute Download'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CSV Import Modal */}
+      {isImportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-2xl space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <Upload className="w-4 h-4 text-blue-400" />
+              Import Custom Forex Candle CSV
+            </h3>
+
+            <div className="grid grid-cols-3 gap-3 text-xs font-mono">
+              <div>
+                <label className="block text-slate-400 mb-1 font-sans">Symbol</label>
+                <select
+                  value={importSymbol}
+                  onChange={(e) => setImportSymbol(e.target.value as ForexSymbol)}
+                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                >
+                  <option value="EURUSD">EURUSD</option>
+                  <option value="GBPUSD">GBPUSD</option>
+                  <option value="USDJPY">USDJPY</option>
+                  <option value="XAUUSD">XAUUSD</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-sans">Timeframe</label>
+                <select
+                  value={importTimeframe}
+                  onChange={(e) => setImportTimeframe(e.target.value as Timeframe)}
+                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                >
+                  <option value="M1">M1</option>
+                  <option value="M5">M5</option>
+                  <option value="M10">M10</option>
+                  <option value="M15">M15</option>
+                  <option value="M30">M30</option>
+                  <option value="H1">H1</option>
+                  <option value="H3">H3</option>
+                  <option value="D1">D1</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-slate-400 mb-1 font-sans">UTC Offset</label>
+                <input
+                  type="number"
+                  value={importUtcOffset}
+                  onChange={(e) => setImportUtcOffset(parseInt(e.target.value) || 0)}
+                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-slate-400 text-xs mb-1 font-sans">
+                Paste CSV Lines (Format: Time,Open,High,Low,Close,Volume,Spread)
+              </label>
+              <textarea
+                value={importCsvText}
+                onChange={(e) => setImportCsvText(e.target.value)}
+                placeholder="Time,Open,High,Low,Close,Volume,Spread&#10;2026-10-20 10:00:00,1.0850,1.0865,1.0840,1.0855,300,1.0&#10;2026-10-20 11:00:00,1.0855,1.0870,1.0850,1.0862,420,1.0"
+                rows={7}
+                className="w-full rounded bg-slate-950 p-2.5 font-mono text-xs text-white border border-slate-800 focus:outline-none focus:border-blue-500"
+              />
+            </div>
+
+            {importFeedback && (
+              <div className="p-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono">
+                {importFeedback}
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => setIsImportOpen(false)}
+                className="px-4 py-2 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
               >
                 Cancel
               </button>
               <button
-                onClick={handleProcessCsv}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg transition-colors"
+                type="button"
+                onClick={handleCommitImport}
+                className="px-4 py-2 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white"
               >
-                Ingest CSV to Catalog
+                Audit & Commit to SQLite
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Quality Report Modal */}
-      {activeReport && (
-        <div className="bg-[#0D1322] border border-blue-500/40 rounded-xl p-5 shadow-xl animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
-            <h3 className="text-sm font-bold text-white">
-              Data Quality Audit – {activeReport.symbol} ({activeReport.timeframe})
-            </h3>
-            <button onClick={() => setActiveReport(null)} className="text-xs text-slate-400 hover:text-white">
-              Close
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs mb-3">
-            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-[10px] text-slate-500">Total Bars</div>
-              <div className="text-white font-bold mt-1">{activeReport.totalCandles.toLocaleString()}</div>
-            </div>
-            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-[10px] text-slate-500">Duplicate Timestamps</div>
-              <div className="text-emerald-400 font-bold mt-1">{activeReport.duplicateTimestamps}</div>
-            </div>
-            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-[10px] text-slate-500">Inverted OHLC</div>
-              <div className="text-emerald-400 font-bold mt-1">{activeReport.invertedOHLC}</div>
-            </div>
-            <div className="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
-              <div className="text-[10px] text-slate-500">Quality Score</div>
-              <div className="text-blue-400 font-bold mt-1">{activeReport.scorePct}%</div>
-            </div>
-          </div>
-        </div>
-      )}
-      </>}
     </div>
   );
 };

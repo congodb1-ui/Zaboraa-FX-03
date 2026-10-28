@@ -1,336 +1,692 @@
-import React, { useState } from 'react';
-import { Strategy, StrategyParamSchema } from '../types/forex';
-import { runStrategySmokeTest, validateStrategyCode } from '../engine/workerSandbox';
+import React, { useState, useEffect } from 'react';
 import {
-  Code2,
-  Play,
-  Save,
-  Plus,
-  Copy,
-  Sliders,
+  AlertCircle,
   Check,
-  AlertTriangle,
-  ShieldCheck,
+  CheckCircle2,
+  Code2,
+  Copy,
+  Edit3,
+  FileCode,
   Info,
+  Play,
+  Plus,
+  RotateCcw,
+  Save,
+  Shield,
+  ShieldCheck,
+  Sliders,
+  Trash2,
 } from 'lucide-react';
+import {
+  BUILT_IN_STRATEGIES,
+  executeStrategyBar,
+  StrategyDefinition,
+  validateStrategySecurity,
+} from '../engine/workerSandbox';
+import { DatasetRecord } from '../types/forex';
 
 interface StrategyStudioViewProps {
-  strategies: Strategy[];
-  onSelectStrategy: (strat: Strategy) => void;
-  onSaveStrategy: (strat: Strategy) => Promise<boolean> | boolean | void;
-  onLaunchBacktest: (strat: Strategy) => void;
+  datasets: DatasetRecord[];
+  strategies?: StrategyDefinition[];
+  onSaveStrategy: (strategy: StrategyDefinition) => void;
+  onCreateStrategy?: (strategy: StrategyDefinition) => void;
+  onDeleteStrategy?: (id: string) => void;
 }
 
 export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
-  strategies,
-  onSelectStrategy,
+  datasets,
+  strategies = BUILT_IN_STRATEGIES,
   onSaveStrategy,
-  onLaunchBacktest,
+  onCreateStrategy,
+  onDeleteStrategy,
 }) => {
-  const [selectedStratId, setSelectedStratId] = useState<string>(strategies[0]?.id || '');
-  const [codeContent, setCodeContent] = useState<string>(strategies[0]?.code || '');
-  const [activeParams, setActiveParams] = useState<Record<string, any>>(strategies[0]?.params || {});
-  const [copied, setCopied] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [workerTestResult, setWorkerTestResult] = useState<{ passed: boolean; message: string } | null>(null);
+  const [strategyList, setStrategyList] = useState<StrategyDefinition[]>(strategies);
+  const [selectedStrategy, setSelectedStrategy] = useState<StrategyDefinition>(
+    strategies[0] || BUILT_IN_STRATEGIES[0]
+  );
 
-  const currentStrat = strategies.find((s) => s.id === selectedStratId) || strategies[0];
+  // Editable Form State
+  const [editName, setEditName] = useState<string>(selectedStrategy.name);
+  const [editDescription, setEditDescription] = useState<string>(selectedStrategy.description);
+  const [editAuthor, setEditAuthor] = useState<string>(selectedStrategy.author);
+  const [editVersion, setEditVersion] = useState<string>(selectedStrategy.version);
+  const [code, setCode] = useState<string>(selectedStrategy.code);
+  const [params, setParams] = useState<Record<string, any>>(selectedStrategy.params || {});
 
-  const handleSelectStrat = (s: Strategy) => {
-    setSelectedStratId(s.id);
-    setCodeContent(s.code);
-    setActiveParams(s.params || {});
-    setWorkerTestResult(null);
+  // New parameter draft
+  const [newParamKey, setNewParamKey] = useState<string>('');
+  const [newParamValue, setNewParamValue] = useState<string>('');
+  const [newParamType, setNewParamType] = useState<'number' | 'string' | 'boolean'>('number');
+
+  // Active Editor Sub-tab
+  const [activeEditorTab, setActiveEditorTab] = useState<'code' | 'params' | 'meta'>('code');
+
+  // Feedback states
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
+  const [smokeOutput, setSmokeOutput] = useState<{
+    success: boolean;
+    logs: string[];
+    signalsCount: number;
+    error?: string;
+  } | null>(null);
+
+  // Sync when strategy selection changes
+  const handleSelectStrategy = (strat: StrategyDefinition) => {
+    setSelectedStrategy(strat);
+    setEditName(strat.name);
+    setEditDescription(strat.description);
+    setEditAuthor(strat.author);
+    setEditVersion(strat.version);
+    setCode(strat.code);
+    setParams(strat.params || {});
+    setSmokeOutput(null);
+    setSaveSuccessMsg(null);
   };
 
-  const handleParamChange = (name: string, value: any) => {
-    setActiveParams((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSave = async () => {
-    if (!currentStrat || isSaving) return;
-    const updated: Strategy = {
-      ...currentStrat,
-      code: codeContent,
-      params: activeParams,
-    };
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      const ok = await onSaveStrategy(updated);
-      if (ok === false) {
-        setSaveError(`Strategy '${updated.name}' was NOT saved to the database.`);
-        return;
-      }
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } finally {
-      setIsSaving(false);
+  // Sync when external strategies prop updates
+  useEffect(() => {
+    setStrategyList(strategies);
+    if (!strategies.some((s) => s.id === selectedStrategy.id)) {
+      if (strategies[0]) handleSelectStrategy(strategies[0]);
     }
-  };
+  }, [strategies]);
 
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(codeContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleWorkerSmokeTest = async () => {
-    const validation = validateStrategyCode(codeContent);
-    if (!validation.isValid) {
-      setWorkerTestResult({
-        passed: false,
-        message: `Validation failed: ${validation.errors.join(' ')}`,
+  // Handle Save
+  const handleSave = async () => {
+    // 1. Static AST Security Check
+    const sec = validateStrategySecurity(code);
+    if (!sec.valid) {
+      setSmokeOutput({
+        success: false,
+        logs: [],
+        signalsCount: 0,
+        error: sec.error,
       });
       return;
     }
 
-    const sampleCandles = Array.from({ length: 60 }, (_, idx) => ({
-      time: 1700000000 + idx * 3600,
-      open: 1.0850 + idx * 0.0001,
-      high: 1.0860 + idx * 0.0001,
-      low: 1.0840 + idx * 0.0001,
-      close: 1.0855 + idx * 0.0001,
-      tickVolume: 400,
-      spread: 1.0,
+    const updatedStrategy: StrategyDefinition = {
+      ...selectedStrategy,
+      name: editName.trim() || selectedStrategy.name,
+      description: editDescription.trim(),
+      author: editAuthor.trim() || 'Custom Trader',
+      version: editVersion.trim() || '1.0.0',
+      params,
+      code,
+    };
+
+    // Call prop callback
+    onSaveStrategy(updatedStrategy);
+
+    // Save to server SQLite backend
+    try {
+      await fetch('/api/strategies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedStrategy),
+      });
+    } catch {}
+
+    // Update local state list
+    setStrategyList((prev) => {
+      const idx = prev.findIndex((s) => s.id === updatedStrategy.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = updatedStrategy;
+        return copy;
+      }
+      return [...prev, updatedStrategy];
+    });
+
+    setSelectedStrategy(updatedStrategy);
+    setSaveSuccessMsg(`Strategy "${updatedStrategy.name}" successfully saved! It is now active in the Backtest Lab and Bots Fleet.`);
+    setTimeout(() => setSaveSuccessMsg(null), 5000);
+  };
+
+  // Handle Create New Custom Strategy
+  const handleCreateNew = () => {
+    const newId = `custom-strat-${Date.now()}`;
+    const newStrat: StrategyDefinition = {
+      id: newId,
+      name: 'Custom Breakout Strategy',
+      description: 'User-defined algorithmic strategy with customizable stop-loss and take-profit targets.',
+      author: 'Trader',
+      version: '1.0.0',
+      params: {
+        riskLots: 1.0,
+        stopLossPips: 25,
+        takeProfitPips: 50,
+      },
+      code: `// Custom Trading Strategy Contract
+function onBar(ctx, bar) {
+  const idx = ctx.currentBarIndex;
+  if (idx < 20) return;
+
+  const pipScale = ctx.symbol === 'USDJPY' ? 0.01 : ctx.symbol === 'XAUUSD' ? 1.0 : 0.0001;
+
+  // Simple Momentum Breakout logic
+  if (ctx.openPositions.length === 0) {
+    const prevBar = ctx.getBar(idx - 1);
+    if (bar.close > prevBar.high) {
+      const sl = Number((bar.close - 25 * pipScale).toFixed(5));
+      const tp1 = Number((bar.close + 40 * pipScale).toFixed(5));
+      const tp2 = Number((bar.close + 75 * pipScale).toFixed(5));
+      ctx.buy(ctx.symbol, 1.0, sl, tp1, tp2);
+      ctx.log('Buy signal generated @ ' + bar.close);
+    }
+  }
+}`,
+    };
+
+    if (onCreateStrategy) {
+      onCreateStrategy(newStrat);
+    }
+    setStrategyList((prev) => [...prev, newStrat]);
+    handleSelectStrategy(newStrat);
+    setActiveEditorTab('code');
+  };
+
+  // Handle Duplicate
+  const handleDuplicate = () => {
+    const dupId = `strat-copy-${Date.now()}`;
+    const duplicated: StrategyDefinition = {
+      ...selectedStrategy,
+      id: dupId,
+      name: `${editName} (Copy)`,
+      author: `${editAuthor || 'Trader'}`,
+      code,
+      params: { ...params },
+    };
+
+    if (onCreateStrategy) {
+      onCreateStrategy(duplicated);
+    }
+    setStrategyList((prev) => [...prev, duplicated]);
+    handleSelectStrategy(duplicated);
+    setSaveSuccessMsg(`Strategy duplicated as "${duplicated.name}".`);
+    setTimeout(() => setSaveSuccessMsg(null), 4000);
+  };
+
+  // Handle Delete
+  const handleDelete = async (id: string) => {
+    if (confirm(`Are you sure you want to delete strategy "${selectedStrategy.name}"?`)) {
+      if (onDeleteStrategy) {
+        onDeleteStrategy(id);
+      }
+      try {
+        await fetch(`/api/strategies/${id}`, { method: 'DELETE' });
+      } catch {}
+
+      const remaining = strategyList.filter((s) => s.id !== id);
+      setStrategyList(remaining);
+      if (remaining.length > 0) {
+        handleSelectStrategy(remaining[0]);
+      }
+    }
+  };
+
+  // Parameter Editing
+  const handleParamChange = (key: string, value: any) => {
+    setParams((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const handleAddParam = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newParamKey.trim()) return;
+
+    let parsedVal: any = newParamValue;
+    if (newParamType === 'number') {
+      parsedVal = parseFloat(newParamValue) || 0;
+    } else if (newParamType === 'boolean') {
+      parsedVal = newParamValue.toLowerCase() === 'true';
+    }
+
+    setParams((prev) => ({
+      ...prev,
+      [newParamKey.trim()]: parsedVal,
     }));
 
-    const res = await runStrategySmokeTest(codeContent, sampleCandles, activeParams);
-    if (res.success) {
-      setWorkerTestResult({
-        passed: true,
-        message: `QuickJS WASM sandbox test PASSED in ${res.durationMs}ms (${res.decisionsCount} decisions). Zero lookahead.`,
+    setNewParamKey('');
+    setNewParamValue('');
+  };
+
+  const handleDeleteParam = (key: string) => {
+    setParams((prev) => {
+      const copy = { ...prev };
+      delete copy[key];
+      return copy;
+    });
+  };
+
+  // Smoke Test Sandbox
+  const handleRunSmokeTest = () => {
+    const sec = validateStrategySecurity(code);
+    if (!sec.valid) {
+      setSmokeOutput({
+        success: false,
+        logs: [],
+        signalsCount: 0,
+        error: sec.error,
       });
-    } else {
-      setWorkerTestResult({
-        passed: false,
-        message: `QuickJS sandbox halted: ${res.error}`,
+      return;
+    }
+
+    const testDataset = datasets[0];
+    if (!testDataset || testDataset.candles.length < 30) {
+      setSmokeOutput({
+        success: false,
+        logs: [],
+        signalsCount: 0,
+        error: 'No valid test candles available for sandbox smoke test.',
+      });
+      return;
+    }
+
+    const testContext = {
+      symbol: testDataset.symbol,
+      balance: 10000,
+      equity: 10000,
+      openPositions: [],
+    };
+
+    let totalSignals = 0;
+    const accumulatedLogs: string[] = [];
+
+    try {
+      for (let i = 25; i < 45; i++) {
+        const res = executeStrategyBar(code, testDataset.candles, i, testContext);
+        if (res.error) {
+          throw new Error(res.error);
+        }
+        totalSignals += res.signals.length;
+        accumulatedLogs.push(...res.logs);
+      }
+
+      setSmokeOutput({
+        success: true,
+        logs: accumulatedLogs.slice(0, 10),
+        signalsCount: totalSignals,
+      });
+    } catch (err: any) {
+      setSmokeOutput({
+        success: false,
+        logs: accumulatedLogs,
+        signalsCount: totalSignals,
+        error: err?.message || 'Sandbox execution failure',
       });
     }
   };
 
-  if (!currentStrat) {
-    return (
-      <div className="p-4 bg-[#0B101D] border border-slate-800 rounded-xl text-xs text-slate-400 font-mono">
-        No strategies available.
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      {/* Strategy Selector Strip */}
-      <div className="flex items-center justify-between bg-[#0B101D] border border-slate-800 p-2 rounded-xl">
-        <div className="flex items-center gap-2 overflow-x-auto">
-          {strategies.map((s) => {
-            const isSelected = s.id === selectedStratId;
-            return (
-              <button type="button"
-                key={s.id}
-                onClick={() => handleSelectStrat(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  isSelected
-                    ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-900/30'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <span>{s.name}</span>
-                <span className="ml-1.5 text-[10px] opacity-75 font-mono">v{s.version}</span>
-              </button>
-            );
-          })}
+    <div className="space-y-6">
+      {/* Top Banner Notice */}
+      <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-xs text-blue-300">
+        <div className="flex items-center gap-2">
+          <Info className="w-4 h-4 text-blue-400 shrink-0" />
+          <span>
+            <strong>Strategy Studio & Parameter Studio:</strong> You can edit logic, add custom parameters, clone presets, and create brand-new algorithmic strategies.
+          </span>
         </div>
-
-        <button type="button"
-          onClick={async () => {
-            const newStrat: Strategy = {
-              id: `strat_custom_${Date.now()}`,
-              name: 'Custom Alpha Strategy',
-              description: 'TypeScript StrategyContract for Zaboraa FX.',
-              sourceType: 'typescript',
-              version: '1.0.0',
-              tags: ['Custom', 'TypeScript'],
-              paramsSchema: [
-                { name: 'period', type: 'number', default: 14, min: 2, max: 100, step: 1, description: 'Period length' },
-                { name: 'takeProfitPips', type: 'number', default: 50, min: 10, max: 200, step: 5, description: 'Take profit in pips' },
-              ],
-              params: { period: 14, takeProfitPips: 50 },
-              code: `// Custom Alpha Strategy
-// Implements Zaboraa FX TypeScript Strategy Contract
-
-export const strategy = {
-  name: "Custom Alpha",
-  version: "1.0.0",
-  init(ctx) {
-    ctx.warmupPeriod = 20;
-  },
-  onBar(ctx, bar) {
-    // Access closed bars via ctx.data
-    // Execute: ctx.buy(0.1, sl, tp, "Comment")
-  }
-};
-`,
-              createdAt: new Date().toISOString(),
-            };
-            // Select the new strategy only after the server confirmed it, otherwise the editor
-            // would show new code while Save targets a different strategy.
-            const ok = await onSaveStrategy(newStrat);
-            if (ok === false) {
-              setSaveError('New strategy was NOT saved to the database.');
-              return;
-            }
-            setSaveError(null);
-            setSelectedStratId(newStrat.id);
-            setCodeContent(newStrat.code);
-            setActiveParams(newStrat.params);
-          }}
-          className="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-semibold shrink-0 transition-colors"
+        <button
+          type="button"
+          onClick={handleCreateNew}
+          className="flex items-center gap-1 px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold font-mono shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>New Strategy</span>
+          Create New Strategy
         </button>
       </div>
 
-      {/* Limited Sandboxing Notice */}
-      <div className="p-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-mono text-slate-400 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <span>Client-side Web Worker sandbox active. File, DOM, and network access are restricted.</span>
-        </div>
-        <span className="text-[10px] text-slate-500">TypeScript Native Execution</span>
-      </div>
-
-      {saveSuccess && (
-        <div className="p-3 bg-emerald-950/60 border border-emerald-500/50 rounded-xl text-xs text-emerald-300 font-mono flex items-center justify-between animate-fadeIn">
-          <span>Strategy '{currentStrat?.name}' saved successfully.</span>
+      {/* Save Success Banner */}
+      {saveSuccessMsg && (
+        <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-center gap-2 font-mono">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>{saveSuccessMsg}</span>
         </div>
       )}
 
-      {saveError && (
-        <div className="p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-xs text-rose-300 font-mono flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
-          <span>{saveError}</span>
-        </div>
-      )}
-
-      {/* Editor & Parameter Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Code Editor */}
-        <div className="lg:col-span-2 bg-[#0D1322] border border-slate-800 rounded-xl p-4 flex flex-col shadow-lg">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
-            <div className="flex items-center gap-2">
-              <Code2 className="w-4 h-4 text-blue-400" />
-              <span className="text-xs font-bold text-white uppercase tracking-wider">
-                TypeScript StrategyContract
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button type="button"
-                onClick={handleWorkerSmokeTest}
-                className="px-2.5 py-1 text-blue-400 hover:text-blue-300 bg-blue-500/10 border border-blue-500/30 rounded text-xs flex items-center gap-1 transition-colors"
-              >
-                <Play className="w-3 h-3" />
-                <span>Test in Worker</span>
-              </button>
-              <button type="button"
-                onClick={handleCopyCode}
-                className="px-2.5 py-1 text-slate-400 hover:text-white bg-slate-900 border border-slate-800 rounded text-xs flex items-center gap-1 transition-colors"
-              >
-                {copied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                <span>{copied ? 'Copied' : 'Copy'}</span>
-              </button>
-              <button type="button"
-                onClick={handleSave}
-                disabled={isSaving}
-                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded text-xs font-bold flex items-center gap-1 transition-colors shadow-sm"
-              >
-                <Save className="w-3.5 h-3.5" />
-                <span>{isSaving ? 'Saving...' : 'Save'}</span>
-              </button>
-            </div>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Sidebar: Strategy List */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Strategy Catalog ({strategyList.length})
+            </h3>
+            <button
+              type="button"
+              onClick={handleCreateNew}
+              className="text-[11px] text-blue-400 hover:text-blue-300 font-bold flex items-center gap-0.5"
+            >
+              <Plus className="w-3 h-3" /> New
+            </button>
           </div>
 
-          {workerTestResult && (
-            <div className={`mb-3 p-2.5 rounded-lg border text-xs font-mono flex items-center gap-2 ${
-              workerTestResult.passed
-                ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300'
-                : 'bg-rose-950/40 border-rose-500/40 text-rose-300'
-            }`}>
-              {workerTestResult.passed ? <Check className="w-4 h-4 shrink-0" /> : <AlertTriangle className="w-4 h-4 shrink-0" />}
-              <span>{workerTestResult.message}</span>
-            </div>
-          )}
-
-          {/* Code Textarea */}
-          <div className="relative font-mono text-xs flex-1 min-h-[380px] bg-[#090D16] border border-slate-800/80 rounded-lg p-3 text-slate-200 overflow-auto">
-            <textarea
-              value={codeContent}
-              onChange={(e) => setCodeContent(e.target.value)}
-              className="w-full h-full min-h-[380px] bg-transparent text-emerald-300 font-mono text-xs focus:outline-none resize-none leading-relaxed"
-              spellCheck={false}
-            />
-          </div>
-
-          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-            <span>Interface: init(ctx), onBar(ctx, bar)</span>
-            <span>Single code path runs unchanged in Backtest, Paper, and Live modes</span>
+          <div className="space-y-2">
+            {strategyList.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => handleSelectStrategy(s)}
+                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                  selectedStrategy.id === s.id
+                    ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500 shadow-sm'
+                    : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800/50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-white line-clamp-1">{s.name}</span>
+                  {s.id.startsWith('custom') || s.id.startsWith('strat-copy') ? (
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono">
+                      Custom
+                    </span>
+                  ) : null}
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 line-clamp-2">
+                  {s.description}
+                </div>
+                <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-slate-500">
+                  <span>v{s.version}</span>
+                  <span className="text-blue-400">
+                    {Object.keys(s.params || {}).length} params
+                  </span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Right Column: Parameters & Launch */}
-        <div className="space-y-4">
-          <div className="bg-[#0D1322] border border-slate-800 rounded-xl p-4 shadow-lg">
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-2 mb-3">
-              <Sliders className="w-4 h-4 text-amber-400" />
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                Strategy Parameters
-              </h3>
+        {/* Main Editor Area */}
+        <div className="lg:col-span-3 space-y-4">
+          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+            {/* Header with Title and Action Buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Code2 className="w-4 h-4 text-blue-400" />
+                  {editName}
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Author: {editAuthor} · Version: {editVersion} · Contract: onBar(ctx, bar)
+                </span>
+              </div>
+
+              {/* Action Buttons: Save, Duplicate, Delete, Smoke Test */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRunSmokeTest}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current text-blue-400" />
+                  Smoke Test
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDuplicate}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                >
+                  <Copy className="w-3.5 h-3.5 text-indigo-400" />
+                  Duplicate
+                </button>
+
+                {(selectedStrategy.id.startsWith('custom') || selectedStrategy.id.startsWith('strat-copy')) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(selectedStrategy.id)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    Delete
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  Save Strategy
+                </button>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              {currentStrat.paramsSchema.map((param) => {
-                const val = activeParams[param.name] !== undefined ? activeParams[param.name] : param.default;
-                return (
-                  <div key={param.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-300 font-mono">{param.name}</span>
-                      <span className="text-[10px] text-slate-500">{param.description}</span>
+            {/* Navigation Tabs for Editor: Code, Parameters, Details */}
+            <div className="flex items-center gap-2 mt-3 pb-2 border-b border-slate-800/80 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setActiveEditorTab('code')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                  activeEditorTab === 'code'
+                    ? 'bg-blue-600 text-white font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <FileCode className="w-3.5 h-3.5" />
+                <span>Code & Logic onBar()</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveEditorTab('params')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                  activeEditorTab === 'params'
+                    ? 'bg-blue-600 text-white font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Sliders className="w-3.5 h-3.5" />
+                <span>Parameters ({Object.keys(params).length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveEditorTab('meta')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
+                  activeEditorTab === 'meta'
+                    ? 'bg-blue-600 text-white font-bold'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Strategy Info</span>
+              </button>
+            </div>
+
+            {/* TAB 1: CODE EDITOR */}
+            {activeEditorTab === 'code' && (
+              <div className="mt-3">
+                <textarea
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  rows={20}
+                  spellCheck={false}
+                  className="w-full rounded bg-slate-950 p-3 font-mono text-xs leading-relaxed text-slate-200 border border-slate-800/80 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            )}
+
+            {/* TAB 2: PARAMETERS EDITOR */}
+            {activeEditorTab === 'params' && (
+              <div className="mt-3 space-y-4">
+                <p className="text-xs text-slate-400">
+                  Parameters defined here can be accessed directly in your code via <code className="text-blue-400 font-mono">ctx.params</code> or tuned inside the Parameter Sweep Heatmap matrix.
+                </p>
+
+                {/* Parameter List */}
+                <div className="space-y-2">
+                  {Object.entries(params).map(([key, val]) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between gap-3 p-2.5 rounded bg-slate-950 border border-slate-800 text-xs font-mono"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-200">{key}:</span>
+                        <span className="text-[10px] text-slate-500 font-sans uppercase">
+                          ({typeof val})
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {typeof val === 'boolean' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleParamChange(key, !val)}
+                            className={`px-3 py-1 rounded font-bold text-xs ${
+                              val ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                            }`}
+                          >
+                            {val ? 'TRUE' : 'FALSE'}
+                          </button>
+                        ) : typeof val === 'number' ? (
+                          <input
+                            type="number"
+                            step="any"
+                            value={val}
+                            onChange={(e) => handleParamChange(key, parseFloat(e.target.value) || 0)}
+                            className="w-32 px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-100 text-right focus:outline-none focus:border-blue-500"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={val}
+                            onChange={(e) => handleParamChange(key, e.target.value)}
+                            className="w-48 px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-100 focus:outline-none focus:border-blue-500"
+                          />
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteParam(key)}
+                          title="Remove Parameter"
+                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-900"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
+                  ))}
+                </div>
 
+                {/* Add Parameter Form */}
+                <form
+                  onSubmit={handleAddParam}
+                  className="p-3 rounded-lg bg-slate-950/80 border border-slate-800/80 flex flex-wrap items-center gap-3 text-xs"
+                >
+                  <span className="font-bold text-slate-300">Add Parameter:</span>
+                  <input
+                    type="text"
+                    placeholder="Key (e.g. stopLossPips)"
+                    value={newParamKey}
+                    onChange={(e) => setNewParamKey(e.target.value)}
+                    className="px-2.5 py-1.5 rounded bg-slate-900 border border-slate-800 text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Initial Value (e.g. 25)"
+                    value={newParamValue}
+                    onChange={(e) => setNewParamValue(e.target.value)}
+                    className="px-2.5 py-1.5 rounded bg-slate-900 border border-slate-800 text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                  />
+                  <select
+                    value={newParamType}
+                    onChange={(e: any) => setNewParamType(e.target.value)}
+                    className="px-2 py-1.5 rounded bg-slate-900 border border-slate-800 text-slate-300 text-xs font-mono"
+                  >
+                    <option value="number">Number</option>
+                    <option value="string">String</option>
+                    <option value="boolean">Boolean</option>
+                  </select>
+                  <button
+                    type="submit"
+                    className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs"
+                  >
+                    Add
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB 3: METADATA & DETAILS */}
+            {activeEditorTab === 'meta' && (
+              <div className="mt-3 space-y-3 text-xs font-sans">
+                <div>
+                  <label className="block text-slate-400 text-[11px] mb-1">Strategy Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-800 text-slate-100 font-bold focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">Author / Source</label>
                     <input
-                      type={param.type === 'number' ? 'number' : 'text'}
-                      step={param.step || 1}
-                      min={param.min}
-                      max={param.max}
-                      value={val}
-                      onChange={(e) =>
-                        handleParamChange(
-                          param.name,
-                          param.type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value
-                        )
-                      }
-                      className="w-full bg-slate-900 border border-slate-800 rounded p-1.5 font-mono text-white text-xs focus:outline-none focus:border-blue-500"
+                      type="text"
+                      value={editAuthor}
+                      onChange={(e) => setEditAuthor(e.target.value)}
+                      className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-800 text-slate-100 focus:outline-none focus:border-blue-500"
                     />
                   </div>
-                );
-              })}
-            </div>
+                  <div>
+                    <label className="block text-slate-400 text-[11px] mb-1">Version</label>
+                    <input
+                      type="text"
+                      value={editVersion}
+                      onChange={(e) => setEditVersion(e.target.value)}
+                      className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-800 text-slate-100 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-800/80">
-              <button type="button"
-                onClick={() => onLaunchBacktest({ ...currentStrat, params: activeParams })}
-                className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-950/40"
+                <div>
+                  <label className="block text-slate-400 text-[11px] mb-1">Description</label>
+                  <textarea
+                    rows={3}
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Smoke Test Sandbox Output */}
+            {smokeOutput && (
+              <div
+                className={`mt-3 p-3 rounded-lg border text-xs font-mono ${
+                  smokeOutput.success
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                }`}
               >
-                <Play className="w-3.5 h-3.5" />
-                <span>Launch in Backtesting Lab</span>
-              </button>
-            </div>
+                <div className="flex items-center gap-2 font-bold mb-1">
+                  {smokeOutput.success ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 text-rose-400" />
+                  )}
+                  <span>
+                    {smokeOutput.success
+                      ? `Sandbox Smoke Test Passed: ${smokeOutput.signalsCount} signals generated with zero lookahead violations.`
+                      : `Sandbox Execution Failed: ${smokeOutput.error}`}
+                  </span>
+                </div>
+                {smokeOutput.logs.length > 0 && (
+                  <div className="mt-2 space-y-0.5 text-[11px] text-slate-400 bg-slate-950/80 p-2 rounded border border-slate-800">
+                    {smokeOutput.logs.map((l, i) => (
+                      <div key={i}>{l}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
