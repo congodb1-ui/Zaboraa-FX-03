@@ -252,7 +252,7 @@ export const App: React.FC = () => {
       swap: -3.2,
       commission: 7.0,
       openTime: Math.floor(Date.now() / 1000) - 86400,
-      comment: 'Donchian Breakout #101',
+      comment: 'Donchian Breakout (101)',
       mode: 'DEMO',
     },
     {
@@ -270,7 +270,7 @@ export const App: React.FC = () => {
       swap: -4.25,
       commission: 3.5,
       openTime: Math.floor(Date.now() / 1000) - 43200,
-      comment: 'Gold Momentum #104',
+      comment: 'Gold Momentum (104)',
       mode: 'DEMO',
     },
   ]);
@@ -499,7 +499,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-[#0B1020] text-slate-900 dark:text-[#E6ECF5] flex flex-col justify-between selection:bg-indigo-600 selection:text-white transition-colors">
+    <div className="min-h-screen bg-bg text-text flex flex-col justify-between selection:bg-primary selection:text-white transition-colors">
       <div>
         {/* Navigation Header */}
         <Header
@@ -598,6 +598,11 @@ export const App: React.FC = () => {
               bots={bots}
               brokerState={brokerState}
               riskEvents={riskEvents}
+              positions={positions}
+              orders={orders}
+              strategies={strategies}
+              datasets={datasets}
+              onClosePosition={handleClosePosition}
               onToggleBotStatus={(botId, newStatus) =>
                 setBots((prev) =>
                   prev.map((b) => (b.id === botId ? { ...b, status: newStatus } : b))
@@ -632,13 +637,13 @@ export const App: React.FC = () => {
 
       {/* Floating System Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg bg-[#0F1B2F] border border-blue-500/50 text-slate-100 text-xs shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-lg bg-surface border border-info/50 text-text text-xs shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
           <span>{toastMessage}</span>
           <button
             type="button"
             onClick={() => setToastMessage(null)}
-            className="text-slate-400 hover:text-white font-bold ml-2 cursor-pointer"
+            className="text-text-muted hover:text-text font-bold ml-2 cursor-pointer"
           >
             ✕
           </button>
@@ -656,10 +661,10 @@ export const App: React.FC = () => {
       />
 
       {/* Institutional Risk Footer */}
-      <footer className="border-t border-slate-200 dark:border-[#223049] bg-white dark:bg-[#070A11] px-4 py-3 mt-12 text-slate-500 dark:text-[#9FB0C8] text-xs transition-colors">
+      <footer className="border-t border-border bg-surface px-4 py-3 mt-12 text-text-muted text-xs transition-colors">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+            <ShieldCheck className="w-4 h-4 text-success shrink-0" />
             <span>
               Zaboraa FX Quantitative Trading Desk · Local First Architecture
             </span>

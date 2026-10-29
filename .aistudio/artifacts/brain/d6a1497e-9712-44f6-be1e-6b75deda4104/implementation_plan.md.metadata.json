@@ -1,0 +1,6 @@
+{
+  "summary":  "Comprehensive implementation plan for adding an interactive Bot Inspection Panel to Automated Bot Fleet. When any automated bot card is clicked, a dedicated detail panel opens beneath the grid with tabbed views: (1) Live Interactive PriceChart rendering the bot's currency/metal candles, strategy indicator overlays (MAs, Donchian channels, Supertrend), and trade markers for entries, exits, SL/TP levels, and floating P&L; (2) Bot Live Orders & Open Positions with ticket numbers, lots, P&L, and manual close action; (3) Strategy Specification & Execution Logs detailing parameters, risk limits, magic number, and closed-bar signals.",
+  "updatedAt":  "2026-10-29T09:25:03.623648517Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}

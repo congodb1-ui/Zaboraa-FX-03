@@ -40,8 +40,8 @@
 | **2** | Committed Indicator Fixtures & Generator Script | `scripts/generate-indicator-fixtures.ts`, `src/engine/__tests__/fixtures/indicators_reference.json` | **DONE** | NOTE: `indicators_reference.json` was generated via `scripts/generate-indicator-fixtures.ts` from `src/engine/technicalIndicators.ts`. Tests marked as "self-consistency only" pending independent benchmark reference vectors. | **Y** (`indicatorMath.test.ts`, `fixturesParity.test.ts`) |
 | **2** | Layout Persistence (`chart_layouts` table) | `src/db/sqlite.ts`, `server.ts`, `src/components/PriceChart.tsx` | **DONE** | Backend schema and `/api/chart/layouts` endpoints persist custom user layout, active overlays, and subpane configurations with `owner_id`. | **Y** (`PriceChart.tsx`) |
 | **2** | 50,000-Bar Performance Benchmark Test | `src/engine/__tests__/chartBenchmark.test.ts` | **DONE** | Benchmarks verify full batch compute across 50,000 bars and per-frame visible-range draw-prep executes $\le 16.6\text{ms}$ (60 FPS). | **Y** (`chartBenchmark.test.ts`) |
-| **3** | Universal Design System Semantic CSS Variables | `src/index.css` | **IN PROGRESS** | Sub-step 3a: Tokens & UI kit components (`src/components/ui/*`). | **Pending Stage 3** |
-| **3** | Elimination of Hardcoded Hex in All 12 Views | All views in `src/components/` | **IN PROGRESS** | Sub-steps 3b & 3c: view migration and `designTokens.test.ts`. | **Pending Stage 3** |
+| **3** | Universal Design System Semantic CSS Variables | `src/index.css` | **DONE** | Unified CSS variables (--bg, --surface, --border, --text, --primary, --success, --danger, --warning, --info) for Dark Navy and Light themes. | **Y** (`designTokens.test.ts`) |
+| **3** | Elimination of Hardcoded Hex in All 12 Views | All views in `src/components/`, `src/App.tsx`, `index.html` | **DONE** | Zero hardcoded hex, rgb/hsl, or slate-* classes outside justified exceptions. Automated lint test enforced. | **Y** (`designTokens.test.ts`) |
 
 ---
 
@@ -109,16 +109,61 @@ Result: PASSED (25 test files passed, 110 tests passed, 0 failures, exit code 0)
 - src/engine/__tests__/cotIngest.test.ts (3 tests)
 - src/engine/__tests__/technicalIndicators.test.ts (2 tests)
 - src/engine/__tests__/smartMoneyLabels.test.ts (4 tests)
+- src/engine/__tests__/designTokens.test.ts (1 test) [Stage 3 Automated Token Linter]
 
 GATE 3: Production Build (`npm run build`)
-Result: PASSED (Vite v6.4.5 built dist/ in 8.35s, exit code 0)
+Result: PASSED (Vite v6.4.5 built dist/ in 6.45s, exit code 0)
 ```
 
 ---
 
-## 4. Current Workstream: Stage 3 Rollout
+## 4. Stage 3: Universal Design System Final Enforcement
 
-Proceeding to **Stage 3: Universal Design System Rollout**:
-- **3a**: Tokens and UI kit (`src/index.css`, `index.html` body cleanup, `src/components/ui/*`).
-- **3b**: View migrations (Group 1, Group 2, Group 3).
-- **3c**: Automated token linting (`designTokens.test.ts`) and visual responsiveness verification.
+### Final Violation Counts (Step 3 Enforced)
+| File | Total Violations | Hex Literals | RGB/HSL | Slate Classes | Status |
+|---|---|---|---|---|---|
+| `src/App.tsx` | 0 | 0 | 0 | 0 | Clean (Migrated to semantic tokens) |
+| `index.html` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/MarketsView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/KillSwitchModal.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/LoginView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/MfaEnrollmentView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/Header.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/AdminAccountsView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/StrategyStudioView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/PineConverterView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/BacktestView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/OptimizationView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/BotsView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/DataManagerView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/FundamentalView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/AIAnalysisView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/TechnicalAnalysisView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/SettingsView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| `src/components/SmartMoneyFootprintView.tsx` | 0 | 0 | 0 | 0 | Clean |
+| **Documented Exceptions**: | | | | | |
+| `src/components/PriceChart.tsx` | - | - | - | - | Justified: jsdom canvas fallback & indicator palettes |
+| `src/components/CandlestickChart.tsx` | - | - | - | - | Justified: SVG presentation attributes & TP/SL paths |
+| `src/components/D3SimulationTimeline.tsx` | - | - | - | - | Justified: D3 color gradients, axes & equity curves |
+| `src/engine/*` | - | - | - | - | Justified: Algorithmic marker schemas & session models |
+| **Total Unjustified Violations** | **0** | **0** | **0** | **0** | **CLEAN & ENFORCED** |
+
+---
+
+## 5. Step 4 Verification & Operational Notes
+
+### Visual Verification
+**Status**: not visually verified (executed in automated headless environment).
+
+**5-Item Manual Verification Checklist**:
+1. **Chart contrast**: Verify canvas background (`--bg`), candlesticks (`--success`/`--danger`), and gridlines (`--border`) maintain legible contrast in both Dark Navy and Light themes.
+2. **Table overflow at ~390px**: Verify table containers in Markets, Bots, Data Manager, and Admin views scroll horizontally on mobile screens without breaking viewport layout.
+3. **Modal fit**: Confirm `KillSwitchModal` and order confirmation modals fit vertically on mobile viewports with sticky action buttons.
+4. **Toggle states**: Verify active/inactive states for Algo Trading, Firewall toggle, and theme switch are distinct in both themes.
+5. **Focus rings**: Confirm Tab/Shift+Tab navigation displays prominent focus rings across all interactive inputs, buttons, and select dropdowns.
+
+### Indicator Fixtures Classification
+- `src/engine/__tests__/fixtures/indicators_reference.json` was generated via `scripts/generate-indicator-fixtures.ts` directly from `src/engine/technicalIndicators.ts`.
+- Tests in `indicatorMath.test.ts` and `fixturesParity.test.ts` are labeled **self-consistency only** (verifying regression prevention and determinism) pending external TA-Lib benchmark reference vectors.
+
+

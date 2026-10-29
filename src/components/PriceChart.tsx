@@ -58,6 +58,19 @@ export interface PriceChartProps {
   visualBlocks?: StrategyVisualBlock[];
   visualLines?: StrategyVisualLine[];
   visualMarkers?: StrategyVisualMarker[];
+  initialIndicators?: {
+    showSMA20?: boolean;
+    showEMA50?: boolean;
+    showBollinger?: boolean;
+    showKeltner?: boolean;
+    showDonchian?: boolean;
+    showIchimoku?: boolean;
+    showSupertrend?: boolean;
+    showParabolicSAR?: boolean;
+    showVWAP?: boolean;
+    showPivots?: boolean;
+    showSessions?: boolean;
+  };
   onSymbolChange?: (sym: string) => void;
   onTimeframeChange?: (tf: string) => void;
 }
@@ -71,6 +84,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   visualBlocks = [],
   visualLines = [],
   visualMarkers = [],
+  initialIndicators,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,17 +95,34 @@ export const PriceChart: React.FC<PriceChartProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Active overlay toggles
-  const [showSMA20, setShowSMA20] = useState<boolean>(true);
-  const [showEMA50, setShowEMA50] = useState<boolean>(false);
-  const [showBollinger, setShowBollinger] = useState<boolean>(false);
-  const [showKeltner, setShowKeltner] = useState<boolean>(false);
-  const [showDonchian, setShowDonchian] = useState<boolean>(false);
-  const [showIchimoku, setShowIchimoku] = useState<boolean>(false);
-  const [showSupertrend, setShowSupertrend] = useState<boolean>(false);
-  const [showParabolicSAR, setShowParabolicSAR] = useState<boolean>(false);
-  const [showVWAP, setShowVWAP] = useState<boolean>(false);
-  const [showPivots, setShowPivots] = useState<boolean>(false);
-  const [showSessions, setShowSessions] = useState<boolean>(false);
+  const [showSMA20, setShowSMA20] = useState<boolean>(initialIndicators?.showSMA20 ?? true);
+  const [showEMA50, setShowEMA50] = useState<boolean>(initialIndicators?.showEMA50 ?? false);
+  const [showBollinger, setShowBollinger] = useState<boolean>(initialIndicators?.showBollinger ?? false);
+  const [showKeltner, setShowKeltner] = useState<boolean>(initialIndicators?.showKeltner ?? false);
+  const [showDonchian, setShowDonchian] = useState<boolean>(initialIndicators?.showDonchian ?? false);
+  const [showIchimoku, setShowIchimoku] = useState<boolean>(initialIndicators?.showIchimoku ?? false);
+  const [showSupertrend, setShowSupertrend] = useState<boolean>(initialIndicators?.showSupertrend ?? false);
+  const [showParabolicSAR, setShowParabolicSAR] = useState<boolean>(initialIndicators?.showParabolicSAR ?? false);
+  const [showVWAP, setShowVWAP] = useState<boolean>(initialIndicators?.showVWAP ?? false);
+  const [showPivots, setShowPivots] = useState<boolean>(initialIndicators?.showPivots ?? false);
+  const [showSessions, setShowSessions] = useState<boolean>(initialIndicators?.showSessions ?? false);
+
+  // Sync when initialIndicators prop changes dynamically
+  useEffect(() => {
+    if (initialIndicators) {
+      if (initialIndicators.showSMA20 !== undefined) setShowSMA20(initialIndicators.showSMA20);
+      if (initialIndicators.showEMA50 !== undefined) setShowEMA50(initialIndicators.showEMA50);
+      if (initialIndicators.showBollinger !== undefined) setShowBollinger(initialIndicators.showBollinger);
+      if (initialIndicators.showKeltner !== undefined) setShowKeltner(initialIndicators.showKeltner);
+      if (initialIndicators.showDonchian !== undefined) setShowDonchian(initialIndicators.showDonchian);
+      if (initialIndicators.showIchimoku !== undefined) setShowIchimoku(initialIndicators.showIchimoku);
+      if (initialIndicators.showSupertrend !== undefined) setShowSupertrend(initialIndicators.showSupertrend);
+      if (initialIndicators.showParabolicSAR !== undefined) setShowParabolicSAR(initialIndicators.showParabolicSAR);
+      if (initialIndicators.showVWAP !== undefined) setShowVWAP(initialIndicators.showVWAP);
+      if (initialIndicators.showPivots !== undefined) setShowPivots(initialIndicators.showPivots);
+      if (initialIndicators.showSessions !== undefined) setShowSessions(initialIndicators.showSessions);
+    }
+  }, [initialIndicators]);
 
   // Layouts menu
   const [showLayoutMenu, setShowLayoutMenu] = useState<boolean>(false);
@@ -717,6 +748,193 @@ export const PriceChart: React.FC<PriceChartProps> = ({
       drawOverlayLine(indicatorData.supertrend.supertrend, '#10b981', 2.0);
     }
 
+    // Draw Strategy Visual Lines (e.g. dynamic breakout levels, trailing bands)
+    if (visualLines && visualLines.length > 0) {
+      for (const vl of visualLines) {
+        if (!vl.points || vl.points.length === 0) continue;
+        ctx.strokeStyle = vl.color || '#38bdf8';
+        ctx.lineWidth = 1.6;
+        if (vl.style === 'dashed') ctx.setLineDash([4, 3]);
+        else if (vl.style === 'dotted') ctx.setLineDash([2, 2]);
+        else ctx.setLineDash([]);
+
+        ctx.beginPath();
+        let started = false;
+        for (const pt of vl.points) {
+          let bIdx = activeCandles.findIndex((c) => Math.abs(c.time - pt.time) < 1800);
+          if (bIdx >= clampedStart && bIdx < clampedStart + count) {
+            const x = (bIdx - clampedStart) * slotWidth + slotWidth / 2;
+            const y = priceToY(pt.price);
+            if (!started) {
+              ctx.moveTo(x, y);
+              started = true;
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // Draw Strategy Visual Markers (e.g. entry signal arrows, breakout triangles)
+    if (visualMarkers && visualMarkers.length > 0) {
+      for (const vm of visualMarkers) {
+        let bIdx = activeCandles.findIndex((c) => Math.abs(c.time - vm.time) < 1800);
+        if (bIdx >= clampedStart && bIdx < clampedStart + count) {
+          const x = (bIdx - clampedStart) * slotWidth + slotWidth / 2;
+          const y = priceToY(vm.price);
+          ctx.fillStyle = vm.color || '#3b82f6';
+          if (vm.shape === 'triangle_up') {
+            ctx.beginPath();
+            ctx.moveTo(x, y - 8);
+            ctx.lineTo(x - 5, y + 2);
+            ctx.lineTo(x + 5, y + 2);
+            ctx.closePath();
+            ctx.fill();
+          } else if (vm.shape === 'triangle_down') {
+            ctx.beginPath();
+            ctx.moveTo(x, y + 8);
+            ctx.lineTo(x - 5, y - 2);
+            ctx.lineTo(x + 5, y - 2);
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.arc(x, y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          if (vm.label) {
+            ctx.font = '9px JetBrains Mono, monospace';
+            ctx.fillText(vm.label, x + 7, y + 3);
+          }
+        }
+      }
+    }
+
+    // Draw Executed Trades & Open Positions directly on the chart
+    if (trades && trades.length > 0) {
+      for (const tr of trades) {
+        const entryTime = tr.openTime || (tr as any).entryTime;
+        const entryPrice = tr.openPrice || (tr as any).entryPrice;
+        if (!entryTime || !Number.isFinite(entryPrice)) continue;
+
+        let entryIdx = activeCandles.findIndex((c) => c.time === entryTime);
+        if (entryIdx === -1) {
+          // Find closest candle within 48h
+          let bestDiff = Infinity;
+          activeCandles.forEach((c, idx) => {
+            const diff = Math.abs(c.time - entryTime);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              entryIdx = idx;
+            }
+          });
+        }
+        if (entryIdx === -1) continue;
+
+        const isVisible = entryIdx >= clampedStart && entryIdx < clampedStart + count;
+        const entryX = (entryIdx - clampedStart) * slotWidth + slotWidth / 2;
+        const entryY = priceToY(entryPrice);
+        const isBuy = tr.side === 'BUY';
+        const tradeColor = isBuy ? '#10b981' : '#f43f5e';
+
+        if (isVisible) {
+          // Entry arrow marker on candle
+          ctx.fillStyle = tradeColor;
+          ctx.beginPath();
+          if (isBuy) {
+            ctx.moveTo(entryX, entryY + 10);
+            ctx.lineTo(entryX - 5, entryY + 20);
+            ctx.lineTo(entryX + 5, entryY + 20);
+            ctx.closePath();
+            ctx.fill();
+          } else {
+            ctx.moveTo(entryX, entryY - 10);
+            ctx.lineTo(entryX - 5, entryY - 20);
+            ctx.lineTo(entryX + 5, entryY - 20);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          // Entry price text badge
+          ctx.fillStyle = tradeColor;
+          ctx.font = '9px JetBrains Mono, monospace';
+          const label = `${isBuy ? 'BUY' : 'SELL'} ${tr.volume}L @ ${entryPrice.toFixed(precision)}`;
+          ctx.fillText(label, entryX + 7, isBuy ? entryY + 18 : entryY - 14);
+        }
+
+        // Horizontal Stop Loss reference line
+        if (tr.sl && Number.isFinite(tr.sl)) {
+          const slY = priceToY(tr.sl);
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(Math.max(0, entryX), slY);
+          ctx.lineTo(width, slY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#ef4444';
+          ctx.font = '9px JetBrains Mono, monospace';
+          ctx.fillText(`SL: ${tr.sl.toFixed(precision)}`, width - 85, slY - 3);
+        }
+
+        // Horizontal Take Profit reference line
+        if (tr.tp && Number.isFinite(tr.tp)) {
+          const tpY = priceToY(tr.tp);
+          ctx.strokeStyle = '#10b981';
+          ctx.lineWidth = 1.0;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(Math.max(0, entryX), tpY);
+          ctx.lineTo(width, tpY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#10b981';
+          ctx.font = '9px JetBrains Mono, monospace';
+          ctx.fillText(`TP: ${tr.tp.toFixed(precision)}`, width - 85, tpY - 3);
+        }
+
+        // Trade connector to exit bar or latest candle
+        const hasExit = tr.closeTime && tr.closePrice && Number.isFinite(tr.closePrice);
+        let endIdx = hasExit
+          ? activeCandles.findIndex((c) => c.time === tr.closeTime)
+          : activeCandles.length - 1;
+        if (endIdx === -1) endIdx = activeCandles.length - 1;
+
+        const endX = (endIdx - clampedStart) * slotWidth + slotWidth / 2;
+        const targetPrice = hasExit ? tr.closePrice : activeCandles[endIdx]?.close || entryPrice;
+        const endY = priceToY(targetPrice);
+
+        ctx.strokeStyle = tradeColor;
+        ctx.lineWidth = 1.2;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath();
+        ctx.moveTo(entryX, entryY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Target / current badge
+        if (endIdx >= clampedStart && endIdx < clampedStart + count) {
+          ctx.beginPath();
+          ctx.arc(endX, endY, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = tradeColor;
+          ctx.fill();
+
+          if (tr.pnl !== undefined && Number.isFinite(tr.pnl)) {
+            const isProfit = tr.pnl >= 0;
+            const pnlText = `${isProfit ? '+' : ''}$${tr.pnl.toFixed(2)}`;
+            ctx.fillStyle = isProfit ? '#10b981' : '#f43f5e';
+            ctx.font = 'bold 9px JetBrains Mono, monospace';
+            ctx.fillText(pnlText, endX + 6, endY - 4);
+          }
+        }
+      }
+    }
+
     // 7. Sub-Pane Rendering (RSI, MACD, Stochastic, ATR, etc.)
     if (hasSubPane) {
       const subTop = pricePaneHeight + 20;
@@ -812,6 +1030,9 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     clampedStart,
     crosshair,
     themeTick,
+    trades,
+    visualLines,
+    visualMarkers,
   ]);
 
   const activeCandle = crosshair
