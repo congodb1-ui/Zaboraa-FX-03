@@ -56,9 +56,8 @@ export const LoginView: React.FC = () => {
               <span>Authentication is not configured</span>
             </div>
             <p className="text-[11px] leading-relaxed text-slate-600 dark:text-[#9FB0C8]">
-              Add <code className="px-1 py-0.5 rounded bg-amber-500/15 font-mono text-amber-600 dark:text-amber-300">SUPABASE_URL</code>,{' '}
-              <code className="px-1 py-0.5 rounded bg-amber-500/15 font-mono text-amber-600 dark:text-amber-300">SUPABASE_ANON_KEY</code>, and{' '}
-              <code className="px-1 py-0.5 rounded bg-amber-500/15 font-mono text-amber-600 dark:text-amber-300">SUPABASE_SERVICE_ROLE_KEY</code> to your{' '}
+              Add <code className="px-1 py-0.5 rounded bg-amber-500/15 font-mono text-amber-600 dark:text-amber-300">SUPABASE_URL</code> and{' '}
+              <code className="px-1 py-0.5 rounded bg-amber-500/15 font-mono text-amber-600 dark:text-amber-300">SUPABASE_ANON_KEY</code> to your{' '}
               <code className="font-mono">.env</code> to activate authenticated operations.
             </p>
           </div>

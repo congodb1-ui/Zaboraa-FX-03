@@ -115,7 +115,52 @@ function validateTimeframe(tf: string): tf is Timeframe {
   return VALID_TIMEFRAMES.has(tf.toUpperCase());
 }
 
-async function startServer() {
+// In-memory rate limiting store (120 req/min per IP)
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+export function rateLimiter(limit: number = 120, windowMs: number = 60000) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.path.startsWith('/api/')) return next();
+    const key = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress || 'local';
+    const now = Date.now();
+    const record = rateLimitStore.get(key);
+    if (!record || now > record.resetAt) {
+      rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    record.count++;
+    if (record.count > limit) {
+      return res.status(429).json({
+        error: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests. Please slow down.',
+      });
+    }
+    next();
+  };
+}
+
+// Public research allowlist (accessible without auth)
+export const PUBLIC_ALLOWLIST_ROUTES = new Set([
+  '/api/health',
+  '/api/auth/config',
+  '/api/technical/analysis',
+  '/api/technical/candles',
+  '/api/fundamentals/cot',
+  '/api/fundamentals/macro',
+  '/api/fundamentals/calendar',
+  '/api/fundamentals/sentiment',
+  '/api/cot/summary',
+  '/api/cot/report',
+]);
+
+export function isPublicAllowlisted(p: string): boolean {
+  if (PUBLIC_ALLOWLIST_ROUTES.has(p)) return true;
+  if (p.startsWith('/api/smartmoney/')) return true;
+  if (p.startsWith('/api/fundamentals/')) return true;
+  if (p.startsWith('/api/technical/')) return true;
+  return false;
+}
+
+export async function createExpressApp(options: { skipVite?: boolean } = {}) {
   const app = express();
 
   app.use(cors({ origin: true, credentials: true }));
@@ -123,8 +168,10 @@ async function startServer() {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
     res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
+  app.use(rateLimiter());
   app.use(express.json({ limit: '10mb' }));
 
   // ==========================================
@@ -146,24 +193,6 @@ async function startServer() {
       supabaseAnonKey: isSupabaseConfigured ? SUPABASE_ANON_KEY : undefined,
     });
   });
-
-  // Public research allowlist (accessible without auth)
-  const PUBLIC_ALLOWLIST_ROUTES = new Set([
-    '/api/health',
-    '/api/auth/config',
-    '/api/technical/analysis',
-    '/api/technical/candles',
-    '/api/fundamentals/cot',
-    '/api/fundamentals/macro',
-    '/api/cot/summary',
-    '/api/cot/report',
-  ]);
-
-  function isPublicAllowlisted(p: string): boolean {
-    if (PUBLIC_ALLOWLIST_ROUTES.has(p)) return true;
-    if (p.startsWith('/api/smartmoney/')) return true;
-    return false;
-  }
 
   // Global Auth Guard Middleware
   app.use(async (req: Request, res: Response, next: NextFunction) => {
@@ -498,7 +527,7 @@ async function startServer() {
 
   app.put('/api/admin/users/:userId/role', requirePermission('user.manage'), async (req: Request, res: Response) => {
     try {
-      const targetUserId = req.params.userId;
+      const targetUserId = String(req.params.userId);
       const { role } = req.body || {};
       if (!role) return res.status(400).json({ error: 'ROLE_REQUIRED' });
 
@@ -535,7 +564,7 @@ async function startServer() {
 
   app.put('/api/admin/users/:userId/status', requirePermission('user.manage'), async (req: Request, res: Response) => {
     try {
-      const targetUserId = req.params.userId;
+      const targetUserId = String(req.params.userId);
       const { status } = req.body || {};
       if (!status || !['active', 'disabled'].includes(status)) {
         return res.status(400).json({ error: 'INVALID_STATUS' });
@@ -571,7 +600,7 @@ async function startServer() {
 
   app.post('/api/admin/users/:userId/assign-account', requirePermission('account.manage'), (req: Request, res: Response) => {
     try {
-      const targetUserId = req.params.userId;
+      const targetUserId = String(req.params.userId);
       const { accountId, action = 'assign' } = req.body || {};
       if (!accountId) return res.status(400).json({ error: 'ACCOUNT_ID_REQUIRED' });
 
@@ -1100,7 +1129,7 @@ async function startServer() {
 
   app.delete('/api/chart/layouts/:id', (req: Request, res: Response) => {
     const actor = (req as any).user as UserSessionPayload | undefined;
-    const success = deleteChartLayout(req.params.id, actor?.userId || 'global');
+    const success = deleteChartLayout(String(req.params.id), actor?.userId || 'global');
     return res.json({ success });
   });
 
@@ -2096,19 +2125,21 @@ async function startServer() {
   // 4. FRONTEND VITE INTEGRATION
   // ==========================================
 
-  // Mount Vite development middlewares in dev mode
-  if (process.env.NODE_ENV !== 'production') {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.resolve(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
+  // Mount Vite development middlewares in dev mode (unless skipVite is requested)
+  if (!options.skipVite) {
+    if (process.env.NODE_ENV !== 'production') {
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: 'spa',
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.resolve(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
   }
 
   // Initialize 6-month historical datasets & COT baseline if not present
@@ -2122,13 +2153,22 @@ async function startServer() {
     console.warn('[Zaboraa FX] Non-fatal startup initialization:', err.message);
   }
 
+  return app;
+}
+
+export async function startServer() {
+  const app = await createExpressApp({ skipVite: false });
+
   app.listen(PORT, HOST, () => {
     console.log(`[Zaboraa FX] Full-Stack Server running on http://${HOST}:${PORT}`);
     console.log(`[Zaboraa FX] MT5 Bridge target: ${BRIDGE_URL}`);
   });
 }
 
-startServer().catch((err) => {
-  console.error('[Zaboraa FX] Failed to start server:', err);
-  process.exit(1);
-});
+// Start server when executed directly, not when imported by test suites
+if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  startServer().catch((err) => {
+    console.error('[Zaboraa FX] Failed to start server:', err);
+    process.exit(1);
+  });
+}

@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Candle, ForexSymbol, StrategyVisualLine, TechnicalAnalysisReport } from '../types/forex';
 import { CandlestickChart } from './CandlestickChart';
+import { PriceChart } from './PriceChart';
 
 interface TechnicalAnalysisViewProps {
   initialSymbol?: string;
@@ -429,45 +430,14 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
         )}
       </div>
 
-      {/* 4. EMBEDDED CANDLESTICK CHART */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <BarChart2 className="w-5 h-5 text-indigo-500" />
-            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
-              Interactive Candlestick Chart ({symbol} · {timeframe})
-            </h2>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs">
-            <label className="flex items-center gap-1.5 text-slate-600 dark:text-[#9FB0C8] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showMAs}
-                onChange={(e) => setShowMAs(e.target.checked)}
-                className="rounded accent-indigo-600 cursor-pointer"
-              />
-              <span>Moving Averages (20, 50, 200)</span>
-            </label>
-
-            <label className="flex items-center gap-1.5 text-slate-600 dark:text-[#9FB0C8] cursor-pointer">
-              <input
-                type="checkbox"
-                checked={showPivots}
-                onChange={(e) => setShowPivots(e.target.checked)}
-                className="rounded accent-indigo-600 cursor-pointer"
-              />
-              <span>Pivot Level (PP)</span>
-            </label>
-          </div>
-        </div>
-
+      {/* 4. EMBEDDED HIGH-PERFORMANCE CANVAS PRICE CHART */}
+      <div className="p-2 sm:p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
         {candles.length > 0 ? (
-          <CandlestickChart
+          <PriceChart
             candles={candles}
             symbol={symbol}
             timeframe={timeframe}
-            height={380}
+            height={440}
             visualLines={chartVisualLines}
           />
         ) : (

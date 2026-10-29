@@ -1,22 +1,29 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-let clientInstance: SupabaseClient | null = null;
-let clientConfig: { configured: boolean; supabaseUrl?: string; supabaseAnonKey?: string } | null = null;
-let configPromise: Promise<typeof clientConfig> | null = null;
-
-export async function fetchAuthConfig(): Promise<{
+export interface AuthConfig {
   configured: boolean;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
-}> {
+}
+
+let clientInstance: SupabaseClient | null = null;
+let clientConfig: AuthConfig | null = null;
+let configPromise: Promise<AuthConfig> | null = null;
+
+export async function fetchAuthConfig(): Promise<AuthConfig> {
   if (clientConfig) return clientConfig;
   if (!configPromise) {
     configPromise = fetch('/api/auth/config')
       .then((res) => res.json())
       .then((data) => {
-        clientConfig = data;
-        if (data.configured && data.supabaseUrl && data.supabaseAnonKey) {
-          clientInstance = createClient(data.supabaseUrl, data.supabaseAnonKey, {
+        const conf: AuthConfig = {
+          configured: Boolean(data?.configured),
+          supabaseUrl: data?.supabaseUrl,
+          supabaseAnonKey: data?.supabaseAnonKey,
+        };
+        clientConfig = conf;
+        if (conf.configured && conf.supabaseUrl && conf.supabaseAnonKey) {
+          clientInstance = createClient(conf.supabaseUrl, conf.supabaseAnonKey, {
             auth: {
               persistSession: true,
               autoRefreshToken: true,
@@ -24,12 +31,13 @@ export async function fetchAuthConfig(): Promise<{
             },
           });
         }
-        return clientConfig;
+        return conf;
       })
       .catch((err) => {
         console.warn('Failed to load auth config:', err);
-        clientConfig = { configured: false };
-        return clientConfig;
+        const fallback: AuthConfig = { configured: false };
+        clientConfig = fallback;
+        return fallback;
       });
   }
   return configPromise;

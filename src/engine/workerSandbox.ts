@@ -734,17 +734,6 @@ export function executeStrategyBar(
     log,
   };
 
-  const securityResult = validateStrategySecurity(code);
-  if (!securityResult.valid) {
-    return {
-      signals: [],
-      logs,
-      visualBlocks: [],
-      visualLines: [],
-      visualMarkers: [],
-      error: securityResult.error,
-    };
-  }
 
   try {
     const startTime = Date.now();
