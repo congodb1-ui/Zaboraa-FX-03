@@ -1,6 +1,7 @@
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import path from 'path';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 import {
@@ -30,7 +31,41 @@ import {
   getAuditLogs,
   getBrokerAccounts,
   upsertBrokerAccount,
+  getFirewallState,
+  setFirewallState,
+  getFirewallSettings,
+  saveFirewallSetting,
+  HARD_CEILINGS,
+  recordFirewallAudit,
+  getFirewallAuditLogs,
+  recordBlockedOrder,
+  getBlockedOrderLogs,
+  assignUserAccount,
+  removeUserAccount,
+  getUserAssignedAccounts,
+  isUserAssignedToAccount,
+  verifyAndConsumeMfaRecoveryCode,
+  tryAcquireIdempotencyKey,
+  completeIdempotencyKey,
+  saveChartLayout,
+  getChartLayouts,
+  deleteChartLayout,
 } from './src/db/sqlite';
+import {
+  isSupabaseConfigured,
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  MASTER_REQUIRE_MFA,
+  verifySupabaseToken,
+  resolveUserSession,
+  attemptMasterAdminBootstrap,
+  isLastActiveMasterAdmin,
+  validatePrivilegeEscalation,
+  generateMfaRecoveryCodes,
+  invalidateUserCache,
+  supabaseAdmin,
+  UserSessionPayload,
+} from './src/services/supabaseServer';
 import { auditCandles, fixCandles } from './src/engine/data/candleQuality';
 import { candleCsvLines, importCandlesCsv } from './src/engine/data/candleCsv';
 import { seedHistoricalDatasets } from './src/engine/data/seedHistoricalData';
@@ -57,7 +92,9 @@ import {
   quantChatWithAi,
   explainSmartMoneySignalWithAi,
 } from './src/services/aiAdvisorService';
-import { ForexSymbol, Timeframe, DatasetRecord } from './src/types/forex';
+import { computeTechnicalReport } from './src/engine/technicalIndicators';
+import { ForexSymbol, Timeframe, DatasetRecord, Candle } from './src/types/forex';
+import { calculatePipValue } from './src/engine/engineMath';
 
 dotenv.config();
 
@@ -81,8 +118,157 @@ function validateTimeframe(tf: string): tf is Timeframe {
 async function startServer() {
   const app = express();
 
-  app.use(cors());
+  app.use(cors({ origin: true, credentials: true }));
+  app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+  });
   app.use(express.json({ limit: '10mb' }));
+
+  // ==========================================
+  // PUBLIC HEALTH & RUNTIME AUTH CONFIG
+  // ==========================================
+
+  app.get('/api/health', (req: Request, res: Response) => {
+    return res.json({
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      authConfigured: isSupabaseConfigured,
+    });
+  });
+
+  app.get('/api/auth/config', (req: Request, res: Response) => {
+    return res.json({
+      configured: isSupabaseConfigured,
+      supabaseUrl: isSupabaseConfigured ? SUPABASE_URL : undefined,
+      supabaseAnonKey: isSupabaseConfigured ? SUPABASE_ANON_KEY : undefined,
+    });
+  });
+
+  // Public research allowlist (accessible without auth)
+  const PUBLIC_ALLOWLIST_ROUTES = new Set([
+    '/api/health',
+    '/api/auth/config',
+    '/api/technical/analysis',
+    '/api/technical/candles',
+    '/api/fundamentals/cot',
+    '/api/fundamentals/macro',
+    '/api/cot/summary',
+    '/api/cot/report',
+  ]);
+
+  function isPublicAllowlisted(p: string): boolean {
+    if (PUBLIC_ALLOWLIST_ROUTES.has(p)) return true;
+    if (p.startsWith('/api/smartmoney/')) return true;
+    return false;
+  }
+
+  // Global Auth Guard Middleware
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.path.startsWith('/api/')) {
+      return next();
+    }
+
+    if (req.path === '/api/health' || req.path === '/api/auth/config') {
+      return next();
+    }
+
+    // 1. Unconfigured mode: allow public research GET routes, fail-close all others with 503
+    if (!isSupabaseConfigured) {
+      if (req.method === 'GET' && isPublicAllowlisted(req.path)) {
+        return next();
+      }
+      return res.status(503).json({
+        error: 'AUTH_NOT_CONFIGURED',
+        message: 'Authentication is not configured. Add the Supabase environment variables.',
+      });
+    }
+
+    // 2. Configured mode: allow public research GET routes without auth
+    if (req.method === 'GET' && isPublicAllowlisted(req.path)) {
+      return next();
+    }
+
+    // 3. Require valid Bearer token for all other API endpoints
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'UNAUTHORIZED',
+        message: 'Authorization Bearer token required',
+      });
+    }
+
+    const token = authHeader.substring(7).trim();
+    const verified = await verifySupabaseToken(token);
+    if (!verified.valid || !verified.payload) {
+      return res.status(401).json({
+        error: 'INVALID_TOKEN',
+        message: verified.error || 'Token verification failed',
+      });
+    }
+
+    const userId = verified.payload.sub || verified.payload.id;
+    const email = verified.payload.email || '';
+    const aal = verified.payload.aal || 'aal1';
+
+    const userSession = await resolveUserSession(userId, email, aal);
+    if (!userSession) {
+      return res.status(401).json({
+        error: 'SESSION_INVALID',
+        message: 'User profile inactive, pending approval, or disabled',
+      });
+    }
+
+    // MFA AAL2 enforcement for administrative roles
+    if (
+      MASTER_REQUIRE_MFA &&
+      (userSession.role === 'master_admin' || userSession.role === 'admin') &&
+      userSession.aal !== 'aal2' &&
+      !req.path.startsWith('/api/admin/users/mfa/')
+    ) {
+      return res.status(403).json({
+        error: 'MFA_REQUIRED',
+        message: 'Two-factor authentication (AAL2) is required for administrative accounts',
+      });
+    }
+
+    (req as any).user = userSession;
+    next();
+  });
+
+  // Permission Guard Helper
+  function requirePermission(perm: string) {
+    return (req: Request, res: Response, next: NextFunction) => {
+      const user = (req as any).user as UserSessionPayload | undefined;
+      if (!user) return res.status(401).json({ error: 'UNAUTHORIZED' });
+      if (user.role === 'master_admin' || user.permissions.includes(perm)) {
+        return next();
+      }
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: `Missing required permission: ${perm}`,
+      });
+    };
+  }
+
+  // Object-Level Account Access Guard Helper
+  function requireAccountAccess(getAccountId?: (req: Request) => string) {
+    return (req: Request, res: Response, next: NextFunction) => {
+      const user = (req as any).user as UserSessionPayload | undefined;
+      if (!user) return res.status(401).json({ error: 'UNAUTHORIZED' });
+      const accountId = getAccountId ? getAccountId(req) : req.params.accountId || req.body?.accountId;
+      if (!accountId) return next();
+      if (!isUserAssignedToAccount(user.userId, accountId, user.role)) {
+        return res.status(403).json({
+          error: 'FORBIDDEN_ACCOUNT_ACCESS',
+          message: `User is not assigned to broker account ${accountId}`,
+        });
+      }
+      next();
+    };
+  }
 
   // ==========================================
   // 1. BRIDGE PROXY & TELEMETRY ROUTES
@@ -237,14 +423,702 @@ async function startServer() {
     }
   });
 
+  // ==========================================
+  // 2C. USER MANAGEMENT & RBAC ENDPOINTS
+  // ==========================================
+
+  app.get('/api/admin/users/me', (req: Request, res: Response) => {
+    const user = (req as any).user as UserSessionPayload | undefined;
+    if (!user) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    return res.json(user);
+  });
+
+  app.get('/api/admin/users', requirePermission('user.manage'), async (req: Request, res: Response) => {
+    try {
+      let profiles: any[] = [];
+      if (supabaseAdmin) {
+        const { data, error } = await supabaseAdmin.from('profiles').select('*').order('created_at', { ascending: false });
+        if (!error && data) profiles = data;
+      }
+      if (profiles.length === 0) {
+        const user = (req as any).user;
+        profiles = [
+          {
+            user_id: user?.userId || 'usr-master-admin',
+            email: user?.email || 'admin@zaboraa.com',
+            role: user?.role || 'master_admin',
+            status: 'active',
+            created_at: new Date().toISOString(),
+          },
+        ];
+      }
+
+      const enriched = profiles.map((p) => ({
+        ...p,
+        assignedAccounts: getUserAssignedAccounts(p.user_id),
+      }));
+
+      return res.json({ users: enriched });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_LOAD_USERS', message: e.message });
+    }
+  });
+
+  app.post('/api/admin/users/invite', requirePermission('user.manage'), async (req: Request, res: Response) => {
+    try {
+      const { email, role = 'trader' } = req.body || {};
+      if (!email) return res.status(400).json({ error: 'EMAIL_REQUIRED' });
+
+      const actor = (req as any).user as UserSessionPayload;
+      const escalationCheck = validatePrivilegeEscalation(actor.role, actor.permissions, role);
+      if (!escalationCheck.allowed) {
+        return res.status(403).json({ error: 'ESCALATION_BLOCKED', message: escalationCheck.reason });
+      }
+
+      if (supabaseAdmin) {
+        const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
+        if (error) return res.status(400).json({ error: error.message });
+        if (data.user) {
+          await supabaseAdmin.from('profiles').upsert({
+            user_id: data.user.id,
+            email: email.toLowerCase(),
+            role,
+            status: 'active',
+            updated_at: new Date().toISOString(),
+          });
+        }
+      }
+
+      recordAuditLog(actor.email, actor.role, 'INVITE_USER', `Invited ${email} with initial role '${role}'`);
+      return res.json({ success: true, message: `Invitation sent to ${email}` });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'INVITE_FAILED', message: e.message });
+    }
+  });
+
+  app.put('/api/admin/users/:userId/role', requirePermission('user.manage'), async (req: Request, res: Response) => {
+    try {
+      const targetUserId = req.params.userId;
+      const { role } = req.body || {};
+      if (!role) return res.status(400).json({ error: 'ROLE_REQUIRED' });
+
+      const actor = (req as any).user as UserSessionPayload;
+
+      const escalationCheck = validatePrivilegeEscalation(actor.role, actor.permissions, role);
+      if (!escalationCheck.allowed) {
+        return res.status(403).json({ error: 'ESCALATION_BLOCKED', message: escalationCheck.reason });
+      }
+
+      const isLastMaster = await isLastActiveMasterAdmin(targetUserId);
+      if (isLastMaster && role !== 'master_admin') {
+        return res.status(400).json({
+          error: 'LAST_MASTER_ADMIN_PROTECTED',
+          message: 'Cannot demote the last active Master Admin. Promote another Master Admin first.',
+        });
+      }
+
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ role, updated_at: new Date().toISOString() })
+          .eq('user_id', targetUserId);
+        if (error) return res.status(400).json({ error: error.message });
+      }
+
+      invalidateUserCache(targetUserId);
+      recordAuditLog(actor.email, actor.role, 'UPDATE_USER_ROLE', `Updated user ${targetUserId} to role '${role}'`);
+      return res.json({ success: true, targetUserId, role });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'ROLE_UPDATE_FAILED', message: e.message });
+    }
+  });
+
+  app.put('/api/admin/users/:userId/status', requirePermission('user.manage'), async (req: Request, res: Response) => {
+    try {
+      const targetUserId = req.params.userId;
+      const { status } = req.body || {};
+      if (!status || !['active', 'disabled'].includes(status)) {
+        return res.status(400).json({ error: 'INVALID_STATUS' });
+      }
+
+      const actor = (req as any).user as UserSessionPayload;
+
+      if (status === 'disabled') {
+        const isLastMaster = await isLastActiveMasterAdmin(targetUserId);
+        if (isLastMaster) {
+          return res.status(400).json({
+            error: 'LAST_MASTER_ADMIN_PROTECTED',
+            message: 'Cannot disable the last active Master Admin account.',
+          });
+        }
+      }
+
+      if (supabaseAdmin) {
+        const { error } = await supabaseAdmin
+          .from('profiles')
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq('user_id', targetUserId);
+        if (error) return res.status(400).json({ error: error.message });
+      }
+
+      invalidateUserCache(targetUserId);
+      recordAuditLog(actor.email, actor.role, 'UPDATE_USER_STATUS', `Set status to '${status}' for user ${targetUserId}`);
+      return res.json({ success: true, targetUserId, status });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'STATUS_UPDATE_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/admin/users/:userId/assign-account', requirePermission('account.manage'), (req: Request, res: Response) => {
+    try {
+      const targetUserId = req.params.userId;
+      const { accountId, action = 'assign' } = req.body || {};
+      if (!accountId) return res.status(400).json({ error: 'ACCOUNT_ID_REQUIRED' });
+
+      const actor = (req as any).user as UserSessionPayload;
+
+      if (action === 'assign') {
+        assignUserAccount(targetUserId, accountId, actor.email);
+        recordAuditLog(actor.email, actor.role, 'ASSIGN_ACCOUNT', `Assigned broker account ${accountId} to user ${targetUserId}`);
+      } else {
+        removeUserAccount(targetUserId, accountId);
+        recordAuditLog(actor.email, actor.role, 'REMOVE_ACCOUNT', `Removed broker account ${accountId} from user ${targetUserId}`);
+      }
+
+      return res.json({ success: true, assignedAccounts: getUserAssignedAccounts(targetUserId) });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'ASSIGNMENT_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/admin/users/mfa/recovery-codes', (req: Request, res: Response) => {
+    const user = (req as any).user as UserSessionPayload | undefined;
+    if (!user) return res.status(401).json({ error: 'UNAUTHORIZED' });
+
+    const recoveryCodes = generateMfaRecoveryCodes(user.userId);
+    return res.json({ recoveryCodes });
+  });
+
+  app.post('/api/admin/users/mfa/verify-recovery', (req: Request, res: Response) => {
+    const user = (req as any).user as UserSessionPayload | undefined;
+    if (!user) return res.status(401).json({ error: 'UNAUTHORIZED' });
+    const { code } = req.body || {};
+    if (!code) return res.status(400).json({ error: 'RECOVERY_CODE_REQUIRED' });
+
+    const valid = verifyAndConsumeMfaRecoveryCode(user.userId, String(code));
+    if (!valid) {
+      return res.status(400).json({ error: 'INVALID_RECOVERY_CODE', message: 'Recovery code is invalid or has already been used.' });
+    }
+    return res.json({ success: true, message: 'Recovery code verified and consumed.' });
+  });
+
+  // ==========================================
+  // 2D. RISK FIREWALL SETTINGS & AUDIT
+  // ==========================================
+
+  app.get('/api/admin/firewall', requirePermission('firewall.view'), (req: Request, res: Response) => {
+    try {
+      const scope = String(req.query.scope || 'global:demo');
+      const accountType = req.query.type === 'live' || scope.includes('live') ? 'live' : 'demo';
+      const state = getFirewallState(scope);
+      const settings = getFirewallSettings(scope, accountType);
+
+      return res.json({
+        scope,
+        accountType,
+        state,
+        settings,
+        hardCeilings: HARD_CEILINGS,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FAILED_TO_LOAD_FIREWALL', message: e.message });
+    }
+  });
+
+  app.put('/api/admin/firewall', requirePermission('firewall.edit'), (req: Request, res: Response) => {
+    try {
+      const actor = (req as any).user as UserSessionPayload;
+      const { scope = 'global:demo', settings, enabled, disableConfirmation, reason = 'Firewall configuration update' } = req.body || {};
+      const isLiveScope = scope.includes('live');
+
+      // 1. Validate Master Switch Toggle
+      if (enabled === false) {
+        if (isLiveScope) {
+          return res.status(400).json({
+            error: 'LIVE_FIREWALL_DISABLE_FORBIDDEN',
+            message: 'Strict Security Gate: Risk Firewall can never be disabled for LIVE accounts.',
+          });
+        }
+        if (disableConfirmation !== 'DISABLE') {
+          return res.status(400).json({
+            error: 'CONFIRMATION_REQUIRED',
+            message: 'Disabling firewall on DEMO scope requires typing DISABLE.',
+          });
+        }
+        setFirewallState(scope, false, actor.email, reason);
+        recordFirewallAudit({
+          actor: actor.email,
+          role: actor.role,
+          scope,
+          key: 'firewall_enabled',
+          old_value: '1',
+          new_value: '0',
+          reason: `Operator disabled firewall (24h auto-expiry active): ${reason}`,
+        });
+      } else if (enabled === true) {
+        setFirewallState(scope, true);
+        recordFirewallAudit({
+          actor: actor.email,
+          role: actor.role,
+          scope,
+          key: 'firewall_enabled',
+          old_value: '0',
+          new_value: '1',
+          reason: `Operator re-enabled firewall: ${reason}`,
+        });
+      }
+
+      // 2. Validate Settings against Hard Ceilings
+      if (settings && typeof settings === 'object') {
+        const currentSettings = getFirewallSettings(scope, isLiveScope ? 'live' : 'demo');
+
+        if (settings.maxRiskPerTradePct !== undefined) {
+          const val = Number(settings.maxRiskPerTradePct);
+          if (isNaN(val) || val <= 0 || val > HARD_CEILINGS.maxRiskPerTradePct) {
+            return res.status(400).json({
+              error: 'HARD_CEILING_VIOLATED',
+              message: `maxRiskPerTradePct must be between 0.1% and ${HARD_CEILINGS.maxRiskPerTradePct}%. Attempted: ${val}%.`,
+            });
+          }
+          if (val !== currentSettings.maxRiskPerTradePct) {
+            saveFirewallSetting(scope, 'maxRiskPerTradePct', String(val), actor.email);
+            recordFirewallAudit({
+              actor: actor.email,
+              role: actor.role,
+              scope,
+              key: 'maxRiskPerTradePct',
+              old_value: `${currentSettings.maxRiskPerTradePct}%`,
+              new_value: `${val}%`,
+              reason,
+            });
+          }
+        }
+
+        if (settings.dailyLossLimitPct !== undefined) {
+          const val = Number(settings.dailyLossLimitPct);
+          if (isNaN(val) || val <= 0 || val > HARD_CEILINGS.dailyLossLimitPct) {
+            return res.status(400).json({
+              error: 'HARD_CEILING_VIOLATED',
+              message: `dailyLossLimitPct must be between 0.1% and ${HARD_CEILINGS.dailyLossLimitPct}%. Attempted: ${val}%.`,
+            });
+          }
+          if (val !== currentSettings.dailyLossLimitPct) {
+            saveFirewallSetting(scope, 'dailyLossLimitPct', String(val), actor.email);
+            recordFirewallAudit({
+              actor: actor.email,
+              role: actor.role,
+              scope,
+              key: 'dailyLossLimitPct',
+              old_value: `${currentSettings.dailyLossLimitPct}%`,
+              new_value: `${val}%`,
+              reason,
+            });
+          }
+        }
+
+        if (settings.maxLots !== undefined) {
+          const val = Number(settings.maxLots);
+          if (isNaN(val) || val <= 0 || val > HARD_CEILINGS.maxLots) {
+            return res.status(400).json({
+              error: 'HARD_CEILING_VIOLATED',
+              message: `maxLots must be between 0.01 and ${HARD_CEILINGS.maxLots}. Attempted: ${val}.`,
+            });
+          }
+          if (val !== currentSettings.maxLots) {
+            saveFirewallSetting(scope, 'maxLots', String(val), actor.email);
+            recordFirewallAudit({
+              actor: actor.email,
+              role: actor.role,
+              scope,
+              key: 'maxLots',
+              old_value: String(currentSettings.maxLots),
+              new_value: String(val),
+              reason,
+            });
+          }
+        }
+
+        if (settings.maxOpenPositions !== undefined) {
+          const val = parseInt(String(settings.maxOpenPositions), 10);
+          if (isNaN(val) || val <= 0 || val > HARD_CEILINGS.maxOpenPositions) {
+            return res.status(400).json({
+              error: 'HARD_CEILING_VIOLATED',
+              message: `maxOpenPositions must be between 1 and ${HARD_CEILINGS.maxOpenPositions}. Attempted: ${val}.`,
+            });
+          }
+          if (val !== currentSettings.maxOpenPositions) {
+            saveFirewallSetting(scope, 'maxOpenPositions', String(val), actor.email);
+            recordFirewallAudit({
+              actor: actor.email,
+              role: actor.role,
+              scope,
+              key: 'maxOpenPositions',
+              old_value: String(currentSettings.maxOpenPositions),
+              new_value: String(val),
+              reason,
+            });
+          }
+        }
+
+        if (settings.maxDrawdownPct !== undefined) {
+          const val = Number(settings.maxDrawdownPct);
+          if (isNaN(val) || val <= 0 || val > HARD_CEILINGS.maxDrawdownPct) {
+            return res.status(400).json({
+              error: 'HARD_CEILING_VIOLATED',
+              message: `maxDrawdownPct must be between 1% and ${HARD_CEILINGS.maxDrawdownPct}%. Attempted: ${val}%.`,
+            });
+          }
+          if (val !== currentSettings.maxDrawdownPct) {
+            saveFirewallSetting(scope, 'maxDrawdownPct', String(val), actor.email);
+            recordFirewallAudit({
+              actor: actor.email,
+              role: actor.role,
+              scope,
+              key: 'maxDrawdownPct',
+              old_value: `${currentSettings.maxDrawdownPct}%`,
+              new_value: `${val}%`,
+              reason,
+            });
+          }
+        }
+
+        for (const k of ['mandatoryStopLoss', 'maxSpreadPipsEURUSD', 'maxSpreadPipsGBPUSD', 'maxSpreadPipsUSDJPY', 'maxSpreadPointsXAUUSD', 'tradingHoursStartUtc', 'tradingHoursEndUtc', 'newsBlackoutMinutes']) {
+          if (settings[k] !== undefined) {
+            if (k === 'mandatoryStopLoss' && isLiveScope && settings[k] === false) {
+              return res.status(400).json({
+                error: 'MANDATORY_SL_LOCKED',
+                message: 'Mandatory Stop-Loss is permanently locked to true for LIVE accounts.',
+              });
+            }
+            saveFirewallSetting(scope, k, String(settings[k]), actor.email);
+          }
+        }
+      }
+
+      return res.json({
+        success: true,
+        scope,
+        state: getFirewallState(scope),
+        settings: getFirewallSettings(scope, isLiveScope ? 'live' : 'demo'),
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'FIREWALL_UPDATE_FAILED', message: e.message });
+    }
+  });
+
+  app.get('/api/admin/firewall/audit', requirePermission('audit.view'), (req: Request, res: Response) => {
+    const limit = parseInt(String(req.query.limit || '100'), 10);
+    return res.json({ audit: getFirewallAuditLogs(limit) });
+  });
+
+  app.get('/api/admin/firewall/blocked-orders', requirePermission('audit.view'), (req: Request, res: Response) => {
+    const limit = parseInt(String(req.query.limit || '100'), 10);
+    return res.json({ blockedOrders: getBlockedOrderLogs(limit) });
+  });
+
+  // ==========================================
+  // 2E. ORDER EXECUTION WITH IDEMPOTENCY & 422 REMEDIATION
+  // ==========================================
+
+  app.post('/api/orders', async (req: Request, res: Response) => {
+    const actor = (req as any).user as UserSessionPayload | undefined;
+    const {
+      accountId = '50192834',
+      accountType = 'demo',
+      symbol = 'EURUSD',
+      side = 'BUY',
+      volume = 1.0,
+      price,
+      sl,
+      tp,
+      currentSpreadPips = 1.2,
+      balance = 10000.0,
+      openPositionsCount = 0,
+    } = req.body || {};
+
+    const requiredPerm = accountType === 'live' ? 'order.place_live' : 'order.place_demo';
+    if (actor && actor.role !== 'master_admin' && !actor.permissions.includes(requiredPerm)) {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: `Missing required permission: ${requiredPerm}`,
+      });
+    }
+
+    if (actor && !isUserAssignedToAccount(actor.userId, accountId, actor.role)) {
+      return res.status(403).json({
+        error: 'FORBIDDEN_ACCOUNT_ACCESS',
+        message: `User is not assigned to broker account ${accountId}`,
+      });
+    }
+
+    // Atomic Idempotency Check
+    const idempotencyKey = String(req.headers['x-idempotency-key'] || '');
+    if (idempotencyKey) {
+      const requestHash = crypto.createHash('sha256').update(JSON.stringify(req.body)).digest('hex');
+      const acq = tryAcquireIdempotencyKey(idempotencyKey, actor?.userId || 'system', requestHash);
+      if (acq.status === 'conflict') {
+        return res.status(409).json({
+          error: 'IDEMPOTENCY_CONFLICT',
+          message: 'Idempotency key reused with different request payload.',
+        });
+      }
+      if (acq.status === 'in_progress') {
+        return res.status(409).json({
+          error: 'REQUEST_IN_PROGRESS',
+          message: 'An order submission with this idempotency key is already in progress.',
+        });
+      }
+      if (acq.status === 'completed') {
+        return res.status(acq.cachedStatus || 200).json(acq.cachedBody);
+      }
+    }
+
+    const scope = accountId;
+    const firewallState = getFirewallState(scope);
+    const limits = getFirewallSettings(scope, accountType === 'live' ? 'live' : 'demo');
+
+    const defaultPrices: Record<string, number> = {
+      EURUSD: 1.0852,
+      GBPUSD: 1.2965,
+      USDJPY: 151.34,
+      XAUUSD: 2650.0,
+    };
+    const orderPrice = Number(price) || defaultPrices[symbol] || 1.0852;
+    const slNum = Number(sl);
+    const volNum = Number(volume);
+
+    if (firewallState.enabled) {
+      if (limits.mandatoryStopLoss) {
+        if (!slNum || slNum <= 0) {
+          const errPayload = {
+            error: 'FIREWALL_REJECTED',
+            rule: 'mandatoryStopLoss',
+            ruleName: 'Mandatory Stop-Loss',
+            limit: true,
+            attempted: false,
+            message: 'Risk check rejected: Hard Stop-Loss is mandatory on this account.',
+          };
+          recordBlockedOrder({
+            userId: actor?.userId || 'unknown',
+            accountId,
+            symbol,
+            attemptedLots: volNum,
+            attemptedRiskUsd: 0,
+            ruleViolated: 'mandatoryStopLoss',
+            suggestedLots: null,
+            errorMessage: errPayload.message,
+          });
+          if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 422, errPayload);
+          return res.status(422).json(errPayload);
+        }
+
+        if (side === 'BUY' && slNum >= orderPrice) {
+          const errPayload = {
+            error: 'FIREWALL_REJECTED',
+            rule: 'mandatoryStopLoss',
+            ruleName: 'Invalid Stop-Loss Placement',
+            limit: orderPrice,
+            attempted: slNum,
+            message: `Buy Stop-Loss (${slNum}) must be strictly below entry price (${orderPrice}).`,
+          };
+          if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 422, errPayload);
+          return res.status(422).json(errPayload);
+        }
+
+        if (side === 'SELL' && slNum <= orderPrice) {
+          const errPayload = {
+            error: 'FIREWALL_REJECTED',
+            rule: 'mandatoryStopLoss',
+            ruleName: 'Invalid Stop-Loss Placement',
+            limit: orderPrice,
+            attempted: slNum,
+            message: `Sell Stop-Loss (${slNum}) must be strictly above entry price (${orderPrice}).`,
+          };
+          if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 422, errPayload);
+          return res.status(422).json(errPayload);
+        }
+      }
+
+      if (volNum > limits.maxLots) {
+        const errPayload = {
+          error: 'FIREWALL_REJECTED',
+          rule: 'maxLots',
+          ruleName: 'Max Lots Per Trade',
+          limit: limits.maxLots,
+          attempted: volNum,
+          suggestedLots: limits.maxLots,
+          message: `Order size ${volNum} lots exceeds risk ceiling of ${limits.maxLots} lots.`,
+        };
+        recordBlockedOrder({
+          userId: actor?.userId || 'unknown',
+          accountId,
+          symbol,
+          attemptedLots: volNum,
+          attemptedRiskUsd: 0,
+          ruleViolated: 'maxLots',
+          suggestedLots: limits.maxLots,
+          errorMessage: errPayload.message,
+        });
+        if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 422, errPayload);
+        return res.status(422).json(errPayload);
+      }
+
+      if (openPositionsCount >= limits.maxOpenPositions) {
+        const errPayload = {
+          error: 'FIREWALL_REJECTED',
+          rule: 'maxOpenPositions',
+          ruleName: 'Max Open Positions',
+          limit: limits.maxOpenPositions,
+          attempted: openPositionsCount,
+          suggestedLots: null,
+          message: `Open positions count (${openPositionsCount}) reached limit of ${limits.maxOpenPositions}.`,
+        };
+        if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 422, errPayload);
+        return res.status(422).json(errPayload);
+      }
+
+      if (slNum > 0) {
+        const pipScale = symbol === 'USDJPY' ? 0.01 : symbol === 'XAUUSD' ? 1.0 : 0.0001;
+        const slPips = Math.abs(orderPrice - slNum) / pipScale;
+        const perLotPipVal = calculatePipValue(symbol as ForexSymbol, 1.0, orderPrice);
+        const attemptedRiskUsd = slPips * calculatePipValue(symbol as ForexSymbol, volNum, orderPrice);
+        const attemptedRiskPct = balance > 0 ? (attemptedRiskUsd / balance) * 100 : 100;
+
+        if (attemptedRiskPct > limits.maxRiskPerTradePct * 1.001) {
+          const allowedRiskUsd = balance * (limits.maxRiskPerTradePct / 100);
+          const perLotRiskUsd = slPips * perLotPipVal;
+          const maxLotsRaw = perLotRiskUsd > 0 ? allowedRiskUsd / perLotRiskUsd : 0;
+          const roundedLots = Math.floor(maxLotsRaw * 100) / 100;
+
+          let suggestedLots: number | null = Math.min(limits.maxLots, roundedLots);
+          let message = `Risk check rejected: Trade risk of $${attemptedRiskUsd.toFixed(2)} (${attemptedRiskPct.toFixed(2)}%) exceeds allowed ${limits.maxRiskPerTradePct}% per trade.`;
+
+          if (suggestedLots < 0.01) {
+            suggestedLots = null;
+            message = `Risk check rejected: Stop loss distance is too wide for minimum 0.01 lot ($${allowedRiskUsd.toFixed(2)} max allowed risk allows ${maxLotsRaw.toFixed(4)} lots).`;
+          }
+
+          const errPayload = {
+            error: 'FIREWALL_REJECTED',
+            rule: 'maxRiskPerTradePct',
+            ruleName: 'Max Risk Per Trade',
+            limit: limits.maxRiskPerTradePct,
+            attempted: Number(attemptedRiskPct.toFixed(2)),
+            attemptedRiskUsd: Number(attemptedRiskUsd.toFixed(2)),
+            allowedRiskUsd: Number(allowedRiskUsd.toFixed(2)),
+            suggestedLots,
+            message,
+          };
+
+          recordBlockedOrder({
+            userId: actor?.userId || 'unknown',
+            accountId,
+            symbol,
+            attemptedLots: volNum,
+            attemptedRiskUsd: attemptedRiskUsd,
+            ruleViolated: 'maxRiskPerTradePct',
+            suggestedLots,
+            errorMessage: message,
+          });
+
+          if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 422, errPayload);
+          return res.status(422).json(errPayload);
+        }
+      }
+    }
+
+    const orderRecord = {
+      id: `ord-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      ticket: Math.floor(10000000 + Math.random() * 90000000),
+      symbol,
+      side,
+      volume: volNum,
+      price: orderPrice,
+      sl: slNum,
+      tp: Number(tp) || undefined,
+      accountId,
+      accountType,
+      status: 'FILLED',
+      submittedBy: actor?.email || 'manual-desk',
+      createdAt: new Date().toISOString(),
+    };
+
+    recordAuditLog(
+      actor?.email || 'trader',
+      actor?.role || 'trader',
+      'ORDER_EXECUTION',
+      `Filled ${side} ${volNum} lots ${symbol} @ ${orderPrice} on account ${accountId}`
+    );
+
+    const successResponse = {
+      success: true,
+      order: orderRecord,
+      message: `Order submitted: ${side} ${volNum.toFixed(2)} lot ${symbol} with SL at ${slNum}`,
+    };
+
+    if (idempotencyKey) completeIdempotencyKey(idempotencyKey, 200, successResponse);
+    return res.json(successResponse);
+  });
+
+  // ==========================================
+  // 2F. CHART LAYOUTS PERSISTENCE
+  // ==========================================
+
+  app.get('/api/chart/layouts', (req: Request, res: Response) => {
+    const actor = (req as any).user as UserSessionPayload | undefined;
+    const scope = String(req.query.scope || 'global');
+    const layouts = getChartLayouts(scope, actor?.userId || 'global');
+    return res.json({ layouts });
+  });
+
+  app.post('/api/chart/layouts', (req: Request, res: Response) => {
+    const actor = (req as any).user as UserSessionPayload | undefined;
+    const { name, scope = 'global', chart_type = 'candles', indicators = [], moving_averages = [] } = req.body || {};
+    if (!name) return res.status(400).json({ error: 'LAYOUT_NAME_REQUIRED' });
+
+    const id = saveChartLayout({
+      name,
+      scope,
+      owner_id: actor?.userId || 'global',
+      chart_type,
+      indicators,
+      moving_averages,
+    });
+
+    return res.json({ success: true, id, message: `Chart layout '${name}' saved` });
+  });
+
+  app.delete('/api/chart/layouts/:id', (req: Request, res: Response) => {
+    const actor = (req as any).user as UserSessionPayload | undefined;
+    const success = deleteChartLayout(req.params.id, actor?.userId || 'global');
+    return res.json({ success });
+  });
+
   // Authoritative server-side multi-level kill switch execution
-  app.post('/api/admin/killswitch', async (req: Request, res: Response) => {
+  app.post('/api/admin/killswitch', requirePermission('kill.engage'), async (req: Request, res: Response) => {
+    const actor = (req as any).user as UserSessionPayload | undefined;
     const { level = 'master', targetId, reason = 'Operator triggered emergency halt' } = req.body || {};
     const timestamp = new Date().toISOString();
 
-    recordAuditLog('Operator', 'Master Admin', `KILL_SWITCH_${level.toUpperCase()}`, `Target: ${targetId || 'ALL'}; Reason: ${reason}`);
+    if (targetId && targetId !== 'ALL' && actor && !isUserAssignedToAccount(actor.userId, targetId, actor.role)) {
+      return res.status(403).json({
+        error: 'FORBIDDEN_ACCOUNT_ACCESS',
+        message: `User is not authorized for broker account ${targetId}`,
+      });
+    }
 
-    // If MT5 Bridge is connected, forward cancel command
+    recordAuditLog(actor?.email || 'Operator', actor?.role || 'Master Admin', `KILL_SWITCH_${level.toUpperCase()}`, `Target: ${targetId || 'ALL'}; Reason: ${reason}`);
+
     let bridgeContacted = false;
     try {
       const resp = await fetch(`${BRIDGE_URL}/killswitch`, {
@@ -717,67 +1591,19 @@ async function startServer() {
     const symbolParam = String(req.query.symbol || 'XAUUSD').toUpperCase();
     const timeframeParam = String(req.query.timeframe || 'H1').toUpperCase();
 
-    // Technical Analysis report for Gold (XAUUSD / XAUUSDm) exactly matching image_cac96abb.png
-    const isGold = symbolParam === 'XAUUSD';
+    const cleanSym = symbolParam.replace(/M$/, '');
+    let storedCandles: Candle[] = [];
+    try {
+      const tfToLoad = (['M1', 'M5', 'M10', 'M15', 'M30', 'H1', 'H3', 'D1'].includes(timeframeParam)
+        ? timeframeParam
+        : 'H1') as Timeframe;
+      storedCandles = loadCandlesFromDb(cleanSym as ForexSymbol, tfToLoad, undefined, undefined, 100);
+      if (storedCandles.length === 0) {
+        storedCandles = loadCandlesFromDb(cleanSym as ForexSymbol, 'H1', undefined, undefined, 100);
+      }
+    } catch {}
 
-    const basePrice = isGold ? 4053.10 : symbolParam === 'EURUSD' ? 1.0852 : symbolParam === 'USDJPY' ? 151.34 : 1.2965;
-    const factor = isGold ? 1 : basePrice / 4053.10;
-    const scale = (val: number | string) => typeof val === 'number' ? Number((val * factor).toFixed(isGold ? 2 : 4)) : val;
-
-    const report = {
-      symbol: isGold ? 'XAU/USD - Gold Spot US Dollar' : `${symbolParam} - Spot FX`,
-      canonicalSymbol: symbolParam,
-      brokerSymbol: `${symbolParam}m`, // Exness demo format
-      price: basePrice,
-      change24h: isGold ? -7.23 : Number((-0.0015 * (basePrice / 1.0852)).toFixed(isGold ? 2 : 4)),
-      change24hPct: isGold ? -0.18 : -0.14,
-      dayRangeLow: scale(4028.19),
-      dayRangeHigh: scale(4070.85),
-      yearRangeLow: scale(3915.17),
-      yearRangeHigh: scale(5595.46),
-      timeframe: timeframeParam,
-      summaryAction: 'Strong Buy' as const,
-      summaryBuyCount: 16,
-      summarySellCount: 3,
-      summaryNeutralCount: 5,
-      maAction: 'Strong Buy' as const,
-      maBuyCount: 10,
-      maSellCount: 2,
-      indicatorsAction: 'Strong Buy' as const,
-      indicatorsBuyCount: 6,
-      indicatorsSellCount: 1,
-      indicatorsNeutralCount: 4,
-      indicators: [
-        { name: 'RSI(14)', value: 59.141, action: 'Buy' as const },
-        { name: 'STOCH(9,6)', value: 55.616, action: 'Buy' as const },
-        { name: 'STOCHRSI(14)', value: 50.155, action: 'Neutral' as const },
-        { name: 'MACD(12,26)', value: isGold ? 5.217 : 0.0005, action: 'Buy' as const },
-        { name: 'ADX(14)', value: 24.409, action: 'Neutral' as const },
-        { name: 'Williams %R', value: -41.045, action: 'Buy' as const },
-        { name: 'CCI(14)', value: 20.641, action: 'Neutral' as const },
-        { name: 'ATR(14)', value: isGold ? 10.4886 : 0.0045, action: 'Less Volatility' as const },
-        { name: 'Highs/Lows(14)', value: isGold ? 3.82 : 0.0012, action: 'Buy' as const },
-        { name: 'Ultimate Oscillator', value: 49.364, action: 'Neutral' as const },
-        { name: 'ROC', value: -0.082, action: 'Sell' as const },
-        { name: 'Bull/Bear Power(13)', value: isGold ? 14.5463 : 0.0021, action: 'Buy' as const },
-      ],
-      movingAverages: [
-        { name: 'MA5', simple: scale(4042.36), simpleAction: 'Buy' as const, exponential: scale(4047.18), exponentialAction: 'Buy' as const },
-        { name: 'MA10', simple: scale(4044.86), simpleAction: 'Buy' as const, exponential: scale(4046.15), exponentialAction: 'Buy' as const },
-        { name: 'MA20', simple: scale(4050.80), simpleAction: 'Buy' as const, exponential: scale(4043.16), exponentialAction: 'Buy' as const },
-        { name: 'MA50', simple: scale(4027.18), simpleAction: 'Buy' as const, exponential: scale(4035.24), exponentialAction: 'Buy' as const },
-        { name: 'MA100', simple: scale(4029.77), simpleAction: 'Buy' as const, exponential: scale(4044.27), exponentialAction: 'Buy' as const },
-        { name: 'MA200', simple: scale(4088.28), simpleAction: 'Sell' as const, exponential: scale(4071.49), exponentialAction: 'Sell' as const },
-      ],
-      pivotPoints: [
-        { name: 'Classic', s3: scale(4029.50), s2: scale(4036.28), s1: scale(4044.67), pivot: scale(4051.45), r1: scale(4059.84), r2: scale(4066.62), r3: scale(4075.01) },
-        { name: 'Fibonacci', s3: scale(4036.28), s2: scale(4042.07), s1: scale(4045.65), pivot: scale(4051.45), r1: scale(4057.24), r2: scale(4060.82), r3: scale(4066.62) },
-        { name: 'Camarilla', s3: scale(4048.90), s2: scale(4050.29), s1: scale(4051.68), pivot: scale(4051.45), r1: scale(4054.46), r2: scale(4055.85), r3: scale(4057.24) },
-        { name: 'Woodie\'s', s3: scale(4030.32), s2: scale(4036.68), s1: scale(4045.49), pivot: scale(4051.85), r1: scale(4060.65), r2: scale(4067.02), r3: scale(4075.82) },
-        { name: 'DeMark\'s', s3: '-', s2: '-', s1: scale(4048.06), pivot: scale(4053.14), r1: scale(4063.23), r2: '-', r3: '-' },
-      ],
-    };
-
+    const report = computeTechnicalReport(cleanSym, timeframeParam, storedCandles);
     return res.json(report);
   });
 

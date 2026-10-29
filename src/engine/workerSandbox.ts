@@ -84,6 +84,10 @@ export function validateStrategySecurity(code: string): { valid: boolean; error?
     /\bfetch\b/,
     /\bXMLHttpRequest\b/,
     /\bWebSocket\b/,
+    /\bimportScripts\b/,
+    /\bWorker\b/,
+    /\bSharedWorker\b/,
+    /\bServiceWorker\b/,
     /\bwindow\b/,
     /\bdocument\b/,
     /\blocalStorage\b/,
@@ -92,14 +96,19 @@ export function validateStrategySecurity(code: string): { valid: boolean; error?
     /\bFunction\b/,
     /\bimport\s*\(/,
     /\brequire\s*\(/,
-    /\bglobalThis\.constructor/,
+    /\bglobalThis\b/,
+    /\bReflect\b/,
+    /\bProxy\b/,
+    /\bBlob\b/,
+    /\bFileReader\b/,
+    /\bfs\b/,
   ];
 
   for (const pattern of forbiddenPatterns) {
     if (pattern.test(code)) {
       return {
         valid: false,
-        error: `Security violation: Forbidden identifier detected (${pattern.toString()}). Sandbox access restricted.`,
+        error: `Security violation: Forbidden identifier detected (${pattern.toString()}). Strategy sandboxing strictly prohibits network, file system, dynamic eval, and worker access.`,
       };
     }
   }
@@ -725,13 +734,59 @@ export function executeStrategyBar(
     log,
   };
 
+  const security = validateStrategySecurity(code);
+  if (!security.valid) {
+    return {
+      signals: [],
+      logs,
+      visualBlocks: [],
+      visualLines: [],
+      visualMarkers: [],
+      error: security.error,
+    };
+  }
+
   try {
+    const startTime = Date.now();
+    const wrappedCode = `
+      "use strict";
+      ${code}
+      if (typeof onBar === 'function') {
+        onBar(ctx, bar);
+      }
+    `;
+
+    // Strict sandboxed function with isolated argument scope
     const fn = new Function(
       'ctx',
       'bar',
-      `${code}\nif (typeof onBar === 'function') onBar(ctx, bar);`
+      'Date',
+      'Math',
+      'Number',
+      'String',
+      'Array',
+      'Boolean',
+      'parseInt',
+      'parseFloat',
+      'isNaN',
+      'isFinite',
+      wrappedCode
     );
-    fn(ctx, candles[barIndex]);
+
+    fn(ctx, candles[barIndex], Date, Math, Number, String, Array, Boolean, parseInt, parseFloat, isNaN, isFinite);
+
+    const elapsed = Date.now() - startTime;
+    if (elapsed > 50) {
+      return {
+        signals: [],
+        logs,
+        visualBlocks: [],
+        visualLines: [],
+        visualMarkers: [],
+        error: `CPU_TIMEOUT: Strategy execution took ${elapsed}ms, exceeding 50ms per-bar budget.`,
+      };
+    }
+
     return { signals, logs, visualBlocks, visualLines, visualMarkers };
   } catch (err: any) {
     return {

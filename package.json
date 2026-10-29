@@ -9,10 +9,12 @@
     "build": "vite build",
     "test": "vitest run",
     "lint": "tsc --noEmit",
+    "admin:reset-mfa": "tsx scripts/reset-admin-mfa.ts",
     "preview": "vite preview --port 3000"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",
+    "@supabase/supabase-js": "^2.118.0",
     "@types/d3": "^7.4.3",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",

@@ -1,24 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Shield,
-  Users,
-  Key,
-  Server,
-  Lock,
-  Unlock,
   AlertTriangle,
+  ArrowRight,
   CheckCircle2,
   Clock,
+  Eye,
+  EyeOff,
+  Filter,
+  History,
+  Key,
+  Lock,
   Plus,
   RefreshCw,
-  FileText,
-  Sliders,
-  DollarSign,
+  Search,
+  Server,
+  Shield,
   ShieldAlert,
+  ShieldCheck,
+  Sliders,
+  Trash2,
+  Unlock,
+  UserCheck,
+  UserPlus,
+  Users,
+  X,
 } from 'lucide-react';
 import { BrokerState } from '../types/forex';
+import { useAuth } from '../context/AuthContext';
 
-export type UserRole = 'Master Admin' | 'Admin' | 'Trader' | 'Viewer';
+export type AdminSubTab = 'firewall' | 'users' | 'accounts' | 'audit';
 
 interface BrokerAccountDef {
   id: string;
@@ -31,7 +41,66 @@ interface BrokerAccountDef {
   last_connection: string;
   max_lots: number;
   risk_pct: number;
-  is_live_approved: number;
+}
+
+interface FirewallSettings {
+  maxRiskPerTradePct: number;
+  maxLots: number;
+  maxOpenPositions: number;
+  dailyLossLimitPct: number;
+  maxDrawdownPct: number;
+  mandatoryStopLoss: boolean;
+  maxSpreadPipsEURUSD: number;
+  maxSpreadPipsGBPUSD: number;
+  maxSpreadPipsUSDJPY: number;
+  maxSpreadPointsXAUUSD: number;
+  tradingHoursStartUtc: number;
+  tradingHoursEndUtc: number;
+  newsBlackoutMinutes: number;
+}
+
+interface FirewallState {
+  scope: string;
+  enabled: boolean;
+  disabled_at?: string | null;
+  disabled_until?: string | null;
+  disabled_by?: string | null;
+  reason?: string | null;
+}
+
+interface FirewallAuditEntry {
+  id: number;
+  timestamp: string;
+  actor: string;
+  role: string;
+  scope: string;
+  key: string;
+  old_value: string;
+  new_value: string;
+  reason: string;
+  hash: string;
+}
+
+interface BlockedOrderEntry {
+  id: number;
+  timestamp: string;
+  user_id: string;
+  account_id: string;
+  symbol: string;
+  attempted_lots: number;
+  attempted_risk_usd: number;
+  rule_violated: string;
+  suggested_lots: number | null;
+  error_message: string;
+}
+
+interface ManagedUser {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  created_at: string;
+  assignedAccounts?: string[];
 }
 
 interface AuditLogEntry {
@@ -48,501 +117,1572 @@ interface AdminAccountsViewProps {
   onOpenKillSwitch: () => void;
 }
 
+const HARD_CEILINGS = {
+  maxRiskPerTradePct: 5.0,
+  dailyLossLimitPct: 10.0,
+  maxLots: 10.0,
+  maxOpenPositions: 20,
+  maxDrawdownPct: 20.0,
+};
+
+const DEFAULT_ACCOUNTS: BrokerAccountDef[] = [
+  {
+    id: 'acc-exness-demo',
+    account_name: 'Primary Exness MT5 Demo',
+    broker: 'Exness',
+    server: 'Exness-MT5Trial9',
+    login: '50192834',
+    type: 'DEMO',
+    status: 'CONNECTED',
+    last_connection: 'Just now',
+    max_lots: 2.0,
+    risk_pct: 1.0,
+  },
+  {
+    id: 'acc-exness-contest',
+    account_name: 'Pre-Production Paper Desk',
+    broker: 'Exness',
+    server: 'Exness-MT5Trial9',
+    login: '50192988',
+    type: 'DEMO',
+    status: 'STANDBY',
+    last_connection: '12m ago',
+    max_lots: 5.0,
+    risk_pct: 1.5,
+  },
+];
+
 export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
   brokerState,
   onOpenKillSwitch,
 }) => {
-  const [currentRole, setCurrentRole] = useState<UserRole>('Master Admin');
-  const [currentUser, setCurrentUser] = useState<string>('congo_admin');
-  const [accounts, setAccounts] = useState<BrokerAccountDef[]>([]);
+  const { user, profile, effectiveRole, previewRole, setPreviewRole, getAccessToken } = useAuth();
+  const [subTab, setSubTab] = useState<AdminSubTab>('firewall');
+
+  // Firewall State & Form
+  const [firewallScope, setFirewallScope] = useState<string>('global:demo');
+  const [firewallState, setFirewallState] = useState<FirewallState>({
+    scope: 'global:demo',
+    enabled: true,
+  });
+  const [serverSettings, setServerSettings] = useState<FirewallSettings>({
+    maxRiskPerTradePct: 2.0,
+    maxLots: 5.0,
+    maxOpenPositions: 10,
+    dailyLossLimitPct: 5.0,
+    maxDrawdownPct: 10.0,
+    mandatoryStopLoss: true,
+    maxSpreadPipsEURUSD: 2.5,
+    maxSpreadPipsGBPUSD: 3.0,
+    maxSpreadPipsUSDJPY: 2.5,
+    maxSpreadPointsXAUUSD: 30.0,
+    tradingHoursStartUtc: 0,
+    tradingHoursEndUtc: 24,
+    newsBlackoutMinutes: 30,
+  });
+  const [formSettings, setFormSettings] = useState<FirewallSettings>(serverSettings);
+  const [firewallAudits, setFirewallAudits] = useState<FirewallAuditEntry[]>([]);
+  const [blockedOrders, setBlockedOrders] = useState<BlockedOrderEntry[]>([]);
+
+  // Modals
+  const [showDisableModal, setShowDisableModal] = useState<boolean>(false);
+  const [disableConfirmationInput, setDisableConfirmationInput] = useState<string>('');
+  const [disableReason, setDisableReason] = useState<string>('');
+
+  const [showDiffModal, setShowDiffModal] = useState<boolean>(false);
+  const [updateReason, setUpdateReason] = useState<string>('');
+
+  // Accounts & Users State
+  const [accounts, setAccounts] = useState<BrokerAccountDef[]>(DEFAULT_ACCOUNTS);
+  const [managedUsers, setManagedUsers] = useState<ManagedUser[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [showAddAccountModal, setShowAddAccountModal] = useState<boolean>(false);
+  const [feedback, setFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
-  // New Account Form state
+  // Invite User Modal
+  const [showInviteModal, setShowInviteModal] = useState<boolean>(false);
+  const [inviteEmail, setInviteEmail] = useState<string>('');
+  const [inviteRole, setInviteRole] = useState<string>('trader');
+
+  // Assign Accounts Modal
+  const [assignUser, setAssignUser] = useState<ManagedUser | null>(null);
+
+  // Broker Accounts Modal
+  const [showAddAccountModal, setShowAddAccountModal] = useState<boolean>(false);
   const [newAccName, setNewAccName] = useState('');
-  const [newAccBroker, setNewAccBroker] = useState('Exness');
   const [newAccServer, setNewAccServer] = useState('Exness-MT5Trial9');
   const [newAccLogin, setNewAccLogin] = useState('');
   const [newAccType, setNewAccType] = useState('DEMO');
   const [newAccMaxLots, setNewAccMaxLots] = useState(2.0);
   const [newAccRiskPct, setNewAccRiskPct] = useState(1.0);
 
-  // Platform Safeguards
-  const [allowTradingState, setAllowTradingState] = useState<boolean>(true);
-  const [allowLiveGate, setAllowLiveGate] = useState<boolean>(false);
-  const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  // Token mask state
+  const [maskedTokens, setMaskedTokens] = useState<Record<string, boolean>>({});
 
-  const loadAdminData = async () => {
+  // 1. Fetch Firewall data on scope change
+  const loadFirewallData = async (scopeToLoad: string) => {
     setIsLoading(true);
     try {
-      const [accRes, logRes] = await Promise.all([
-        fetch('/api/admin/accounts'),
-        fetch('/api/admin/audit-logs'),
+      const token = getAccessToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+      const [fwRes, auditRes, blockedRes] = await Promise.all([
+        fetch(`/api/admin/firewall?scope=${encodeURIComponent(scopeToLoad)}`, { headers }),
+        fetch('/api/admin/firewall/audit', { headers }),
+        fetch('/api/admin/firewall/blocked-orders', { headers }),
       ]);
 
-      if (accRes.ok) {
-        const accData = await accRes.json();
-        setAccounts(accData.accounts || []);
+      if (fwRes.ok) {
+        const data = await fwRes.json();
+        setFirewallState(data.state);
+        setServerSettings(data.settings);
+        setFormSettings(data.settings);
       }
 
-      if (logRes.ok) {
-        const logData = await logRes.json();
-        setAuditLogs(logData.logs || []);
+      if (auditRes.ok) {
+        const aData = await auditRes.json();
+        setFirewallAudits(aData.audit || []);
+      }
+
+      if (blockedRes.ok) {
+        const bData = await blockedRes.json();
+        setBlockedOrders(bData.blockedOrders || []);
       }
     } catch (err) {
-      console.error('Failed to load admin data:', err);
+      console.warn('Failed to load firewall data:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadAdminData();
-  }, []);
-
-  const handleRoleChange = async (role: UserRole) => {
-    setCurrentRole(role);
+  // 2. Fetch Users and Broker Accounts
+  const loadUsersAndAccounts = async () => {
     try {
-      await fetch('/api/admin/audit-log', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: currentUser,
-          role,
-          action: 'ROLE_SWITCH',
-          details: `Switched operational context to ${role}`,
-        }),
-      });
-      loadAdminData();
-    } catch {}
-  };
+      const token = getAccessToken();
+      const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const handleCreateAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newAccName || !newAccLogin) return;
+      const [userRes, accRes, logRes] = await Promise.all([
+        fetch('/api/admin/users', { headers }),
+        fetch('/api/admin/accounts', { headers }),
+        fetch('/api/admin/audit-logs', { headers }),
+      ]);
 
-    try {
-      const res = await fetch('/api/admin/accounts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          account_name: newAccName,
-          broker: newAccBroker,
-          server: newAccServer,
-          login: newAccLogin,
-          type: newAccType,
-          status: 'CONNECTED',
-          max_lots: Number(newAccMaxLots),
-          risk_pct: Number(newAccRiskPct),
-          is_live_approved: false,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setAccounts(data.accounts || []);
-        setShowAddAccountModal(false);
-        setNewAccName('');
-        setNewAccLogin('');
-        setActionFeedback('Broker account provisioned successfully.');
-        setTimeout(() => setActionFeedback(null), 3500);
-        loadAdminData();
+      if (userRes.ok) {
+        const uData = await userRes.json();
+        setManagedUsers(uData.users || []);
       }
-    } catch (err: any) {
-      alert('Failed to save account: ' + err.message);
+
+      if (accRes.ok) {
+        const aData = await accRes.json();
+        if (aData.accounts && aData.accounts.length > 0) {
+          setAccounts(aData.accounts);
+        }
+      }
+
+      if (logRes.ok) {
+        const lData = await logRes.json();
+        setAuditLogs(lData.logs || []);
+      }
+    } catch (err) {
+      console.warn('Failed to load users or accounts:', err);
     }
   };
 
-  const isMasterAdmin = currentRole === 'Master Admin';
-  const canEditConfig = currentRole === 'Master Admin' || currentRole === 'Admin';
-  const canTrade = currentRole !== 'Viewer';
+  useEffect(() => {
+    loadFirewallData(firewallScope);
+    loadUsersAndAccounts();
+  }, [firewallScope]);
+
+  // Master Firewall Toggle (Triggered when user clicks enable/disable)
+  const handleToggleFirewall = () => {
+    const isLive = firewallScope.includes('live');
+    if (firewallState.enabled) {
+      if (isLive) {
+        setFeedback({
+          success: false,
+          message: 'Strict Security Gate: Risk Firewall can NEVER be disabled for LIVE accounts.',
+        });
+        return;
+      }
+      // Demo scope: require typing DISABLE
+      setDisableConfirmationInput('');
+      setDisableReason('');
+      setShowDisableModal(true);
+    } else {
+      // Re-enable immediately
+      executeFirewallUpdate({ enabled: true, reason: 'Re-enabling Risk Firewall protection' });
+    }
+  };
+
+  const confirmDisableFirewall = () => {
+    if (disableConfirmationInput !== 'DISABLE') return;
+    setShowDisableModal(false);
+    executeFirewallUpdate({
+      enabled: false,
+      disableConfirmation: 'DISABLE',
+      reason: disableReason || 'Manual temporary suspension for testing',
+    });
+  };
+
+  // Execute PUT /api/admin/firewall
+  const executeFirewallUpdate = async (payload: {
+    enabled?: boolean;
+    disableConfirmation?: string;
+    settings?: Partial<FirewallSettings>;
+    reason: string;
+  }) => {
+    setIsLoading(true);
+    setFeedback(null);
+    try {
+      const token = getAccessToken();
+      const res = await fetch('/api/admin/firewall', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          scope: firewallScope,
+          ...payload,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback({
+          success: false,
+          message: data.message || data.error || 'Failed to update firewall settings',
+        });
+      } else {
+        setFeedback({
+          success: true,
+          message: 'Risk Firewall updated and verified against hard ceilings.',
+        });
+        setFirewallState(data.state);
+        setServerSettings(data.settings);
+        setFormSettings(data.settings);
+        loadFirewallData(firewallScope);
+      }
+    } catch (err: any) {
+      setFeedback({ success: false, message: `Update failed: ${err.message}` });
+    } finally {
+      setIsLoading(false);
+      setShowDiffModal(false);
+    }
+  };
+
+  // Diff Calculations
+  const getChangedSettings = (): Array<{ key: keyof FirewallSettings; oldVal: any; newVal: any }> => {
+    const changes: Array<{ key: keyof FirewallSettings; oldVal: any; newVal: any }> = [];
+    (Object.keys(formSettings) as Array<keyof FirewallSettings>).forEach((k) => {
+      if (formSettings[k] !== serverSettings[k]) {
+        changes.push({ key: k, oldVal: serverSettings[k], newVal: formSettings[k] });
+      }
+    });
+    return changes;
+  };
+
+  const handleOpenDiffModal = (e: React.FormEvent) => {
+    e.preventDefault();
+    const changes = getChangedSettings();
+    if (changes.length === 0) {
+      setFeedback({ success: true, message: 'No parameter modifications detected.' });
+      return;
+    }
+
+    // Client-side hard ceiling validations
+    if (formSettings.maxRiskPerTradePct > HARD_CEILINGS.maxRiskPerTradePct) {
+      setFeedback({
+        success: false,
+        message: `maxRiskPerTradePct (${formSettings.maxRiskPerTradePct}%) exceeds immutable ceiling of ${HARD_CEILINGS.maxRiskPerTradePct}%.`,
+      });
+      return;
+    }
+    if (formSettings.dailyLossLimitPct > HARD_CEILINGS.dailyLossLimitPct) {
+      setFeedback({
+        success: false,
+        message: `dailyLossLimitPct (${formSettings.dailyLossLimitPct}%) exceeds immutable ceiling of ${HARD_CEILINGS.dailyLossLimitPct}%.`,
+      });
+      return;
+    }
+    if (formSettings.maxLots > HARD_CEILINGS.maxLots) {
+      setFeedback({
+        success: false,
+        message: `maxLots (${formSettings.maxLots}) exceeds immutable ceiling of ${HARD_CEILINGS.maxLots}.`,
+      });
+      return;
+    }
+    if (formSettings.maxOpenPositions > HARD_CEILINGS.maxOpenPositions) {
+      setFeedback({
+        success: false,
+        message: `maxOpenPositions (${formSettings.maxOpenPositions}) exceeds immutable ceiling of ${HARD_CEILINGS.maxOpenPositions}.`,
+      });
+      return;
+    }
+
+    setUpdateReason('');
+    setShowDiffModal(true);
+  };
+
+  const handleConfirmDiffSubmit = () => {
+    executeFirewallUpdate({
+      settings: formSettings,
+      reason: updateReason || 'Updated risk parameters in Admin UI',
+    });
+  };
+
+  // User Management Handlers
+  const handleInviteUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+    try {
+      const token = getAccessToken();
+      const res = await fetch('/api/admin/users/invite', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ email: inviteEmail, role: inviteRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback({ success: false, message: data.message || data.error });
+      } else {
+        setFeedback({ success: true, message: `Invitation sent to ${inviteEmail}` });
+        setShowInviteModal(false);
+        setInviteEmail('');
+        loadUsersAndAccounts();
+      }
+    } catch (e: any) {
+      setFeedback({ success: false, message: e.message });
+    }
+  };
+
+  const handleChangeUserRole = async (userId: string, newRole: string) => {
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/users/${userId}/role`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback({ success: false, message: data.message || data.error });
+      } else {
+        setFeedback({ success: true, message: `User role updated to ${newRole}` });
+        loadUsersAndAccounts();
+      }
+    } catch (e: any) {
+      setFeedback({ success: false, message: e.message });
+    }
+  };
+
+  const handleToggleUserStatus = async (userId: string, currentStatus: string) => {
+    const disabled = currentStatus !== 'DISABLED';
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/users/${userId}/disable`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ disabled }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback({ success: false, message: data.message || data.error });
+      } else {
+        setFeedback({
+          success: true,
+          message: `User ${disabled ? 'disabled' : 'enabled'} successfully`,
+        });
+        loadUsersAndAccounts();
+      }
+    } catch (e: any) {
+      setFeedback({ success: false, message: e.message });
+    }
+  };
+
+  const handleToggleAccountAssignment = async (userId: string, accountId: string, assigned: boolean) => {
+    try {
+      const token = getAccessToken();
+      const res = await fetch(`/api/admin/users/${userId}/assign-accounts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ accountId, action: assigned ? 'unassign' : 'assign' }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setFeedback({ success: false, message: data.message || data.error });
+      } else {
+        loadUsersAndAccounts();
+      }
+    } catch (e: any) {
+      setFeedback({ success: false, message: e.message });
+    }
+  };
+
+  const isLive = firewallScope.includes('live');
+  const changedSettings = getChangedSettings();
 
   return (
     <div className="space-y-6">
-      {/* Role & Access Status Header */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <Shield className="w-5 h-5 text-indigo-400" />
-              <h2 className="text-base font-bold text-white">
-                Multi-User Access & Broker Account Management
-              </h2>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Role-based authorization (RBAC), multi-account routing, encrypted credential vaults, and immutable audit logs.
-            </p>
-          </div>
-
-          {/* Role Selector Pills */}
-          <div className="flex items-center gap-2 bg-slate-950 p-1.5 rounded-lg border border-slate-800">
-            <span className="text-[11px] font-mono text-slate-400 px-2 flex items-center gap-1">
-              <Users className="w-3.5 h-3.5" />
-              Active Role:
-            </span>
-            {(['Master Admin', 'Admin', 'Trader', 'Viewer'] as UserRole[]).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => handleRoleChange(r)}
-                className={`px-3 py-1 rounded text-xs font-semibold transition-all ${
-                  currentRole === r
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+      {/* 1. TOP HEADER & SUB-TAB NAVIGATION */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-[#E6ECF5] tracking-tight">
+            Admin & Data Administration
+          </h1>
+          <p className="text-xs text-slate-500 dark:text-[#9FB0C8] mt-1">
+            Institutional Risk Firewall, user role management, account assignments, and immutable audit logs.
+          </p>
         </div>
 
-        {/* Role Privileges Banner */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mt-4 text-xs font-mono">
-          <div className="p-3 rounded-md bg-slate-900/60 border border-slate-800/80">
-            <span className="text-slate-400 block text-[10px] uppercase font-sans">Live Execution Gate</span>
-            <span className={isMasterAdmin ? 'text-amber-400 font-bold' : 'text-slate-500'}>
-              {isMasterAdmin ? 'Authorized (LOCKED by default)' : 'Unauthorized'}
-            </span>
-          </div>
-          <div className="p-3 rounded-md bg-slate-900/60 border border-slate-800/80">
-            <span className="text-slate-400 block text-[10px] uppercase font-sans">Risk Limits & Params</span>
-            <span className={canEditConfig ? 'text-emerald-400 font-bold' : 'text-slate-500'}>
-              {canEditConfig ? 'Read/Write Permitted' : 'Read-Only'}
-            </span>
-          </div>
-          <div className="p-3 rounded-md bg-slate-900/60 border border-slate-800/80">
-            <span className="text-slate-400 block text-[10px] uppercase font-sans">Trading Desk & Bots</span>
-            <span className={canTrade ? 'text-blue-400 font-bold' : 'text-rose-400 font-bold'}>
-              {canTrade ? 'Operator Permitted' : 'Disabled (Viewer)'}
-            </span>
-          </div>
-          <div className="p-3 rounded-md bg-slate-900/60 border border-slate-800/80">
-            <span className="text-slate-400 block text-[10px] uppercase font-sans">Audit Logging</span>
-            <span className="text-indigo-400 font-bold">100% Authoritative SQLite Trail</span>
-          </div>
-        </div>
-
-        {actionFeedback && (
-          <div className="mt-3 p-2.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" />
-            {actionFeedback}
-          </div>
-        )}
-      </div>
-
-      {/* Global Safety Gates & Master Controls */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-        <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-          <Sliders className="w-4 h-4 text-blue-400" />
-          Global Platform Safety Controls & Execution Guardrails
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-bold text-white block">Automated Trading Master Switch</span>
-              <span className="text-[11px] text-slate-400">Allows bot runners to place pending orders</span>
-            </div>
-            <button
-              type="button"
-              disabled={!canEditConfig}
-              onClick={() => {
-                const next = !allowTradingState;
-                setAllowTradingState(next);
-                fetch('/api/admin/audit-log', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    username: currentUser,
-                    role: currentRole,
-                    action: 'TOGGLE_TRADING_MASTER',
-                    details: `Trading master switch set to ${next}`,
-                  }),
-                });
-              }}
-              className={`px-3 py-1.5 rounded text-xs font-bold font-mono transition-all ${
-                allowTradingState
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                  : 'bg-rose-600 hover:bg-rose-500 text-white'
-              } disabled:opacity-40`}
-            >
-              {allowTradingState ? 'ENABLED' : 'PAUSED'}
-            </button>
-          </div>
-
-          <div className="p-4 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-bold text-white block">ALLOW_LIVE Environment Gate</span>
-              <span className="text-[11px] text-slate-400">Requires explicit environment unlock</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-amber-400 border border-amber-500/30">
-                LOCKED (ALLOW_LIVE=false)
-              </span>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-lg bg-rose-950/20 border border-rose-900/40 flex items-center justify-between">
-            <div>
-              <span className="text-xs font-bold text-rose-300 block">Emergency Kill Switch</span>
-              <span className="text-[11px] text-slate-400">Account-wide halt and position liquidation</span>
-            </div>
-            <button
-              type="button"
-              onClick={onOpenKillSwitch}
-              className="px-3 py-1.5 rounded text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white shadow-md shadow-rose-600/30 transition-all flex items-center gap-1.5 cursor-pointer"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              Engage
-            </button>
-          </div>
+        {/* Sub-tab Switcher */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+          <button
+            type="button"
+            onClick={() => setSubTab('firewall')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              subTab === 'firewall'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <ShieldAlert className="w-3.5 h-3.5" />
+            <span>Risk Firewall</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('users')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              subTab === 'users'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Users & Permissions</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('accounts')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              subTab === 'accounts'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Server className="w-3.5 h-3.5" />
+            <span>Broker Accounts</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('audit')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              subTab === 'audit'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <History className="w-3.5 h-3.5" />
+            <span>System Audit</span>
+          </button>
         </div>
       </div>
 
-      {/* Broker Accounts Table */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Server className="w-4 h-4 text-emerald-400" />
-              Registered MetaTrader 5 Broker Accounts
-            </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Credentials remain secured server-side. Passwords and bridge tokens are never exposed in browser state.
-            </p>
-          </div>
-
-          {canEditConfig && (
-            <button
-              type="button"
-              onClick={() => setShowAddAccountModal(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Broker Account
-            </button>
-          )}
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono border-collapse">
-            <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
-              <tr>
-                <th className="p-3">Account Name</th>
-                <th className="p-3">Broker & Server</th>
-                <th className="p-3">Login</th>
-                <th className="p-3">Mode</th>
-                <th className="p-3">Risk Guardrails</th>
-                <th className="p-3">Status</th>
-                <th className="p-3">Last Sync</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {accounts.map((acc) => (
-                <tr key={acc.id} className="hover:bg-slate-800/20">
-                  <td className="p-3 font-bold text-white font-sans">{acc.account_name}</td>
-                  <td className="p-3 text-slate-300">
-                    {acc.broker} <span className="text-slate-500">({acc.server})</span>
-                  </td>
-                  <td className="p-3 text-slate-400">
-                    {isMasterAdmin ? acc.login : acc.login.substring(0, 2) + '****' + acc.login.slice(-2)}
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                        acc.type === 'LIVE'
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                          : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      }`}
-                    >
-                      {acc.type}
-                    </span>
-                  </td>
-                  <td className="p-3 text-slate-300 text-[11px]">
-                    Max {acc.max_lots}L · {acc.risk_pct}% Risk
-                  </td>
-                  <td className="p-3">
-                    <span className="flex items-center gap-1.5 text-emerald-400 text-[11px]">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      {acc.status}
-                    </span>
-                  </td>
-                  <td className="p-3 text-slate-500 text-[10px]">
-                    {new Date(acc.last_connection).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Administrative Audit Log Trail */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
+      {/* Global Feedback Alert */}
+      {feedback && (
+        <div
+          className={`p-4 rounded-xl text-xs flex items-center justify-between gap-3 border shadow-sm ${
+            feedback.success
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
+              : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-purple-400" />
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-              Immutable Admin Audit Trail (SQLite)
-            </h3>
+            {feedback.success ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+            )}
+            <span>{feedback.message}</span>
           </div>
           <button
             type="button"
-            onClick={loadAdminData}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white cursor-pointer"
+            onClick={() => setFeedback(null)}
+            className="text-slate-400 hover:text-slate-800 dark:hover:text-white font-bold cursor-pointer"
           >
-            <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh Log
+            ✕
           </button>
         </div>
+      )}
 
-        <div className="overflow-x-auto max-h-60 overflow-y-auto">
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
-              <tr>
-                <th className="py-2 px-3">Timestamp (UTC)</th>
-                <th className="py-2 px-3">Operator</th>
-                <th className="py-2 px-3">Role</th>
-                <th className="py-2 px-3">Action</th>
-                <th className="py-2 px-3">Details</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {auditLogs.slice(0, 30).map((log) => (
-                <tr key={log.id} className="hover:bg-slate-800/20">
-                  <td className="py-1.5 px-3 text-slate-400 text-[11px]">
-                    {new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19)}
-                  </td>
-                  <td className="py-1.5 px-3 text-white font-sans">{log.username}</td>
-                  <td className="py-1.5 px-3 text-indigo-400">{log.role}</td>
-                  <td className="py-1.5 px-3 font-bold text-slate-200">{log.action}</td>
-                  <td className="py-1.5 px-3 text-slate-400 text-[11px]">{log.details}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* ============================================================== */}
+      {/* SUB-TAB 1: RISK FIREWALL */}
+      {/* ============================================================== */}
+      {subTab === 'firewall' && (
+        <div className="space-y-6">
+          {/* Firewall Scope & Master Switch Banner */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-[#223049]">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                    Institutional Risk Firewall Control
+                  </h2>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                  Hard-enforced risk limits evaluated on every manual order, automated bot, and API call.
+                </p>
+              </div>
 
-      {/* Add Account Modal */}
-      {showAddAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Plus className="w-4 h-4 text-emerald-400" />
-                Register New MT5 Broker Account
-              </h3>
+              {/* Scope Selector */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Scope:</span>
+                <select
+                  value={firewallScope}
+                  onChange={(e) => setFirewallScope(e.target.value)}
+                  className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="global:demo">Global Demo (Default)</option>
+                  <option value="global:live">Global Live (Locked Protection)</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.login} value={acc.login}>
+                      Account #{acc.login} ({acc.account_name})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Master Switch Tile */}
+            <div
+              className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 transition-colors ${
+                firewallState.enabled
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
+                  : 'bg-rose-500/15 border-rose-500/40 text-rose-900 dark:text-rose-200 animate-pulse'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-3 h-3 rounded-full ${
+                    firewallState.enabled ? 'bg-emerald-500' : 'bg-rose-500'
+                  }`}
+                />
+                <div>
+                  <div className="font-bold text-sm flex items-center gap-2">
+                    <span>Risk Firewall Status: {firewallState.enabled ? 'ACTIVE (Protection Engaged)' : 'OFF (Protection Disabled)'}</span>
+                    {isLive && (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                        LIVE: LOCKED ON
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs opacity-80 mt-0.5">
+                    {firewallState.enabled
+                      ? `All incoming trades on ${firewallScope} are strictly validated against risk ceilings.`
+                      : `Firewall temporarily OFF until ${new Date(firewallState.disabled_until || Date.now() + 86400000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} (24h auto-expiry active). Reason: ${firewallState.reason || 'None'}`}
+                  </div>
+                </div>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setShowAddAccountModal(false)}
-                className="text-slate-400 hover:text-white"
+                onClick={handleToggleFirewall}
+                disabled={isLive}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${
+                  isLive
+                    ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                    : firewallState.enabled
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                }`}
               >
-                ✕
+                {isLive ? 'Locked ON for Live' : firewallState.enabled ? 'Turn OFF (Demo Only)' : 'Re-Enable Firewall'}
+              </button>
+            </div>
+          </div>
+
+          {/* Firewall Limits Form */}
+          <form onSubmit={handleOpenDiffModal} className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                  Risk Ceilings & Parameters ({firewallScope})
+                </h3>
+                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                  Values cannot exceed immutable server ceilings defined in code.
+                </span>
+              </div>
+              {changedSettings.length > 0 && (
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                  {changedSettings.length} unsaved changes
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+              {/* Max Risk Per Trade % */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+                  <span>Max Risk Per Trade (%)</span>
+                  <span className="text-slate-400 font-normal">Ceiling ≤ 5.0%</span>
+                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  max="5.0"
+                  value={formSettings.maxRiskPerTradePct}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      maxRiskPerTradePct: parseFloat(e.target.value) || 0.1,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Maximum percent of balance risked on a single trade's Stop-Loss distance.
+                </p>
+              </div>
+
+              {/* Max Lots */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+                  <span>Max Lots Per Order</span>
+                  <span className="text-slate-400 font-normal">Ceiling ≤ 10.0</span>
+                </div>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.01"
+                  max="10.0"
+                  value={formSettings.maxLots}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      maxLots: parseFloat(e.target.value) || 0.01,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Hard upper lot ceiling allowed for any manual ticket or automated bot order.
+                </p>
+              </div>
+
+              {/* Max Open Positions */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+                  <span>Max Open Positions</span>
+                  <span className="text-slate-400 font-normal">Ceiling ≤ 20</span>
+                </div>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="20"
+                  value={formSettings.maxOpenPositions}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      maxOpenPositions: parseInt(e.target.value, 10) || 1,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Maximum concurrent open positions allowed across all pairs.
+                </p>
+              </div>
+
+              {/* Daily Loss Limit % */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+                  <span>Daily Loss Limit (%)</span>
+                  <span className="text-slate-400 font-normal">Ceiling ≤ 10.0%</span>
+                </div>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="10.0"
+                  value={formSettings.dailyLossLimitPct}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      dailyLossLimitPct: parseFloat(e.target.value) || 0.5,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Trading auto-halts for the remainder of UTC day if realized losses cross this threshold.
+                </p>
+              </div>
+
+              {/* Max Drawdown % */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+                  <span>Max Peak Drawdown (%)</span>
+                  <span className="text-slate-400 font-normal">Ceiling ≤ 20.0%</span>
+                </div>
+                <input
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="20.0"
+                  value={formSettings.maxDrawdownPct}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      maxDrawdownPct: parseFloat(e.target.value) || 1.0,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Account peak-to-trough trailing equity drawdown threshold.
+                </p>
+              </div>
+
+              {/* Mandatory Stop Loss Toggle */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+                  <span>Mandatory Stop Loss</span>
+                  {isLive && <span className="text-amber-500 font-bold">Locked ON (Live)</span>}
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  <button
+                    type="button"
+                    disabled={isLive}
+                    onClick={() =>
+                      setFormSettings((prev) => ({
+                        ...prev,
+                        mandatoryStopLoss: !prev.mandatoryStopLoss,
+                      }))
+                    }
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
+                      formSettings.mandatoryStopLoss
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-slate-300 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {formSettings.mandatoryStopLoss ? 'ACTIVE (Required)' : 'OFF (Allowed on Demo)'}
+                  </button>
+                  <span className="text-[11px] text-slate-400">
+                    Rejects any order submitted without a valid SL.
+                  </span>
+                </div>
+              </div>
+
+              {/* Spread Pips EURUSD */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="font-semibold text-slate-700 dark:text-slate-300">Max Spread (EURUSD)</div>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.5"
+                  max="10.0"
+                  value={formSettings.maxSpreadPipsEURUSD}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      maxSpreadPipsEURUSD: parseFloat(e.target.value) || 0.5,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">Rejects orders if EURUSD spread exceeds this in pips.</p>
+              </div>
+
+              {/* Spread Points XAUUSD */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="font-semibold text-slate-700 dark:text-slate-300">Max Spread (XAUUSD Points)</div>
+                <input
+                  type="number"
+                  step="1"
+                  min="5"
+                  max="100"
+                  value={formSettings.maxSpreadPointsXAUUSD}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      maxSpreadPointsXAUUSD: parseFloat(e.target.value) || 5,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">Rejects Gold orders during high volatility spread spikes.</p>
+              </div>
+
+              {/* News Blackout Minutes */}
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+                <div className="font-semibold text-slate-700 dark:text-slate-300">News Blackout Window (Minutes)</div>
+                <input
+                  type="number"
+                  step="5"
+                  min="0"
+                  max="120"
+                  value={formSettings.newsBlackoutMinutes}
+                  onChange={(e) =>
+                    setFormSettings((prev) => ({
+                      ...prev,
+                      newsBlackoutMinutes: parseInt(e.target.value, 10) || 0,
+                    }))
+                  }
+                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                />
+                <p className="text-[11px] text-slate-400">Halts orders before and after tier-1 economic events (NFP, FOMC).</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-[#223049]">
+              <button
+                type="button"
+                onClick={() => setFormSettings(serverSettings)}
+                disabled={changedSettings.length === 0}
+                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+              >
+                Reset changes
+              </button>
+              <button
+                type="submit"
+                disabled={changedSettings.length === 0 || isLoading}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-40 cursor-pointer"
+              >
+                Review changes & Save ({changedSettings.length})
+              </button>
+            </div>
+          </form>
+
+          {/* Append-Only Firewall Audit Log */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+              <div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Firewall Parameter Audit Trail
+                </h3>
+                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                  Append-only SQLite audit log protected by database triggers (modifications and deletions blocked).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadFirewallData(firewallScope)}
+                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#223049] hover:bg-slate-100 dark:hover:bg-slate-800"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateAccount} className="space-y-3 text-xs">
+            {firewallAudits.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">No firewall changes recorded yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                      <th className="text-left py-2 font-medium">Timestamp</th>
+                      <th className="text-left py-2 font-medium">Actor</th>
+                      <th className="text-left py-2 font-medium">Scope</th>
+                      <th className="text-left py-2 font-medium">Parameter</th>
+                      <th className="text-left py-2 font-medium">Transition</th>
+                      <th className="text-left py-2 font-medium">Reason</th>
+                      <th className="text-right py-2 font-medium">Hash</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                    {firewallAudits.map((entry) => (
+                      <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="py-2.5 text-slate-500 tabular-nums">
+                          {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 font-sans font-semibold text-slate-800 dark:text-slate-200">
+                          {entry.actor} <span className="text-slate-400 font-normal">({entry.role})</span>
+                        </td>
+                        <td className="py-2.5 text-indigo-600 dark:text-indigo-400 font-semibold">{entry.scope}</td>
+                        <td className="py-2.5 font-sans font-medium text-slate-700 dark:text-slate-300">{entry.key}</td>
+                        <td className="py-2.5">
+                          <span className="text-rose-500 line-through mr-1.5">{entry.old_value}</span>
+                          <span className="text-emerald-500 font-bold">{entry.new_value}</span>
+                        </td>
+                        <td className="py-2.5 font-sans text-slate-600 dark:text-slate-300 max-w-xs truncate">
+                          {entry.reason}
+                        </td>
+                        <td className="py-2.5 text-right text-[10px] text-slate-400 font-mono" title={entry.hash}>
+                          {entry.hash.substring(0, 10)}...
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Blocked Orders Log */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
               <div>
-                <label className="block text-slate-400 mb-1">Friendly Account Name</label>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Firewall Blocked Orders Log
+                </h3>
+                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                  Append-only record of all orders rejected by risk boundaries with suggested lot sizing.
+                </span>
+              </div>
+            </div>
+
+            {blockedOrders.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs">No blocked orders recorded. All submitted orders met risk parameters.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                      <th className="text-left py-2 font-medium">Timestamp</th>
+                      <th className="text-left py-2 font-medium">Symbol</th>
+                      <th className="text-right py-2 font-medium">Attempted Lots</th>
+                      <th className="text-right py-2 font-medium">Attempted Risk</th>
+                      <th className="text-left py-2 font-medium">Violated Rule</th>
+                      <th className="text-right py-2 font-medium">Suggested Lots</th>
+                      <th className="text-left py-2 font-medium">Message</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                    {blockedOrders.map((ord) => (
+                      <tr key={ord.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="py-2.5 text-slate-500 tabular-nums">
+                          {new Date(ord.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                        <td className="py-2.5 font-sans font-bold text-slate-900 dark:text-white">{ord.symbol}</td>
+                        <td className="py-2.5 text-right text-rose-500 font-bold">{ord.attempted_lots.toFixed(2)}</td>
+                        <td className="py-2.5 text-right text-rose-500 font-bold">${ord.attempted_risk_usd.toFixed(2)}</td>
+                        <td className="py-2.5 text-amber-500 font-semibold">{ord.rule_violated}</td>
+                        <td className="py-2.5 text-right text-emerald-500 font-bold">
+                          {ord.suggested_lots !== null ? `${ord.suggested_lots.toFixed(2)} lots` : 'None'}
+                        </td>
+                        <td className="py-2.5 font-sans text-slate-600 dark:text-slate-300 max-w-sm truncate" title={ord.error_message}>
+                          {ord.error_message}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SUB-TAB 2: USERS & PERMISSIONS */}
+      {/* ============================================================== */}
+      {subTab === 'users' && (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  Supabase User Identities & Role Assignments
+                </h2>
+                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                  Roles stored in public.profiles with Row-Level Security. Privilege escalation is blocked on the server.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInviteModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm cursor-pointer"
+              >
+                <UserPlus className="w-3.5 h-3.5" />
+                <span>Invite User</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                    <th className="text-left py-2 font-medium">User Identity</th>
+                    <th className="text-left py-2 font-medium">Assigned Role</th>
+                    <th className="text-center py-2 font-medium">Account Access</th>
+                    <th className="text-center py-2 font-medium">Status</th>
+                    <th className="text-right py-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                  {managedUsers.map((u) => {
+                    const isMasterAdmin = u.role === 'master_admin';
+                    const isSelf = u.id === profile?.userId;
+                    return (
+                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                        <td className="py-3">
+                          <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span>{u.email}</span>
+                            {isMasterAdmin && (
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30">
+                                MASTER
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono">ID: {u.id.substring(0, 16)}...</div>
+                        </td>
+                        <td className="py-3">
+                          <select
+                            value={u.role}
+                            disabled={isMasterAdmin || effectiveRole !== 'master_admin'}
+                            onChange={(e) => handleChangeUserRole(u.id, e.target.value)}
+                            className="px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs font-semibold text-slate-800 dark:text-slate-200 disabled:opacity-60 cursor-pointer"
+                          >
+                            <option value="admin">admin</option>
+                            <option value="trader">trader</option>
+                            <option value="viewer">viewer</option>
+                            <option value="pending">pending</option>
+                          </select>
+                        </td>
+                        <td className="py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setAssignUser(u)}
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 transition-colors cursor-pointer"
+                          >
+                            {u.assignedAccounts && u.assignedAccounts.length > 0
+                              ? `${u.assignedAccounts.length} accounts`
+                              : 'Assign accounts'}
+                          </button>
+                        </td>
+                        <td className="py-3 text-center">
+                          <span
+                            className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                              u.status === 'ACTIVE'
+                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                                : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                            }`}
+                          >
+                            {u.status}
+                          </span>
+                        </td>
+                        <td className="py-3 text-right space-x-2">
+                          <button
+                            type="button"
+                            disabled={isMasterAdmin || isSelf}
+                            onClick={() => handleToggleUserStatus(u.id, u.status)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                              isMasterAdmin || isSelf
+                                ? 'text-slate-400 cursor-not-allowed opacity-50'
+                                : u.status === 'ACTIVE'
+                                ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10'
+                                : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                            }`}
+                          >
+                            {u.status === 'ACTIVE' ? 'Disable' : 'Enable'}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SUB-TAB 3: BROKER ACCOUNTS */}
+      {/* ============================================================== */}
+      {subTab === 'accounts' && (
+        <div className="space-y-6">
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 dark:text-white">Broker Accounts</h2>
+                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                  MetaTrader 5 demo and production instances registered with the local bridge.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddAccountModal(true)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Account</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                    <th className="text-left py-2 font-medium">Account Name</th>
+                    <th className="text-left py-2 font-medium">Broker & Server</th>
+                    <th className="text-left py-2 font-medium">Login</th>
+                    <th className="text-center py-2 font-medium">Type</th>
+                    <th className="text-center py-2 font-medium">Status</th>
+                    <th className="text-right py-2 font-medium">Max Lots</th>
+                    <th className="text-right py-2 font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  {accounts.map((acc) => (
+                    <tr key={acc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <td className="py-3 font-sans font-semibold text-slate-900 dark:text-white">
+                        {acc.account_name}
+                      </td>
+                      <td className="py-3 text-slate-600 dark:text-[#9FB0C8]">
+                        <span className="font-sans font-medium text-slate-800 dark:text-slate-200 mr-1.5">
+                          {acc.broker}
+                        </span>
+                        <span>({acc.server})</span>
+                      </td>
+                      <td className="py-3 text-slate-700 dark:text-slate-300">{acc.login}</td>
+                      <td className="py-3 text-center font-sans">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                          {acc.type}
+                        </span>
+                      </td>
+                      <td className="py-3 text-center font-sans">
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
+                            acc.status === 'CONNECTED'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          }`}
+                        >
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              acc.status === 'CONNECTED' ? 'bg-emerald-500' : 'bg-slate-400'
+                            }`}
+                          />
+                          {acc.status}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right text-slate-700 dark:text-slate-300">{acc.max_lots} lots</td>
+                      <td className="py-3 text-right font-sans space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => setAccounts((prev) => prev.filter((a) => a.id !== acc.id))}
+                          className="px-2 py-1 rounded-md text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* SUB-TAB 4: SYSTEM AUDIT */}
+      {/* ============================================================== */}
+      {subTab === 'audit' && (
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+            <div>
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">System Audit Log</h2>
+              <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                Authoritative local activity record (orders, parameter edits, emergency actions).
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={loadUsersAndAccounts}
+              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#223049] hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                  <th className="text-left py-2 font-medium">Timestamp</th>
+                  <th className="text-left py-2 font-medium">Operator</th>
+                  <th className="text-left py-2 font-medium">Action</th>
+                  <th className="text-left py-2 font-medium">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                {auditLogs.slice(0, 25).map((log) => (
+                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                    <td className="py-2.5 text-slate-500 tabular-nums">
+                      {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </td>
+                    <td className="py-2.5 font-sans font-semibold text-slate-800 dark:text-slate-200">
+                      {log.username} <span className="text-slate-400 font-normal">({log.role})</span>
+                    </td>
+                    <td className="py-2.5">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="py-2.5 text-slate-600 dark:text-[#9FB0C8] font-sans">
+                      {log.details || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 1: DISABLE FIREWALL CONFIRMATION (DEMO ONLY) */}
+      {/* ============================================================== */}
+      {showDisableModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-rose-500/50 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-rose-600">
+              <ShieldAlert className="w-5 h-5 shrink-0" />
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Disable Risk Firewall (24h Auto-Expiry)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              Disabling the Risk Firewall bypasses all lot size ceilings, daily loss halts, and mandatory Stop-Loss checks on DEMO accounts.
+              Protection will automatically re-enable after 24 hours. A red persistent banner will be displayed across the Trading Desk.
+            </p>
+
+            <div className="space-y-3 pt-2 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 dark:text-slate-300">
+                  Reason for Suspension (Required for Audit Trail)
+                </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Exness Raw Spread Demo 2"
-                  value={newAccName}
-                  onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                  placeholder="e.g. Backtesting custom high-lot grid execution"
+                  value={disableReason}
+                  onChange={(e) => setDisableReason(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1">Broker</label>
-                  <input
-                    type="text"
-                    required
-                    value={newAccBroker}
-                    onChange={(e) => setNewAccBroker(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
-                  />
+              <div>
+                <label className="font-semibold text-slate-700 dark:text-slate-300">
+                  Type <span className="font-mono font-bold text-rose-600">DISABLE</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={disableConfirmationInput}
+                  onChange={(e) => setDisableConfirmationInput(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3">
+              <button
+                type="button"
+                onClick={() => setShowDisableModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={disableConfirmationInput !== 'DISABLE' || !disableReason}
+                onClick={confirmDisableFirewall}
+                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/30 disabled:opacity-40 cursor-pointer"
+              >
+                Confirm & Disable
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 2: DIFF PREVIEW & REASON */}
+      {/* ============================================================== */}
+      {showDiffModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-lg w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                  Confirm Firewall Parameter Changes
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDiffModal(false)}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+              The following modifications will be written to SQLite and logged in the append-only audit trail:
+            </p>
+
+            <div className="max-h-60 overflow-y-auto space-y-2">
+              {changedSettings.map((c) => (
+                <div
+                  key={c.key}
+                  className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs font-mono"
+                >
+                  <span className="font-sans font-semibold text-slate-800 dark:text-slate-200">{c.key}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-rose-500 line-through">{String(c.oldVal)}</span>
+                    <ArrowRight className="w-3 h-3 text-slate-400" />
+                    <span className="text-emerald-500 font-bold">{String(c.newVal)}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Server</label>
-                  <input
-                    type="text"
-                    required
-                    value={newAccServer}
-                    onChange={(e) => setNewAccServer(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
-                  />
-                </div>
+              ))}
+            </div>
+
+            <div className="space-y-1 pt-2">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Reason for Change (Audit Requirement)
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Adjusting risk limits for prop-firm demo challenge rules"
+                value={updateReason}
+                onChange={(e) => setUpdateReason(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#223049]">
+              <button
+                type="button"
+                onClick={() => setShowDiffModal(false)}
+                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!updateReason || isLoading}
+                onClick={handleConfirmDiffSubmit}
+                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-40 cursor-pointer"
+              >
+                {isLoading ? 'Saving...' : 'Confirm & Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 3: INVITE USER */}
+      {/* ============================================================== */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Invite Team User</h3>
+            <form onSubmit={handleInviteUser} className="space-y-3 text-xs">
+              <div>
+                <label className="text-slate-600 dark:text-slate-400 font-medium">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="trader@firm.com"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white"
+                />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1">Account Login ID</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. 50192835"
-                    value={newAccLogin}
-                    onChange={(e) => setNewAccLogin(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Account Mode</label>
-                  <select
-                    value={newAccType}
-                    onChange={(e) => setNewAccType(e.target.value)}
-                    className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
-                  >
-                    <option value="DEMO">DEMO (Paper/Trial)</option>
-                    <option value="LIVE">LIVE (Real Funds)</option>
-                  </select>
-                </div>
+              <div>
+                <label className="text-slate-600 dark:text-slate-400 font-medium">Assigned Role</label>
+                <select
+                  value={inviteRole}
+                  onChange={(e) => setInviteRole(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="trader">Trader</option>
+                  <option value="viewer">Viewer</option>
+                </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-slate-400 mb-1">Max Lot Cap</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0.01"
-                    max="100"
-                    value={newAccMaxLots}
-                    onChange={(e) => setNewAccMaxLots(parseFloat(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-slate-400 mb-1">Risk % Per Trade</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0.1"
-                    max="10"
-                    value={newAccRiskPct}
-                    onChange={(e) => setNewAccRiskPct(parseFloat(e.target.value))}
-                    className="w-full px-3 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex justify-end gap-2">
+              <div className="flex justify-end gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setShowAddAccountModal(false)}
-                  className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300"
+                  onClick={() => setShowInviteModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer"
+                >
+                  Send Invitation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 4: ASSIGN ACCOUNTS */}
+      {/* ============================================================== */}
+      {assignUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                Account Assignments: {assignUser.email}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setAssignUser(null)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+              Select which broker accounts this user is authorized to trade or view:
+            </p>
+
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {accounts.map((acc) => {
+                const isAssigned = (assignUser.assignedAccounts || []).includes(acc.login);
+                return (
+                  <div
+                    key={acc.login}
+                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-900 dark:text-white">{acc.account_name}</div>
+                      <div className="text-[11px] text-slate-400 font-mono">
+                        #{acc.login} · {acc.server}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAccountAssignment(assignUser.id, acc.login, isAssigned)}
+                      className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
+                        isAssigned
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                      }`}
+                    >
+                      {isAssigned ? 'Assigned ✓' : 'Assign'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setAssignUser(null)}
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* MODAL 5: ADD BROKER ACCOUNT */}
+      {/* ============================================================== */}
+      {showAddAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Register MT5 Broker Account</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newAccName || !newAccLogin) return;
+                const newAcc: BrokerAccountDef = {
+                  id: `acc-${Date.now()}`,
+                  account_name: newAccName,
+                  broker: 'Exness',
+                  server: newAccServer,
+                  login: newAccLogin,
+                  type: newAccType,
+                  status: 'STANDBY',
+                  last_connection: 'Never',
+                  max_lots: newAccMaxLots,
+                  risk_pct: newAccRiskPct,
+                };
+                setAccounts((prev) => [newAcc, ...prev]);
+                setShowAddAccountModal(false);
+              }}
+              className="space-y-3 text-xs"
+            >
+              <div>
+                <label className="text-slate-600 dark:text-slate-400 font-medium">Account Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Exness Demo Primary"
+                  value={newAccName}
+                  onChange={(e) => setNewAccName(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-600 dark:text-slate-400 font-medium">MT5 Server</label>
+                <input
+                  type="text"
+                  required
+                  value={newAccServer}
+                  onChange={(e) => setNewAccServer(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-600 dark:text-slate-400 font-medium">MT5 Login</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 50192834"
+                  value={newAccLogin}
+                  onChange={(e) => setNewAccLogin(e.target.value)}
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddAccountModal(false)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer"
                 >
                   Save Account
                 </button>

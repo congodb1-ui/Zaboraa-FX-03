@@ -21,7 +21,7 @@ export interface Candle {
   low: number;
   close: number;
   tickVolume: number;
-  spread: number;
+  spread?: number;
 }
 
 export interface DatasetRecord {
@@ -322,7 +322,7 @@ export interface PivotPointRow {
   s3: number | string;
   s2: number | string;
   s1: number | string;
-  pivot: number;
+  pivot: number | string;
   r1: number | string;
   r2: number | string;
   r3: number | string;
@@ -354,4 +354,5 @@ export interface TechnicalAnalysisReport {
   indicators: TechnicalIndicatorItem[];
   movingAverages: MovingAverageItem[];
   pivotPoints: PivotPointRow[];
+  lastUpdated?: string;
 }

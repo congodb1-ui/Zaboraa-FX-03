@@ -38,6 +38,31 @@ export const App: React.FC = () => {
   const [studioSelectedStrategyId, setStudioSelectedStrategyId] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Dual Theme state (defaults to dark)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    try {
+      const saved = localStorage.getItem('zaboraa_theme');
+      return saved === 'light' ? 'light' : 'dark';
+    } catch {
+      return 'dark';
+    }
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    try {
+      localStorage.setItem('zaboraa_theme', theme);
+    } catch {}
+  }, [theme]);
+
+  const handleToggleTheme = () => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  };
+
   // Broker State (Connected to Exness MT5 Demo Terminal)
   const [brokerState, setBrokerState] = useState<BrokerState>({
     connected: true,
@@ -474,7 +499,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#090D16] text-slate-100 flex flex-col justify-between selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B1020] text-slate-900 dark:text-[#E6ECF5] flex flex-col justify-between selection:bg-indigo-600 selection:text-white transition-colors">
       <div>
         {/* Navigation Header */}
         <Header
@@ -482,10 +507,12 @@ export const App: React.FC = () => {
           setActiveTab={setActiveTab}
           brokerState={brokerState}
           onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
+          theme={theme}
+          onToggleTheme={handleToggleTheme}
         />
 
         {/* Main Content Area */}
-        <main className="max-w-7xl mx-auto px-4 py-6">
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
           {activeTab === 'markets' && (
             <MarketsView
               brokerState={brokerState}
@@ -628,17 +655,17 @@ export const App: React.FC = () => {
         onResetKillSwitch={handleResetKillSwitch}
       />
 
-      {/* Quiet Regulatory & Safety Footer */}
-      <footer className="border-t border-slate-900 bg-[#070A11] px-4 py-3 mt-12 text-slate-500 text-[11px]">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3 font-mono">
+      {/* Institutional Risk Footer */}
+      <footer className="border-t border-slate-200 dark:border-[#223049] bg-white dark:bg-[#070A11] px-4 py-3 mt-12 text-slate-500 dark:text-[#9FB0C8] text-xs transition-colors">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span className="text-slate-400">
-              Zaboraa FX Research Portal · Sandbox Isolated · Exness MT5 Bridge
+            <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
+            <span>
+              Zaboraa FX Quantitative Trading Desk · Local First Architecture
             </span>
           </div>
           <div>
-            Mandatory Notice: Forex & Gold trading carries significant financial risk. Keep ALLOW_TRADING=false for research.
+            Mandatory Risk Disclosure: Leveraged Forex & Gold trading carries significant financial risk.
           </div>
         </div>
       </footer>

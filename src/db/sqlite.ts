@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import {
   Candle,
   DatasetRecord,
@@ -18,6 +19,18 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 const DB_PATH = path.join(DATA_DIR, 'zaboraa.sqlite');
+const BACKUP_DIR = path.join(DATA_DIR, 'backups');
+if (!fs.existsSync(BACKUP_DIR)) {
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
+}
+if (fs.existsSync(DB_PATH)) {
+  try {
+    const backupFile = path.join(BACKUP_DIR, `zaboraa_pre_firewall_${Date.now()}.sqlite`);
+    fs.copyFileSync(DB_PATH, backupFile);
+  } catch (err) {
+    console.warn('Pre-migration backup warning:', err);
+  }
+}
 
 export const db = new Database(DB_PATH);
 
@@ -268,6 +281,111 @@ db.exec(`
     is_live_approved INTEGER NOT NULL,
     created_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS user_account_assignments (
+    user_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    assigned_at TEXT NOT NULL,
+    assigned_by TEXT NOT NULL,
+    PRIMARY KEY (user_id, account_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_mfa_recovery_codes (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    code_hash TEXT NOT NULL,
+    used INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    used_at TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS risk_firewall_settings (
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    updated_by TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    PRIMARY KEY (scope, key)
+  );
+
+  CREATE TABLE IF NOT EXISTS risk_firewall_state (
+    scope TEXT PRIMARY KEY,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    disabled_at TEXT,
+    disabled_until TEXT,
+    disabled_by TEXT,
+    reason TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS risk_firewall_audit (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    actor TEXT NOT NULL,
+    role TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    key TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    prev_hash TEXT,
+    hash TEXT NOT NULL
+  );
+
+  CREATE TRIGGER IF NOT EXISTS prevent_firewall_audit_update BEFORE UPDATE ON risk_firewall_audit
+  BEGIN
+    SELECT RAISE(ABORT, 'risk_firewall_audit is append-only: UPDATE forbidden');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS prevent_firewall_audit_delete BEFORE DELETE ON risk_firewall_audit
+  BEGIN
+    SELECT RAISE(ABORT, 'risk_firewall_audit is append-only: DELETE forbidden');
+  END;
+
+  CREATE TABLE IF NOT EXISTS blocked_orders_log (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    attempted_lots REAL NOT NULL,
+    attempted_risk_usd REAL NOT NULL,
+    rule_violated TEXT NOT NULL,
+    suggested_lots REAL,
+    error_message TEXT NOT NULL
+  );
+
+  CREATE TRIGGER IF NOT EXISTS prevent_blocked_orders_update BEFORE UPDATE ON blocked_orders_log
+  BEGIN
+    SELECT RAISE(ABORT, 'blocked_orders_log is append-only: UPDATE forbidden');
+  END;
+
+  CREATE TRIGGER IF NOT EXISTS prevent_blocked_orders_delete BEFORE DELETE ON blocked_orders_log
+  BEGIN
+    SELECT RAISE(ABORT, 'blocked_orders_log is append-only: DELETE forbidden');
+  END;
+
+  CREATE TABLE IF NOT EXISTS idempotency_keys (
+    key TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    request_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    response_status INTEGER,
+    response_body TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS chart_layouts (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    scope TEXT NOT NULL,
+    owner_id TEXT NOT NULL,
+    chart_type TEXT NOT NULL,
+    indicators TEXT NOT NULL,
+    moving_averages TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
 `);
 
 /**
@@ -304,7 +422,7 @@ export function saveCandlesToDb(
         c.low,
         c.close,
         c.tickVolume,
-        c.spread
+        c.spread ?? (symbol === 'XAUUSD' ? 25.0 : 1.2)
       );
       count++;
     }
@@ -1046,5 +1164,549 @@ export function upsertBrokerAccount(account: {
     new Date().toISOString()
   );
 }
+
+// ==========================================
+// RISK FIREWALL & RBAC REPOSITORY
+// ==========================================
+
+export interface RiskFirewallSettingsMap {
+  maxRiskPerTradePct: number;
+  dailyLossLimitPct: number;
+  maxDrawdownPct: number;
+  maxLots: number;
+  maxOpenPositions: number;
+  mandatoryStopLoss: boolean;
+  maxSpreadPipsEURUSD: number;
+  maxSpreadPipsGBPUSD: number;
+  maxSpreadPipsUSDJPY: number;
+  maxSpreadPointsXAUUSD: number;
+  tradingHoursStartUtc: number;
+  tradingHoursEndUtc: number;
+  newsBlackoutMinutes: number;
+}
+
+export const DEFAULT_FIREWALL_SETTINGS: Record<'global:demo' | 'global:live', RiskFirewallSettingsMap> = {
+  'global:demo': {
+    maxRiskPerTradePct: 2.0,
+    dailyLossLimitPct: 3.0,
+    maxDrawdownPct: 10.0,
+    maxLots: 1.0,
+    maxOpenPositions: 5,
+    mandatoryStopLoss: true,
+    maxSpreadPipsEURUSD: 2.0,
+    maxSpreadPipsGBPUSD: 2.5,
+    maxSpreadPipsUSDJPY: 2.0,
+    maxSpreadPointsXAUUSD: 40,
+    tradingHoursStartUtc: 0,
+    tradingHoursEndUtc: 24,
+    newsBlackoutMinutes: 30,
+  },
+  'global:live': {
+    maxRiskPerTradePct: 2.0,
+    dailyLossLimitPct: 3.0,
+    maxDrawdownPct: 10.0,
+    maxLots: 0.5,
+    maxOpenPositions: 5,
+    mandatoryStopLoss: true,
+    maxSpreadPipsEURUSD: 2.0,
+    maxSpreadPipsGBPUSD: 2.5,
+    maxSpreadPipsUSDJPY: 2.0,
+    maxSpreadPointsXAUUSD: 40,
+    tradingHoursStartUtc: 0,
+    tradingHoursEndUtc: 24,
+    newsBlackoutMinutes: 30,
+  },
+};
+
+export const HARD_CEILINGS = {
+  maxRiskPerTradePct: 5.0,
+  dailyLossLimitPct: 10.0,
+  maxLots: 10.0,
+  maxOpenPositions: 20,
+  maxDrawdownPct: 30.0,
+};
+
+// Seed default firewall settings and state on startup
+export function seedFirewallDefaults(): void {
+  const insertSetting = db.prepare(`
+    INSERT OR IGNORE INTO risk_firewall_settings (scope, key, value, updated_by, updated_at)
+    VALUES (?, ?, ?, 'system:bootstrap', ?)
+  `);
+  const insertState = db.prepare(`
+    INSERT OR IGNORE INTO risk_firewall_state (scope, enabled, disabled_at, disabled_until, disabled_by, reason)
+    VALUES (?, 1, NULL, NULL, NULL, NULL)
+  `);
+
+  const now = new Date().toISOString();
+  for (const [scope, settings] of Object.entries(DEFAULT_FIREWALL_SETTINGS)) {
+    insertState.run(scope);
+    for (const [k, v] of Object.entries(settings)) {
+      insertSetting.run(scope, k, String(v), now);
+    }
+  }
+}
+
+seedFirewallDefaults();
+
+export interface FirewallState {
+  scope: string;
+  enabled: boolean;
+  disabledAt: string | null;
+  disabledUntil: string | null;
+  disabledBy: string | null;
+  reason: string | null;
+}
+
+/**
+ * Get firewall state for a scope with automatic 24h expiration check
+ */
+export function getFirewallState(scope: string): FirewallState {
+  const row = db.prepare('SELECT * FROM risk_firewall_state WHERE scope = ?').get(scope) as any;
+  if (!row) {
+    db.prepare('INSERT INTO risk_firewall_state (scope, enabled) VALUES (?, 1)').run(scope);
+    return {
+      scope,
+      enabled: true,
+      disabledAt: null,
+      disabledUntil: null,
+      disabledBy: null,
+      reason: null,
+    };
+  }
+
+  // Auto-expiry check
+  if (row.enabled === 0 && row.disabled_until) {
+    const untilMs = new Date(row.disabled_until).getTime();
+    if (Date.now() >= untilMs) {
+      db.prepare(`
+        UPDATE risk_firewall_state
+        SET enabled = 1, disabled_at = NULL, disabled_until = NULL, disabled_by = NULL, reason = 'auto-expired'
+        WHERE scope = ?
+      `).run(scope);
+
+      recordFirewallAudit({
+        actor: 'system:auto-expiry',
+        role: 'system',
+        scope,
+        key: 'firewall_enabled',
+        old_value: '0',
+        new_value: '1',
+        reason: '24-hour auto-expiry expired; automatically restored firewall to ON',
+      });
+
+      return {
+        scope,
+        enabled: true,
+        disabledAt: null,
+        disabledUntil: null,
+        disabledBy: null,
+        reason: 'auto-expired',
+      };
+    }
+  }
+
+  return {
+    scope: row.scope,
+    enabled: Boolean(row.enabled),
+    disabledAt: row.disabled_at || null,
+    disabledUntil: row.disabled_until || null,
+    disabledBy: row.disabled_by || null,
+    reason: row.reason || null,
+  };
+}
+
+/**
+ * Update firewall state
+ */
+export function setFirewallState(
+  scope: string,
+  enabled: boolean,
+  disabledBy?: string,
+  reason?: string
+): void {
+  const now = new Date();
+  const disabledAt = enabled ? null : now.toISOString();
+  // 24 hours expiry
+  const disabledUntil = enabled ? null : new Date(now.getTime() + 24 * 3600 * 1000).toISOString();
+
+  db.prepare(`
+    INSERT INTO risk_firewall_state (scope, enabled, disabled_at, disabled_until, disabled_by, reason)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(scope) DO UPDATE SET
+      enabled = excluded.enabled,
+      disabled_at = excluded.disabled_at,
+      disabled_until = excluded.disabled_until,
+      disabled_by = excluded.disabled_by,
+      reason = excluded.reason
+  `).run(scope, enabled ? 1 : 0, disabledAt, disabledUntil, disabledBy || null, reason || null);
+}
+
+/**
+ * Get merged firewall settings for a scope, falling back to global:live or global:demo
+ */
+export function getFirewallSettings(
+  scope: string,
+  accountType: 'demo' | 'live' = 'demo'
+): RiskFirewallSettingsMap {
+  const globalScope = `global:${accountType}`;
+  const baseDefaults = { ...DEFAULT_FIREWALL_SETTINGS[globalScope as 'global:demo' | 'global:live'] };
+
+  // 1. Fetch global overrides from DB
+  const globalRows = db
+    .prepare('SELECT key, value FROM risk_firewall_settings WHERE scope = ?')
+    .all(globalScope) as { key: string; value: string }[];
+  for (const row of globalRows) {
+    if (row.key in baseDefaults) {
+      if (typeof (baseDefaults as any)[row.key] === 'boolean') {
+        (baseDefaults as any)[row.key] = row.value === 'true' || row.value === '1';
+      } else {
+        (baseDefaults as any)[row.key] = Number(row.value);
+      }
+    }
+  }
+
+  // 2. Fetch account-specific overrides if scope is not global
+  if (scope !== globalScope) {
+    const acctRows = db
+      .prepare('SELECT key, value FROM risk_firewall_settings WHERE scope = ?')
+      .all(scope) as { key: string; value: string }[];
+    for (const row of acctRows) {
+      if (row.key in baseDefaults) {
+        if (typeof (baseDefaults as any)[row.key] === 'boolean') {
+          (baseDefaults as any)[row.key] = row.value === 'true' || row.value === '1';
+        } else {
+          (baseDefaults as any)[row.key] = Number(row.value);
+        }
+      }
+    }
+  }
+
+  return baseDefaults;
+}
+
+/**
+ * Save single firewall setting
+ */
+export function saveFirewallSetting(
+  scope: string,
+  key: string,
+  value: string,
+  updatedBy: string
+): void {
+  db.prepare(`
+    INSERT INTO risk_firewall_settings (scope, key, value, updated_by, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(scope, key) DO UPDATE SET
+      value = excluded.value,
+      updated_by = excluded.updated_by,
+      updated_at = excluded.updated_at
+  `).run(scope, key, value, updatedBy, new Date().toISOString());
+}
+
+export interface FirewallAuditEntry {
+  actor: string;
+  role: string;
+  scope: string;
+  key: string;
+  old_value: string;
+  new_value: string;
+  reason: string;
+}
+
+/**
+ * Record firewall audit entry with SHA-256 hash chaining
+ */
+export function recordFirewallAudit(entry: FirewallAuditEntry): string {
+  const id = 'fwa-' + Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+  const timestamp = new Date().toISOString();
+
+  // Get previous hash
+  const lastRow = db
+    .prepare('SELECT hash FROM risk_firewall_audit ORDER BY rowid DESC LIMIT 1')
+    .get() as { hash?: string } | undefined;
+  const prevHash = lastRow?.hash || '0000000000000000000000000000000000000000000000000000000000000000';
+
+  const hashContent = `${prevHash}|${id}|${timestamp}|${entry.actor}|${entry.role}|${entry.scope}|${entry.key}|${entry.old_value}|${entry.new_value}|${entry.reason}`;
+  const hash = crypto.createHash('sha256').update(hashContent).digest('hex');
+
+  db.prepare(`
+    INSERT INTO risk_firewall_audit (id, timestamp, actor, role, scope, key, old_value, new_value, reason, prev_hash, hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    timestamp,
+    entry.actor,
+    entry.role,
+    entry.scope,
+    entry.key,
+    entry.old_value,
+    entry.new_value,
+    entry.reason,
+    prevHash,
+    hash
+  );
+
+  return id;
+}
+
+/**
+ * Retrieve firewall audit logs
+ */
+export function getFirewallAuditLogs(limit: number = 100): any[] {
+  return db
+    .prepare('SELECT * FROM risk_firewall_audit ORDER BY timestamp DESC LIMIT ?')
+    .all(limit);
+}
+
+/**
+ * Record blocked order event in append-only log
+ */
+export function recordBlockedOrder(entry: {
+  userId: string;
+  accountId: string;
+  symbol: string;
+  attemptedLots: number;
+  attemptedRiskUsd: number;
+  ruleViolated: string;
+  suggestedLots: number | null;
+  errorMessage: string;
+}): string {
+  const id = 'blk-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+  const timestamp = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO blocked_orders_log (
+      id, timestamp, user_id, account_id, symbol, attempted_lots, attempted_risk_usd, rule_violated, suggested_lots, error_message
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    timestamp,
+    entry.userId,
+    entry.accountId,
+    entry.symbol,
+    entry.attemptedLots,
+    entry.attemptedRiskUsd,
+    entry.ruleViolated,
+    entry.suggestedLots,
+    entry.errorMessage
+  );
+  return id;
+}
+
+/**
+ * Retrieve blocked orders log
+ */
+export function getBlockedOrderLogs(limit: number = 100): any[] {
+  return db
+    .prepare('SELECT * FROM blocked_orders_log ORDER BY timestamp DESC LIMIT ?')
+    .all(limit);
+}
+
+// ==========================================
+// OBJECT-LEVEL USER ACCOUNT ASSIGNMENTS
+// ==========================================
+
+export function assignUserAccount(
+  userId: string,
+  accountId: string,
+  assignedBy: string
+): void {
+  db.prepare(`
+    INSERT OR REPLACE INTO user_account_assignments (user_id, account_id, assigned_at, assigned_by)
+    VALUES (?, ?, ?, ?)
+  `).run(userId, accountId, new Date().toISOString(), assignedBy);
+}
+
+export function removeUserAccount(userId: string, accountId: string): void {
+  db.prepare('DELETE FROM user_account_assignments WHERE user_id = ? AND account_id = ?').run(
+    userId,
+    accountId
+  );
+}
+
+export function getUserAssignedAccounts(userId: string): string[] {
+  const rows = db
+    .prepare('SELECT account_id FROM user_account_assignments WHERE user_id = ?')
+    .all(userId) as { account_id: string }[];
+  return rows.map((r) => r.account_id);
+}
+
+export function isUserAssignedToAccount(
+  userId: string,
+  accountId: string,
+  userRole?: string
+): boolean {
+  // Master Admin has universal access
+  if (userRole === 'master_admin') return true;
+  const row = db
+    .prepare('SELECT 1 FROM user_account_assignments WHERE user_id = ? AND account_id = ?')
+    .get(userId, accountId);
+  return Boolean(row);
+}
+
+// ==========================================
+// MFA RECOVERY CODES
+// ==========================================
+
+export function saveMfaRecoveryCodes(userId: string, codeHashes: string[]): void {
+  db.prepare('DELETE FROM user_mfa_recovery_codes WHERE user_id = ?').run(userId);
+  const insert = db.prepare(`
+    INSERT INTO user_mfa_recovery_codes (id, user_id, code_hash, used, created_at)
+    VALUES (?, ?, ?, 0, ?)
+  `);
+  const now = new Date().toISOString();
+  for (const h of codeHashes) {
+    const id = 'rc-' + crypto.randomUUID();
+    insert.run(id, userId, h, now);
+  }
+}
+
+export function verifyAndConsumeMfaRecoveryCode(userId: string, rawCode: string): boolean {
+  const targetHash = crypto.createHash('sha256').update(rawCode.trim().toUpperCase()).digest('hex');
+  const row = db
+    .prepare('SELECT id FROM user_mfa_recovery_codes WHERE user_id = ? AND code_hash = ? AND used = 0')
+    .get(userId, targetHash) as { id: string } | undefined;
+
+  if (!row) return false;
+
+  db.prepare('UPDATE user_mfa_recovery_codes SET used = 1, used_at = ? WHERE id = ?').run(
+    new Date().toISOString(),
+    row.id
+  );
+  return true;
+}
+
+// ==========================================
+// ATOMIC IDEMPOTENCY KEYS
+// ==========================================
+
+export function tryAcquireIdempotencyKey(
+  key: string,
+  userId: string,
+  requestHash: string,
+  ttlMs: number = 86400000
+): {
+  status: 'new' | 'in_progress' | 'completed' | 'conflict';
+  cachedStatus?: number;
+  cachedBody?: any;
+} {
+  const now = Date.now();
+  const existing = db
+    .prepare('SELECT * FROM idempotency_keys WHERE key = ?')
+    .get(key) as any;
+
+  if (existing) {
+    const expiresMs = new Date(existing.expires_at).getTime();
+    if (now > expiresMs) {
+      db.prepare('DELETE FROM idempotency_keys WHERE key = ?').run(key);
+    } else {
+      if (existing.request_hash !== requestHash) {
+        return { status: 'conflict' };
+      }
+      if (existing.status === 'in_progress') {
+        return { status: 'in_progress' };
+      }
+      if (existing.status === 'completed') {
+        try {
+          return {
+            status: 'completed',
+            cachedStatus: existing.response_status,
+            cachedBody: JSON.parse(existing.response_body),
+          };
+        } catch {
+          return { status: 'completed', cachedStatus: existing.response_status, cachedBody: {} };
+        }
+      }
+    }
+  }
+
+  const createdAt = new Date(now).toISOString();
+  const expiresAt = new Date(now + ttlMs).toISOString();
+  try {
+    db.prepare(`
+      INSERT INTO idempotency_keys (key, user_id, request_hash, status, created_at, expires_at)
+      VALUES (?, ?, ?, 'in_progress', ?, ?)
+    `).run(key, userId, requestHash, createdAt, expiresAt);
+    return { status: 'new' };
+  } catch (err: any) {
+    if (err.message && err.message.includes('UNIQUE')) {
+      return { status: 'in_progress' };
+    }
+    throw err;
+  }
+}
+
+export function completeIdempotencyKey(
+  key: string,
+  responseStatus: number,
+  responseBody: any
+): void {
+  db.prepare(`
+    UPDATE idempotency_keys
+    SET status = 'completed', response_status = ?, response_body = ?
+    WHERE key = ?
+  `).run(responseStatus, JSON.stringify(responseBody), key);
+}
+
+// ==========================================
+// CHART LAYOUTS PERSISTENCE
+// ==========================================
+
+export function saveChartLayout(layout: {
+  id?: string;
+  name: string;
+  scope: string; // 'global' or symbol e.g. 'EURUSD'
+  owner_id: string;
+  chart_type: string;
+  indicators: any[];
+  moving_averages: any[];
+}): string {
+  const id = layout.id || 'layout-' + crypto.randomUUID();
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO chart_layouts (id, name, scope, owner_id, chart_type, indicators, moving_averages, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      chart_type = excluded.chart_type,
+      indicators = excluded.indicators,
+      moving_averages = excluded.moving_averages,
+      updated_at = excluded.updated_at
+  `).run(
+    id,
+    layout.name,
+    layout.scope,
+    layout.owner_id,
+    layout.chart_type,
+    JSON.stringify(layout.indicators),
+    JSON.stringify(layout.moving_averages),
+    now,
+    now
+  );
+  return id;
+}
+
+export function getChartLayouts(scope: string, ownerId: string): any[] {
+  const rows = db
+    .prepare(`
+      SELECT * FROM chart_layouts
+      WHERE (scope = 'global' OR scope = ?) AND (owner_id = 'global' OR owner_id = ?)
+      ORDER BY updated_at DESC
+    `)
+    .all(scope, ownerId) as any[];
+
+  return rows.map((r) => ({
+    ...r,
+    indicators: JSON.parse(r.indicators || '[]'),
+    moving_averages: JSON.parse(r.moving_averages || '[]'),
+  }));
+}
+
+export function deleteChartLayout(id: string, ownerId: string): boolean {
+  const res = db
+    .prepare('DELETE FROM chart_layouts WHERE id = ? AND (owner_id = ? OR owner_id = "global")')
+    .run(id, ownerId);
+  return res.changes > 0;
+}
+
 
 

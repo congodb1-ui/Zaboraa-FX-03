@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Flame,
   Footprints,
+  HelpCircle,
   Info,
   Layers,
   LineChart,
@@ -33,6 +34,7 @@ import {
   TICK_VOLUME_LABEL,
 } from '../engine/smartMoney/cotConfig';
 import { Candle } from '../types/forex';
+import { CandlestickChart } from './CandlestickChart';
 
 interface SmartMoneyFootprintViewProps {
   onSelectSymbol?: (symbol: SmartMoneySymbol) => void;
@@ -71,7 +73,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
         setStatusData(data);
       }
     } catch (e) {
-      console.error('Failed to load Smart Money status:', e);
+      console.warn('Failed to load Smart Money status:', e);
     }
   };
 
@@ -83,9 +85,11 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       if (res.ok) {
         const data = await res.json();
         setLatestReading(data);
+      } else {
+        setLatestReading(null);
       }
     } catch (e) {
-      console.error('Failed to load latest reading:', e);
+      setLatestReading(null);
     } finally {
       setIsLoadingLatest(false);
     }
@@ -100,20 +104,20 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
         setSignalsList(data.signals || []);
       }
     } catch (e) {
-      console.error('Failed to load signals:', e);
+      console.warn('Failed to load signals:', e);
     }
   };
 
-  // Load Candles for chart
+  // Load H1 Candles for Charting
   const loadCandles = async (sym: SmartMoneySymbol) => {
     try {
       const res = await fetch(`/api/data/load?symbol=${sym}&timeframe=H1`);
       if (res.ok) {
         const data = await res.json();
-        setCandles((data.candles || []).slice(-80)); // Last 80 H1 bars
+        setCandles(data.candles || []);
       }
     } catch (e) {
-      console.error('Failed to load H1 candles:', e);
+      console.warn('Failed to load candles:', e);
     }
   };
 
@@ -133,7 +137,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       const res = await fetch('/api/smartmoney/cot/refresh', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        setFeedbackMessage(`CFTC COT positioning refreshed: ${data.rowsIngested} weekly rows indexed.`);
+        setFeedbackMessage(`CFTC COT positioning refreshed: ${data.rowsIngested} weekly reports indexed.`);
         await loadStatus();
         await loadLatest(selectedSymbol);
       } else {
@@ -179,7 +183,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       const res = await fetch('/api/smartmoney/outcomes/update', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        setFeedbackMessage(`Updated ${data.outcomesUpdated} multi-horizon outcomes (+4h, +24h, +72h).`);
+        setFeedbackMessage(`Updated ${data.outcomesUpdated} multi-horizon trade outcomes (+4h, +24h, +72h).`);
         await loadSignals(selectedSymbol);
       }
     } catch (err: any) {
@@ -218,8 +222,8 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
   // Handle AI Explanation
   const handleExplainSignal = async (signalRecord?: any) => {
-    const targetSignal = signalRecord || latestReading?.signal;
-    if (!targetSignal) return;
+    const target = signalRecord || latestReading?.signal;
+    if (!target) return;
 
     setIsExplainingAi(true);
     setExplanationText(null);
@@ -229,549 +233,415 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       const res = await fetch('/api/smartmoney/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ signal: targetSignal }),
+        body: JSON.stringify({ signal: target }),
       });
       const data = await res.json();
       if (res.ok && data.explanation) {
         setExplanationText(data.explanation);
       } else {
-        setExplainError(data.message || data.error || 'AI explanation service currently unavailable.');
+        setExplainError(data.message || 'AI advisor service not available.');
       }
-    } catch (err: any) {
-      setExplainError(`Failed to contact AI advisor service: ${err.message}`);
+    } catch (e: any) {
+      setExplainError(e.message || 'Failed to communicate with AI explanation proxy.');
     } finally {
       setIsExplainingAi(false);
     }
   };
 
   const currentSignal = latestReading?.signal;
-  const cot = latestReading?.cotFeatures;
-  const act = latestReading?.activityEvent;
-  const trend = latestReading?.trendContext;
+  const totalCotWeeks =
+    selectedSymbol === 'XAUUSD'
+      ? statusData?.cotFreshness?.totalWeeksXau ?? 0
+      : statusData?.cotFreshness?.totalWeeksEur ?? 0;
+  const totalH1Bars =
+    selectedSymbol === 'XAUUSD'
+      ? statusData?.candleFreshness?.xauH1Bars ?? candles.length
+      : statusData?.candleFreshness?.eurH1Bars ?? candles.length;
+
+  // Has initial data loaded?
+  const hasCotData = totalCotWeeks > 0;
+  const hasH1Bars = totalH1Bars >= 30;
+  const hasSignals = signalsList.length > 0;
+
+  // Diverging scale position for -100 to +100 score
+  const scoreVal = currentSignal?.score ?? 0;
+  // Map -100..+100 to 0%..100% (center = 50%)
+  const scorePositionPct = Math.max(0, Math.min(100, (scoreVal + 100) / 2));
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Symbol Switcher Bar */}
-      <div className="rounded-xl border border-slate-800 bg-[#0E1524] p-5 shadow-2xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      {/* 1. TOP HEADER & INSTRUMENT TOGGLE */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+            <Footprints className="w-5 h-5" />
+          </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                <Footprints className="w-5 h-5" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                  {SMART_MONEY_NAME}
-                  <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    H1 Closed Bars · Point-in-Time
-                  </span>
-                </h1>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Multi-evidence quantitative synthesis: Weekly CFTC COT Futures, H1 Tick Volume Displacement, and UTC H4 Trend Context.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Symbol Selector Buttons */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-mono">Instrument:</span>
-            {SUPPORTED_SYMBOLS.map((sym) => (
-              <button
-                key={sym}
-                type="button"
-                onClick={() => setSelectedSymbol(sym)}
-                className={`px-4 py-2 rounded-lg text-xs font-mono font-bold transition-all ${
-                  selectedSymbol === sym
-                    ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30 ring-1 ring-emerald-400'
-                    : 'bg-slate-900 text-slate-300 border border-slate-800 hover:bg-slate-800'
-                }`}
-              >
-                {sym}
-                <span className="text-[10px] opacity-70 ml-1.5 font-normal">
-                  {sym === 'XAUUSD' ? 'Gold Spot' : 'Euro FX'}
-                </span>
-              </button>
-            ))}
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-[#E6ECF5] tracking-tight">
+              Smart Money Footprint & Institutional COT
+            </h1>
+            <p className="text-xs text-slate-500 dark:text-[#9FB0C8] mt-0.5">
+              Multi-evidence quantitative synthesis: Weekly CFTC COT Futures, H1 Volume Displacement, and H4 Trend Context.
+            </p>
           </div>
         </div>
 
-        {/* Global Feedback notification */}
-        {feedbackMessage && (
-          <div className="mt-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-blue-400" />
-              <span>{feedbackMessage}</span>
-            </div>
+        {/* Universal Indigo Instrument Selector */}
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+          {SUPPORTED_SYMBOLS.map((sym) => (
             <button
+              key={sym}
               type="button"
-              onClick={() => setFeedbackMessage(null)}
-              className="text-slate-400 hover:text-white"
+              onClick={() => setSelectedSymbol(sym)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                selectedSymbol === sym
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+              }`}
             >
-              <X className="w-4 h-4" />
+              {sym === 'XAUUSD' ? 'Gold (XAUUSD)' : 'Euro (EURUSD)'}
             </button>
-          </div>
-        )}
-
-        {/* 2. Current Signal Reading Card */}
-        <div className="mt-5 grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-slate-400 font-mono uppercase tracking-wider">
-                  Active Synthesis State
-                </span>
-                {currentSignal && (
-                  <span
-                    className={`px-3 py-1 rounded-md text-xs font-mono font-bold tracking-wider uppercase flex items-center gap-1.5 ${
-                      currentSignal.direction === 'BUY'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : currentSignal.direction === 'SELL'
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                        : 'bg-slate-800 text-slate-300 border border-slate-700'
-                    }`}
-                  >
-                    {currentSignal.direction === 'BUY' ? (
-                      <ArrowUpRight className="w-4 h-4 text-emerald-400" />
-                    ) : currentSignal.direction === 'SELL' ? (
-                      <ArrowDownRight className="w-4 h-4 text-rose-400" />
-                    ) : (
-                      <Minus className="w-4 h-4 text-slate-400" />
-                    )}
-                    {currentSignal.direction} SIGNAL
-                  </span>
-                )}
-              </div>
-
-              {/* Explain Button */}
-              <button
-                type="button"
-                onClick={() => handleExplainSignal()}
-                disabled={isExplainingAi || !currentSignal}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all disabled:opacity-50 cursor-pointer"
-              >
-                <Sparkles className={`w-3.5 h-3.5 ${isExplainingAi ? 'animate-spin' : ''}`} />
-                {isExplainingAi ? 'Consulting Advisor...' : 'Explain This Signal'}
-              </button>
-            </div>
-
-            {/* Score & Confidence Gauges */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="p-3 rounded-lg bg-[#0E1524] border border-slate-800">
-                <span className="text-[11px] text-slate-400 block mb-1">Synthesized Score</span>
-                <div className="flex items-baseline gap-2">
-                  <span
-                    className={`text-2xl font-mono font-bold tabular-nums ${
-                      (currentSignal?.score || 0) > 0
-                        ? 'text-emerald-400'
-                        : (currentSignal?.score || 0) < 0
-                        ? 'text-rose-400'
-                        : 'text-slate-300'
-                    }`}
-                  >
-                    {currentSignal?.score > 0 ? `+${currentSignal.score}` : currentSignal?.score ?? 0}
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-mono">/ ±100</span>
-                </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div
-                    className={`h-full transition-all ${
-                      (currentSignal?.score || 0) >= 0 ? 'bg-emerald-500' : 'bg-rose-500'
-                    }`}
-                    style={{
-                      width: `${Math.min(100, Math.abs(currentSignal?.score || 0))}%`,
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-[#0E1524] border border-slate-800">
-                <span className="text-[11px] text-slate-400 block mb-1">Empirical Confidence</span>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-mono font-bold text-white tabular-nums">
-                    {currentSignal?.confidence ?? 0}%
-                  </span>
-                  <span className="text-[11px] text-slate-500 font-mono">P-score</span>
-                </div>
-                <div className="w-full bg-slate-800 h-1.5 rounded-full mt-2 overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 transition-all"
-                    style={{ width: `${currentSignal?.confidence || 0}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="p-3 rounded-lg bg-[#0E1524] border border-slate-800">
-                <span className="text-[11px] text-slate-400 block mb-1">Invalidation Reference</span>
-                <div className="text-lg font-mono font-bold text-amber-400 tabular-nums">
-                  {currentSignal?.invalidation_price ? currentSignal.invalidation_price.toFixed(selectedSymbol === 'XAUUSD' ? 2 : 4) : '—'}
-                </div>
-                <span className="text-[10px] text-slate-500 font-mono block mt-1">
-                  Exit rule: ±1.5 × ATR(14)
-                </span>
-              </div>
-            </div>
-
-            {/* Crowded Warning Banner */}
-            {currentSignal?.is_crowded && (
-              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
-                <span>
-                  <strong>Crowded Positioning Alert:</strong> Weekly institutional COT positioning z-score is extreme (|z| ≥ 2.0). Historical crowd saturation increases squeeze risk; confidence reduced by 15 points.
-                </span>
-              </div>
-            )}
-
-            {/* Stale Warning Banner */}
-            {currentSignal?.is_stale && (
-              <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
-                <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
-                <span>
-                  <strong>Stale Data Gate Active:</strong> Latest COT report exceeds 12 days old. Per Hard Rule 6, layer fails closed to 0 (NEUTRAL).
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Context & Time Metadata */}
-          <div className="rounded-xl border border-slate-800/80 bg-slate-950/60 p-5 space-y-3 font-mono text-xs">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
-              Bar Timing & Expiry Guard
-            </h3>
-            <div className="space-y-2 text-slate-300 pt-1">
-              <div className="flex justify-between pb-1.5 border-b border-slate-800">
-                <span className="text-slate-500">Closed Bar Time:</span>
-                <strong className="text-white">
-                  {currentSignal?.bar_time ? new Date(currentSignal.bar_time * 1000).toUTCString() : '—'}
-                </strong>
-              </div>
-              <div className="flex justify-between pb-1.5 border-b border-slate-800">
-                <span className="text-slate-500">Signal Expiry (+24h):</span>
-                <strong className="text-slate-300">
-                  {currentSignal?.expires_at ? new Date(currentSignal.expires_at * 1000).toUTCString() : '—'}
-                </strong>
-              </div>
-              <div className="flex justify-between pb-1.5 border-b border-slate-800">
-                <span className="text-slate-500">Minimum Agreement:</span>
-                <span className="text-emerald-400 font-bold">2 of 3 Non-Zero</span>
-              </div>
-              <div className="flex justify-between pb-1.5 border-b border-slate-800">
-                <span className="text-slate-500">Config Hash:</span>
-                <span className="text-slate-400 text-[10px]">{currentSignal?.config_hash || 'cfg-default'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Execution Status:</span>
-                <span className="text-amber-400 font-bold">ADVISORY ONLY</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 3. Component Breakdown (3 Pillars) */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-5">
-          {/* Pillar 1: COT Weekly Positioning */}
-          <div className="rounded-xl border border-slate-800 bg-[#0A0F1D] p-4 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <Scale className="w-4 h-4 text-blue-400" />
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                  1. CFTC COT Positioning
-                </h4>
-              </div>
-              <span className="text-xs font-mono font-bold text-blue-400">
-                cCot: {cot?.cCot ?? 0}
-              </span>
-            </div>
-
-            <div className="space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Net % Open Interest:</span>
-                <span className="text-white font-bold">{cot?.netPctOi ? `${cot.netPctOi}%` : 'N/A'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">3-Year Z-Score (z156):</span>
-                <span className="text-slate-300">{cot?.z156 ?? 'N/A'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">4-Week Change Z-Score:</span>
-                <span className="text-slate-300">{cot?.chg4z ?? 'N/A'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Effective Since:</span>
-                <span className="text-slate-400 text-[10px]">
-                  {cot?.effectiveAt ? new Date(cot.effectiveAt).toLocaleDateString() : 'N/A'}
-                </span>
-              </div>
-            </div>
-
-            {/* Mandatory Exact String from Hard Rule 5 */}
-            <div className="pt-2 border-t border-slate-800 text-[10px] text-blue-300/80 font-mono italic">
-              {COT_LABEL}
-            </div>
-          </div>
-
-          {/* Pillar 2: Activity Events (H1 Volume Anomalies) */}
-          <div className="rounded-xl border border-slate-800 bg-[#0A0F1D] p-4 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                  2. Activity Events
-                </h4>
-              </div>
-              <span className="text-xs font-mono font-bold text-emerald-400">
-                cAct: {act?.cAct ?? 0}
-              </span>
-            </div>
-
-            <div className="space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Detected Event:</span>
-                <strong className="text-white font-bold">{act?.eventType ?? 'NONE'}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Volume Z-Score:</span>
-                <span className="text-slate-300">{act?.volZ ?? '0.00'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Bar Range (in ATR):</span>
-                <span className="text-slate-300">{act?.rangeInAtr ?? '0.00'}x</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Close Location:</span>
-                <span className="text-slate-300">{act?.closeLoc ? `${Math.round(act.closeLoc * 100)}%` : '50%'}</span>
-              </div>
-            </div>
-
-            {/* Mandatory Exact String from Hard Rule 4 */}
-            <div className="pt-2 border-t border-slate-800 text-[10px] text-emerald-300/80 font-mono italic">
-              {TICK_VOLUME_LABEL}
-            </div>
-          </div>
-
-          {/* Pillar 3: H4 Multi-Timeframe Trend Context */}
-          <div className="rounded-xl border border-slate-800 bg-[#0A0F1D] p-4 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-indigo-400" />
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider font-mono">
-                  3. Trend Context (H4)
-                </h4>
-              </div>
-              <span className="text-xs font-mono font-bold text-indigo-400">
-                cTrend: {trend?.cTrend ?? 0}
-              </span>
-            </div>
-
-            <div className="space-y-1.5 text-xs font-mono">
-              <div className="flex justify-between">
-                <span className="text-slate-400">H4 Trend Direction:</span>
-                <strong className="text-white font-bold">{trend?.trendDirection ?? 'FLAT'}</strong>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Fast EMA (50):</span>
-                <span className="text-slate-300">{trend?.emaFast ?? 'N/A'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Slow EMA (200):</span>
-                <span className="text-slate-300">{trend?.emaSlow ?? 'N/A'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">H4 Completed Bars:</span>
-                <span className="text-slate-400">{trend?.h4BarCount ?? 0}</span>
-              </div>
-            </div>
-
-            <div className="pt-2 border-t border-slate-800 text-[10px] text-indigo-300/80 font-mono italic">
-              UTC-aligned 4h buckets (00, 04, 08, 12, 16, 20 UTC)
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* 4. Data Freshness & Pipeline Management */}
-      <div className="rounded-xl border border-slate-800 bg-[#0E1524] p-5 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
-          <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-              <Database className="w-4 h-4 text-blue-400" />
-              Pipeline Freshness & Sync Operations
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Direct ingestion from free public CFTC feeds and local SQLite H1 candles.
-            </p>
+      {/* Global Feedback notification */}
+      {feedbackMessage && (
+        <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-xs flex items-center justify-between animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <Info className="w-4 h-4 shrink-0 text-indigo-500" />
+            <span>{feedbackMessage}</span>
+          </div>
+          <button type="button" onClick={() => setFeedbackMessage(null)} className="text-slate-400 hover:text-white cursor-pointer">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* 2. THREE-STEP GUIDED SETUP PIPELINE (When data needs ingest or signals) */}
+      {(!hasCotData || !hasH1Bars || !hasSignals) && (
+        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-slate-800 dark:text-amber-100 space-y-4">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <h2 className="text-sm font-bold text-slate-900 dark:text-amber-200">
+              Institutional Signal Setup Checklist
+            </h2>
+          </div>
+          <p className="text-xs text-slate-600 dark:text-amber-200/80">
+            Smart Money Footprint requires 3 authoritative data layers to synthesize hedge fund positioning with price action:
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            {/* Step 1 */}
+            <div className={`p-3.5 rounded-xl border ${hasCotData ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-[#223049]'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-semibold text-slate-800 dark:text-white">1. Weekly CFTC COT</span>
+                {hasCotData ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
+              </div>
+              <p className="text-slate-500 dark:text-[#9FB0C8] text-[11px] mb-3">
+                {hasCotData ? `${totalCotWeeks} weekly reports indexed` : '0 weeks indexed. Fetch official CFTC commitment records.'}
+              </p>
+              {!hasCotData && (
+                <button
+                  type="button"
+                  onClick={handleRefreshCot}
+                  disabled={isRefreshingCot}
+                  className="w-full py-1.5 rounded-lg bg-indigo-600 text-white font-semibold text-xs cursor-pointer"
+                >
+                  {isRefreshingCot ? 'Fetching...' : 'Ingest CFTC reports'}
+                </button>
+              )}
+            </div>
+
+            {/* Step 2 */}
+            <div className={`p-3.5 rounded-xl border ${hasH1Bars ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-[#223049]'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-semibold text-slate-800 dark:text-white">2. Closed H1 Bars</span>
+                {hasH1Bars ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
+              </div>
+              <p className="text-slate-500 dark:text-[#9FB0C8] text-[11px] mb-3">
+                {hasH1Bars ? `${totalH1Bars} closed H1 candles available` : '0 bars found. Minimum 30 closed H1 bars required.'}
+              </p>
+              {!hasH1Bars && (
+                <span className="text-slate-400 text-[11px]">Seeded automatically on startup</span>
+              )}
+            </div>
+
+            {/* Step 3 */}
+            <div className={`p-3.5 rounded-xl border ${hasSignals ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-[#223049]'}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-semibold text-slate-800 dark:text-white">3. Synthesize Signals</span>
+                {hasSignals ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
+              </div>
+              <p className="text-slate-500 dark:text-[#9FB0C8] text-[11px] mb-3">
+                {hasSignals ? `${signalsList.length} candidate signals evaluated` : 'Compute multi-layer confidence score across all closed bars.'}
+              </p>
+              <button
+                type="button"
+                onClick={handleComputeSignals}
+                disabled={isComputingSignals || !hasCotData || !hasH1Bars}
+                className="w-full py-1.5 rounded-lg bg-indigo-600 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer"
+              >
+                {isComputingSignals ? 'Computing...' : 'Compute signals'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. DIVERGING -100 TO +100 SCORE CARD */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <div className="space-y-1">
+            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+              Active Institutional Signal ({selectedSymbol})
+            </h2>
+            <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+              Composite footprint score combining CFTC positioning, volume displacement, and trend direction.
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleRefreshCot}
-              disabled={isRefreshingCot}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingCot ? 'animate-spin' : ''}`} />
-              {isRefreshingCot ? 'Refreshing COT...' : 'Refresh CFTC COT'}
-            </button>
-
             <button
               type="button"
               onClick={handleComputeSignals}
               disabled={isComputingSignals}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              {isComputingSignals ? 'Computing...' : 'Compute H1 Signals'}
+              {isComputingSignals ? 'Computing...' : 'Compute signals'}
             </button>
+            <button
+              type="button"
+              onClick={handleRefreshCot}
+              disabled={isRefreshingCot}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#223049] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+            >
+              {isRefreshingCot ? 'Fetching...' : 'Refresh COT'}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleExplainSignal()}
+              disabled={isExplainingAi || !currentSignal}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#223049] hover:bg-slate-200 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{isExplainingAi ? 'Analyzing...' : 'Explain signal'}</span>
+            </button>
+          </div>
+        </div>
 
+        {currentSignal ? (
+          <div className="space-y-6">
+            {/* Score Number & Signal Badge */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">Synthesis Score:</span>
+                <div className="flex items-baseline gap-2 mt-0.5">
+                  <span className="text-4xl font-extrabold font-mono text-slate-900 dark:text-white tabular-nums tracking-tight">
+                    {scoreVal > 0 ? `+${scoreVal}` : scoreVal}
+                  </span>
+                  <span className="text-slate-400 font-mono text-xs">/ ±100</span>
+                </div>
+              </div>
+
+              {/* Direction Badge */}
+              <div
+                className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${
+                  currentSignal.direction === 'BUY'
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                    : currentSignal.direction === 'SELL'
+                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                }`}
+              >
+                {currentSignal.direction === 'BUY' ? (
+                  <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                ) : currentSignal.direction === 'SELL' ? (
+                  <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                ) : (
+                  <Minus className="w-4 h-4 text-slate-400" />
+                )}
+                <span>{currentSignal.direction} CONFIRMED</span>
+              </div>
+            </div>
+
+            {/* DIVERGING HORIZONTAL GAUGE: -100 to +100 with ±50 thresholds */}
+            <div className="space-y-2">
+              <div className="flex justify-between text-xs text-slate-500 dark:text-[#9FB0C8] font-mono">
+                <span className="text-rose-500 font-bold">-100 (Strong Short)</span>
+                <span className="text-rose-400 font-medium">-50 (Short Gate)</span>
+                <span className="text-slate-400 font-medium">0 (Neutral)</span>
+                <span className="text-emerald-400 font-medium">+50 (Long Gate)</span>
+                <span className="text-emerald-500 font-bold">+100 (Strong Long)</span>
+              </div>
+
+              {/* Gauge Track */}
+              <div className="h-4 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden relative border border-slate-300 dark:border-slate-700">
+                {/* Visual Segments */}
+                <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-slate-400 to-emerald-500 opacity-80" />
+                {/* 50 Threshold Markers */}
+                <div className="absolute top-0 bottom-0 left-[25%] w-0.5 bg-white/70" title="-50 Threshold" />
+                <div className="absolute top-0 bottom-0 left-[50%] w-0.5 bg-white/90" title="Neutral 0" />
+                <div className="absolute top-0 bottom-0 left-[75%] w-0.5 bg-white/70" title="+50 Threshold" />
+                {/* Active Needle Pin */}
+                <div
+                  className="absolute top-0 bottom-0 w-2.5 bg-slate-900 dark:bg-white rounded-full shadow-lg ring-2 ring-indigo-500 transition-all duration-300 -translate-x-1/2"
+                  style={{ left: `${scorePositionPct}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Sub-Components Breakdown with Plain-English Tooltips */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium" title="CFTC Commercial Hedger Net Flow">
+                    COT Hedger Flow (cCot)
+                  </span>
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                </div>
+                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+                  {currentSignal.c_cot > 0 ? `+${currentSignal.c_cot}` : currentSignal.c_cot} / ±40
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
+                  Weekly institutional shift
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium" title="H1 Tick Volume Expansion Event">
+                    Volume Spike (cAct)
+                  </span>
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                </div>
+                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+                  {currentSignal.c_act > 0 ? `+${currentSignal.c_act}` : currentSignal.c_act} / ±35
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
+                  H1 institutional displacement
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium" title="H4 Multi-Timeframe Trend Alignment">
+                    Trend Context (cTrend)
+                  </span>
+                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                </div>
+                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+                  {currentSignal.c_trend > 0 ? `+${currentSignal.c_trend}` : currentSignal.c_trend} / ±25
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
+                  H4 swing & EMA structure
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="py-12 text-center space-y-3">
+            <Footprints className="w-8 h-8 text-slate-400 mx-auto" />
+            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">No signal calculated yet</div>
+            <p className="text-xs text-slate-500 dark:text-[#9FB0C8] max-w-sm mx-auto">
+              Click "Compute signals" above to scan the latest closed H1 bars and synthesize the institutional footprint score.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 4. SIGNAL HISTORY TABLE WITH OUTCOMES */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+              Historical Signal Log ({signalsList.length})
+            </h2>
+            <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+              Point-in-time signals generated from closed H1 bars with multi-horizon outcomes
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleUpdateOutcomes}
-              disabled={isUpdatingOutcomes}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
+              disabled={isUpdatingOutcomes || signalsList.length === 0}
+              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#223049] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
             >
-              <Clock className="w-3.5 h-3.5" />
-              {isUpdatingOutcomes ? 'Updating...' : 'Update Outcomes (+4h/+24h/+72h)'}
+              {isUpdatingOutcomes ? 'Updating...' : 'Update outcomes'}
             </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 text-xs font-mono">
-          <div className="p-3 rounded bg-slate-950 border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">COT Last Report Date:</span>
-            <strong className="text-white">{statusData?.cotFreshness?.lastReportDate || 'N/A'}</strong>
-          </div>
-          <div className="p-3 rounded bg-slate-950 border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">Point-in-Time Effective:</span>
-            <strong className="text-emerald-400">
-              {statusData?.cotFreshness?.effectiveAt ? new Date(statusData.cotFreshness.effectiveAt).toLocaleDateString() : 'N/A'}
-            </strong>
-          </div>
-          <div className="p-3 rounded bg-slate-950 border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">COT History Indexed:</span>
-            <strong className="text-blue-400">
-              {selectedSymbol === 'XAUUSD' ? statusData?.cotFreshness?.totalWeeksXau : statusData?.cotFreshness?.totalWeeksEur} weeks
-            </strong>
-          </div>
-          <div className="p-3 rounded bg-slate-950 border border-slate-800">
-            <span className="text-slate-500 block text-[10px]">H1 Closed Bars Available:</span>
-            <strong className="text-white">
-              {selectedSymbol === 'XAUUSD' ? statusData?.candleFreshness?.xauH1Bars : statusData?.candleFreshness?.eurH1Bars} bars
-            </strong>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Signal History Table */}
-      <div className="rounded-xl border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-          <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-              <LineChart className="w-4 h-4 text-emerald-400" />
-              Generated Signals Ledger ({signalsList.length})
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Append-only immutable record stamped on closed bar times with multi-horizon evaluation.
-            </p>
+            <button
+              type="button"
+              onClick={handleRunEventStudy}
+              disabled={isRunningEval || signalsList.length === 0}
+              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold shadow-sm disabled:opacity-50 cursor-pointer"
+            >
+              {isRunningEval ? 'Evaluating...' : 'Run event study'}
+            </button>
           </div>
         </div>
 
         {signalsList.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 font-mono text-xs">
-            No candidate signals logged yet for {selectedSymbol}. Click <strong>"Compute H1 Signals"</strong> above to evaluate closed bars.
+          <div className="py-8 text-center text-slate-400 text-xs">
+            No historical signals computed for {selectedSymbol}. Click "Compute signals" above.
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left font-mono text-xs">
-              <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="py-2.5 px-3">Symbol</th>
-                  <th className="py-2.5 px-3">Bar Time (UTC)</th>
-                  <th className="py-2.5 px-3">Direction</th>
-                  <th className="py-2.5 px-3">Score</th>
-                  <th className="py-2.5 px-3">Conf</th>
-                  <th className="py-2.5 px-3">Event Type</th>
-                  <th className="py-2.5 px-3">Invalidation</th>
-                  <th className="py-2.5 px-3">+4h Outcome</th>
-                  <th className="py-2.5 px-3">+24h Outcome</th>
-                  <th className="py-2.5 px-3">+72h Outcome</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                  <th className="text-left py-2 font-medium">Bar Time</th>
+                  <th className="text-center py-2 font-medium">Direction</th>
+                  <th className="text-right py-2 font-medium">Score</th>
+                  <th className="text-right py-2 font-medium">Confidence</th>
+                  <th className="text-left py-2 font-medium">Trigger</th>
+                  <th className="text-right py-2 font-medium">Outcomes (+24h)</th>
+                  <th className="text-right py-2 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                {signalsList.map((sig) => {
-                  const out4 = sig.outcomes?.find((o: any) => o.horizon_hours === 4);
-                  const out24 = sig.outcomes?.find((o: any) => o.horizon_hours === 24);
-                  const out72 = sig.outcomes?.find((o: any) => o.horizon_hours === 72);
-
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                {signalsList.slice(0, 10).map((s) => {
+                  const out24 = (s.outcomes || []).find((o: any) => o.horizon_hours === 24);
                   return (
-                    <tr key={sig.id} className="hover:bg-slate-900/40">
-                      <td className="py-2 px-3 font-bold text-white">{sig.symbol}</td>
-                      <td className="py-2 px-3 text-slate-400">
-                        {new Date(sig.bar_time * 1000).toISOString().replace('T', ' ').slice(0, 16)}
+                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2.5 text-slate-500 tabular-nums">
+                        {new Date(s.bar_time * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
-                      <td className="py-2 px-3">
+                      <td className="py-2.5 text-center font-sans">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                            sig.direction === 'BUY'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-rose-500/20 text-rose-400'
+                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                            s.direction === 'BUY'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
                           }`}
                         >
-                          {sig.direction}
+                          {s.direction}
                         </span>
                       </td>
-                      <td className="py-2 px-3 font-bold text-white tabular-nums">
-                        {sig.score > 0 ? `+${sig.score}` : sig.score}
+                      <td className="py-2.5 text-right font-bold tabular-nums text-slate-800 dark:text-white">
+                        {s.score > 0 ? `+${s.score}` : s.score}
                       </td>
-                      <td className="py-2 px-3 tabular-nums">{sig.confidence}%</td>
-                      <td className="py-2 px-3 text-[11px] text-slate-400">{sig.event_type}</td>
-                      <td className="py-2 px-3 text-amber-400 tabular-nums">
-                        {sig.invalidation_price.toFixed(sig.symbol === 'XAUUSD' ? 2 : 4)}
+                      <td className="py-2.5 text-right tabular-nums text-indigo-500 font-semibold">
+                        {s.confidence}%
                       </td>
-                      <td className="py-2 px-3">
-                        {out4 ? (
-                          <span
-                            className={`font-bold tabular-nums ${
-                              out4.return_pips_or_points >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                          >
-                            {out4.return_pips_or_points > 0 ? `+${out4.return_pips_or_points}` : out4.return_pips_or_points}p
-                          </span>
-                        ) : (
-                          <span className="text-slate-600">—</span>
-                        )}
+                      <td className="py-2.5 text-slate-600 dark:text-[#9FB0C8] font-sans">
+                        {s.event_type}
                       </td>
-                      <td className="py-2 px-3">
+                      <td className="py-2.5 text-right tabular-nums">
                         {out24 ? (
-                          <span
-                            className={`font-bold tabular-nums ${
-                              out24.return_pips_or_points >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                          >
-                            {out24.return_pips_or_points > 0 ? `+${out24.return_pips_or_points}` : out24.return_pips_or_points}p
+                          <span className={out24.return_pips_or_points >= 0 ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>
+                            {out24.return_pips_or_points >= 0 ? '+' : ''}{out24.return_pips_or_points.toFixed(1)} pips
                           </span>
                         ) : (
-                          <span className="text-slate-600">—</span>
+                          <span className="text-slate-400">Pending</span>
                         )}
                       </td>
-                      <td className="py-2 px-3">
-                        {out72 ? (
-                          <span
-                            className={`font-bold tabular-nums ${
-                              out72.return_pips_or_points >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                          >
-                            {out72.return_pips_or_points > 0 ? `+${out72.return_pips_or_points}` : out72.return_pips_or_points}p
-                          </span>
-                        ) : (
-                          <span className="text-slate-600">—</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 text-right">
+                      <td className="py-2.5 text-right font-sans">
                         <button
                           type="button"
-                          onClick={() => handleExplainSignal(sig)}
-                          className="px-2 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] transition-all cursor-pointer"
+                          onClick={() => handleExplainSignal(s)}
+                          className="px-2 py-1 rounded text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer"
                         >
                           Explain
                         </button>
@@ -785,147 +655,15 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
         )}
       </div>
 
-      {/* 6. Event Study & Empirical Evidence Panel */}
-      <div className="rounded-xl border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
-          <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-2">
-              <Scale className="w-4 h-4 text-emerald-400" />
-              Event Study & Empirical Baseline (Multi-Horizon Evaluation)
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              1,000 matched random draws with Mulberry32 fixed seed (<code className="text-emerald-400">20261028</code>) after realistic transaction costs.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-2 text-xs font-mono text-slate-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={confirmHeldOut}
-                onChange={(e) => setConfirmHeldOut(e.target.checked)}
-                className="rounded border-slate-700 bg-slate-900 text-emerald-500 focus:ring-emerald-500"
-              />
-              <span className={confirmHeldOut ? 'text-amber-400 font-bold' : 'text-slate-400'}>
-                Evaluate Held-Out 20%
-              </span>
-            </label>
-
-            <button
-              type="button"
-              onClick={handleRunEventStudy}
-              disabled={isRunningEval}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <BarChart3 className="w-3.5 h-3.5" />
-              {isRunningEval ? 'Computing Event Study...' : 'Run Event Study'}
-            </button>
-          </div>
-        </div>
-
-        {/* Mandatory Research Result Banner */}
-        <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs flex items-center gap-2">
-          <Info className="w-4 h-4 text-blue-400 shrink-0" />
-          <span>
-            <strong>Research result, not a trading recommendation.</strong> A null or negative baseline differential is a valid empirical result. Sample counts below 30 are explicitly flagged as Insufficient Sample.
-          </span>
-        </div>
-
-        {evalReport ? (
-          <div className="space-y-4 pt-2">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left font-mono text-xs">
-                <thead className="bg-slate-950/80 text-slate-400 uppercase text-[10px] tracking-wider border-b border-slate-800">
-                  <tr>
-                    <th className="py-2.5 px-3">Horizon</th>
-                    <th className="py-2.5 px-3">Sample (n)</th>
-                    <th className="py-2.5 px-3">Mean Return (Pips)</th>
-                    <th className="py-2.5 px-3">Median</th>
-                    <th className="py-2.5 px-3">Hit Rate (%)</th>
-                    <th className="py-2.5 px-3">95% Bootstrap CI</th>
-                    <th className="py-2.5 px-3">Baseline Mean</th>
-                    <th className="py-2.5 px-3">Excess over Baseline</th>
-                    <th className="py-2.5 px-3">Sample Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                  {evalReport.horizons?.map((h: any) => (
-                    <tr key={h.horizonHours} className="hover:bg-slate-900/40">
-                      <td className="py-2 px-3 font-bold text-white">+{h.horizonHours} Hours</td>
-                      <td className="py-2 px-3 tabular-nums">{h.n}</td>
-                      <td className={`py-2 px-3 font-bold tabular-nums ${h.meanReturnPips >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {h.meanReturnPips > 0 ? `+${h.meanReturnPips}` : h.meanReturnPips} pips
-                      </td>
-                      <td className="py-2 px-3 tabular-nums">{h.medianReturnPips} pips</td>
-                      <td className="py-2 px-3 tabular-nums">{h.hitRatePct}%</td>
-                      <td className="py-2 px-3 text-[11px] text-slate-400">
-                        [{h.bootstrapCi95?.[0]}, {h.bootstrapCi95?.[1]}]
-                      </td>
-                      <td className="py-2 px-3 text-slate-400 tabular-nums">{h.baselineMeanPips} pips</td>
-                      <td className={`py-2 px-3 font-bold tabular-nums ${h.excessOverBaselinePips >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {h.excessOverBaselinePips > 0 ? `+${h.excessOverBaselinePips}` : h.excessOverBaselinePips} pips
-                      </td>
-                      <td className="py-2 px-3">
-                        {h.label === 'INSUFFICIENT SAMPLE' ? (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                            INSUFFICIENT SAMPLE
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-400">
-                            VALID SAMPLE
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Component-Only Ablation Breakdown */}
-            <div className="pt-3 border-t border-slate-800 space-y-2">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-mono">
-                Component-Only Attribution (Ablation Analysis)
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                {evalReport.componentBreakdown?.map((c: any) => (
-                  <div key={c.componentName} className="p-3 rounded-lg bg-slate-950 border border-slate-800 font-mono text-xs">
-                    <span className="text-slate-400 block text-[11px] font-bold line-clamp-1">{c.componentName}</span>
-                    <div className="mt-1 flex justify-between">
-                      <span className="text-slate-500">Events (n):</span>
-                      <strong className="text-white">{c.n}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">+24h Mean:</span>
-                      <span className={c.meanReturn24h >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
-                        {c.meanReturn24h > 0 ? `+${c.meanReturn24h}` : c.meanReturn24h}p
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">+24h Hit Rate:</span>
-                      <span className="text-slate-300">{c.hitRate24h}%</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="py-8 text-center text-slate-500 font-mono text-xs">
-            Click <strong>"Run Event Study"</strong> to compute multi-horizon outcomes and compare against 1,000 matched random baseline draws.
-          </div>
-        )}
-      </div>
-
-      {/* 7. AI Explanation Modal */}
-      {(explanationText || explainError || isExplainingAi) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-800 bg-[#0E1524] p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+      {/* AI Explanation Dialog */}
+      {(explanationText || explainError) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="max-w-lg w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-400" />
-                <h3 className="text-sm font-bold text-white">
-                  Smart Money Signal Advisory Breakdown
+                <Sparkles className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+                  AI Quant Advisor: Signal Breakdown
                 </h3>
               </div>
               <button
@@ -934,52 +672,37 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                   setExplanationText(null);
                   setExplainError(null);
                 }}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {isExplainingAi ? (
-              <div className="py-12 text-center space-y-3">
-                <Sparkles className="w-8 h-8 text-indigo-400 animate-spin mx-auto" />
-                <p className="text-xs text-slate-300 font-mono">
-                  Synthesizing quantitative layers with Vertex AI...
-                </p>
-              </div>
-            ) : explainError ? (
-              <div className="p-4 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-                <strong>Explanation Service Notice:</strong> {explainError}
+            {explanationText ? (
+              <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
+                {explanationText}
               </div>
             ) : (
-              <div className="text-xs text-slate-300 space-y-3 leading-relaxed max-h-[60vh] overflow-y-auto pr-2">
-                {explanationText?.split('\n\n').map((para, i) => (
-                  <p key={i}>{para}</p>
-                ))}
+              <div className="p-3 rounded-lg bg-rose-500/10 text-rose-500 text-xs">
+                {explainError}
               </div>
             )}
 
-            <div className="pt-3 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500 font-mono">
-              <span>{DISCLAIMER_TEXT}</span>
+            <div className="flex justify-end pt-2">
               <button
                 type="button"
                 onClick={() => {
                   setExplanationText(null);
                   setExplainError(null);
                 }}
-                className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs cursor-pointer"
               >
-                Close
+                Done
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* 8. Permanent Disclaimer Footer (Hard Rule 11) */}
-      <footer className="text-center py-4 border-t border-slate-800/80 text-[11px] text-slate-500 font-mono">
-        {DISCLAIMER_TEXT}
-      </footer>
     </div>
   );
 };

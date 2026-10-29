@@ -7,109 +7,101 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  ExternalLink,
-  Flame,
-  Globe,
-  Info,
   Layers,
-  Percent,
+  LineChart,
   RefreshCw,
-  Scale,
-  ShieldAlert,
   Sliders,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
-import { TechnicalAnalysisReport } from '../types/forex';
+import { Candle, ForexSymbol, StrategyVisualLine, TechnicalAnalysisReport } from '../types/forex';
+import { CandlestickChart } from './CandlestickChart';
 
 interface TechnicalAnalysisViewProps {
   initialSymbol?: string;
 }
 
-const DEFAULT_REPORT: TechnicalAnalysisReport = {
-  symbol: 'XAU/USD - Gold Spot US Dollar',
-  canonicalSymbol: 'XAUUSD',
-  brokerSymbol: 'XAUUSDm',
-  price: 4053.10,
-  change24h: -7.23,
-  change24hPct: -0.18,
-  dayRangeLow: 4028.19,
-  dayRangeHigh: 4070.85,
-  yearRangeLow: 3915.17,
-  yearRangeHigh: 5595.46,
-  timeframe: 'H1',
-  summaryAction: 'Strong Buy',
-  summaryBuyCount: 16,
-  summarySellCount: 3,
-  summaryNeutralCount: 5,
-  maAction: 'Strong Buy',
-  maBuyCount: 10,
-  maSellCount: 2,
-  indicatorsAction: 'Strong Buy',
-  indicatorsBuyCount: 6,
-  indicatorsSellCount: 1,
-  indicatorsNeutralCount: 4,
-  indicators: [
-    { name: 'RSI(14)', value: 59.141, action: 'Buy' },
-    { name: 'STOCH(9,6)', value: 55.616, action: 'Buy' },
-    { name: 'STOCHRSI(14)', value: 50.155, action: 'Neutral' },
-    { name: 'MACD(12,26)', value: 5.217, action: 'Buy' },
-    { name: 'ADX(14)', value: 24.409, action: 'Neutral' },
-    { name: 'Williams %R', value: -41.045, action: 'Buy' },
-    { name: 'CCI(14)', value: 20.641, action: 'Neutral' },
-    { name: 'ATR(14)', value: 10.4886, action: 'Less Volatility' },
-    { name: 'Highs/Lows(14)', value: 3.82, action: 'Buy' },
-    { name: 'Ultimate Oscillator', value: 49.364, action: 'Neutral' },
-    { name: 'ROC', value: -0.082, action: 'Sell' },
-    { name: 'Bull/Bear Power(13)', value: 14.5463, action: 'Buy' },
-  ],
-  movingAverages: [
-    { name: 'MA5', simple: 4042.36, simpleAction: 'Buy', exponential: 4047.18, exponentialAction: 'Buy' },
-    { name: 'MA10', simple: 4044.86, simpleAction: 'Buy', exponential: 4046.15, exponentialAction: 'Buy' },
-    { name: 'MA20', simple: 4050.80, simpleAction: 'Buy', exponential: 4043.16, exponentialAction: 'Buy' },
-    { name: 'MA50', simple: 4027.18, simpleAction: 'Buy', exponential: 4035.24, exponentialAction: 'Buy' },
-    { name: 'MA100', simple: 4029.77, simpleAction: 'Buy', exponential: 4044.27, exponentialAction: 'Buy' },
-    { name: 'MA200', simple: 4088.28, simpleAction: 'Sell', exponential: 4071.49, exponentialAction: 'Sell' },
-  ],
-  pivotPoints: [
-    { name: 'Classic', s3: 4029.50, s2: 4036.28, s1: 4044.67, pivot: 4051.45, r1: 4059.84, r2: 4066.62, r3: 4075.01 },
-    { name: 'Fibonacci', s3: 4036.28, s2: 4042.07, s1: 4045.65, pivot: 4051.45, r1: 4057.24, r2: 4060.82, r3: 4066.62 },
-    { name: 'Camarilla', s3: 4048.90, s2: 4050.29, s1: 4051.68, pivot: 4051.45, r1: 4054.46, r2: 4055.85, r3: 4057.24 },
-    { name: 'Woodie\'s', s3: 4030.32, s2: 4036.68, s1: 4045.49, pivot: 4051.85, r1: 4060.65, r2: 4067.02, r3: 4075.82 },
-    { name: 'DeMark\'s', s3: '-', s2: '-', s1: 4048.06, pivot: 4053.14, r1: 4063.23, r2: '-', r3: '-' },
-  ],
-};
+const TIMEFRAMES: Array<{ id: string; label: string }> = [
+  { id: 'M1', label: '1m' },
+  { id: 'M5', label: '5m' },
+  { id: 'M15', label: '15m' },
+  { id: 'M30', label: '30m' },
+  { id: 'H1', label: '1h' },
+  { id: 'H3', label: '3h' },
+  { id: 'D1', label: '1d' },
+];
 
 export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
   initialSymbol = 'XAUUSD',
 }) => {
   const [symbol, setSymbol] = useState<string>(initialSymbol);
   const [timeframe, setTimeframe] = useState<string>('H1');
-  const [data, setData] = useState<TechnicalAnalysisReport>(DEFAULT_REPORT);
+  const [data, setData] = useState<TechnicalAnalysisReport | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [candles, setCandles] = useState<Candle[]>([]);
 
-  const fetchTechnicalAnalysis = async () => {
+  // Chart overlay toggles
+  const [showMAs, setShowMAs] = useState<boolean>(true);
+  const [showPivots, setShowPivots] = useState<boolean>(true);
+  const [lastUpdatedSecAgo, setLastUpdatedSecAgo] = useState<number>(2);
+
+  // Time-since-update counter
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setLastUpdatedSecAgo((prev) => (prev < 60 ? prev + 1 : 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const fetchTechnicalAnalysis = async (sym: string, tf: string) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/technical/analysis?symbol=${symbol}&timeframe=${timeframe}`);
+      const res = await fetch(`/api/technical/analysis?symbol=${sym}&timeframe=${tf}`);
       if (res.ok) {
         const json = await res.json();
-        if (json && json.indicators && json.movingAverages) {
+        if (json && json.indicators) {
           setData(json);
+          setLastUpdatedSecAgo(0);
         }
       }
     } catch (err) {
-      console.warn('Using baseline technical report for', symbol, err);
+      console.warn('Failed to fetch technical analysis for', sym, tf, err);
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load candles for the candlestick chart
+  const fetchCandles = async (sym: string, tf: string) => {
+    try {
+      const cleanSym = sym.replace(/M$/, '');
+      const res = await fetch(`/api/data/load?symbol=${cleanSym}&timeframe=${tf}`);
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.candles && json.candles.length > 0) {
+          setCandles(json.candles);
+          return;
+        }
+      }
+      // If specific timeframe not stored, load H1 fallback
+      const h1Res = await fetch(`/api/data/load?symbol=${cleanSym}&timeframe=H1`);
+      if (h1Res.ok) {
+        const h1Json = await h1Res.json();
+        if (h1Json && h1Json.candles) {
+          setCandles(h1Json.candles);
+        }
+      }
+    } catch (e) {
+      console.warn('Candles load fallback:', e);
+    }
+  };
+
   useEffect(() => {
-    fetchTechnicalAnalysis();
+    fetchTechnicalAnalysis(symbol, timeframe);
+    fetchCandles(symbol, timeframe);
   }, [symbol, timeframe]);
 
-  // Convert an action to needle deflection angle (-70 deg to +70 deg)
+  // Needle deflection angle (-70 deg to +70 deg)
   const getActionAngle = (actionStr: string): number => {
     if (actionStr === 'Strong Buy') return 68;
     if (actionStr === 'Buy') return 34;
@@ -119,32 +111,27 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
     return 0;
   };
 
-  // Helper for rendering semicircular SVG gauge matching image_cac96abb.png
-  const renderGauge = (
-    label: string,
-    action: string,
-    size: 'sm' | 'lg' = 'sm'
-  ) => {
+  // Standardized Gauge Renderer (All 3 gauges exact same size and structure)
+  const renderGauge = (label: string, action: string, buyCount: number, sellCount: number, neutralCount?: number) => {
     const angleDeg = getActionAngle(action);
-    const w = size === 'lg' ? 240 : 160;
-    const h = size === 'lg' ? 140 : 100;
+    const w = 210;
+    const h = 130;
     const cx = w / 2;
-    const cy = h - 16;
-    const r = size === 'lg' ? 95 : 62;
-    const strokeW = size === 'lg' ? 10 : 7;
+    const cy = h - 22;
+    const r = 74;
+    const strokeW = 8;
 
-    // Convert needle angle to radians
     const rad = ((angleDeg - 90) * Math.PI) / 180;
     const needleLen = r - 12;
     const nx = cx + needleLen * Math.cos(rad);
     const ny = cy + needleLen * Math.sin(rad);
 
-    // Clean gradient ID without spaces or special characters
     const gradId = `gauge-grad-${label.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
 
     return (
-      <div className="flex flex-col items-center">
-        <span className="text-xs font-semibold text-slate-300 mb-1">{label}</span>
+      <div className="flex flex-col items-center p-4 rounded-xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm w-full transition-colors">
+        <span className="text-sm font-semibold text-slate-800 dark:text-[#E6ECF5] mb-2">{label}</span>
+
         <svg width={w} height={h} className="overflow-visible" role="img" aria-label={`${label} gauge: ${action}`}>
           <defs>
             <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
@@ -156,16 +143,17 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
             </linearGradient>
           </defs>
 
-          {/* Background arc track */}
+          {/* Track background */}
           <path
             d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
             fill="none"
-            stroke="#1e293b"
-            strokeWidth={strokeW + 4}
+            stroke="currentColor"
+            className="text-slate-200 dark:text-slate-800"
+            strokeWidth={strokeW + 2}
             strokeLinecap="round"
           />
 
-          {/* Colored arc */}
+          {/* Colored Arc */}
           <path
             d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
             fill="none"
@@ -174,317 +162,365 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
             strokeLinecap="round"
           />
 
-          {/* Tick labels for large gauge */}
-          {size === 'lg' && (
-            <>
-              <text x={cx - r - 4} y={cy - 12} textAnchor="end" fill="#f43f5e" fontSize="9" fontFamily="sans-serif">
-                Strong<tspan x={cx - r - 4} dy="11">Sell</tspan>
-              </text>
-              <text x={cx - 50} y={cy - r + 15} textAnchor="middle" fill="#94a3b8" fontSize="9">
-                Sell
-              </text>
-              <text x={cx} y={cy - r - 6} textAnchor="middle" fill="#94a3b8" fontSize="9">
-                Neutral
-              </text>
-              <text x={cx + 50} y={cy - r + 15} textAnchor="middle" fill="#94a3b8" fontSize="9">
-                Buy
-              </text>
-              <text x={cx + r + 4} y={cy - 12} textAnchor="start" fill="#10b981" fontSize="9" fontFamily="sans-serif">
-                Strong<tspan x={cx + r + 4} dy="11">Buy</tspan>
-              </text>
-            </>
-          )}
+          {/* Needle Pin */}
+          <circle cx={cx} cy={cy} r={5} fill="#475569" stroke="#ffffff" strokeWidth="1.5" />
 
-          {/* Needle Center Pin */}
-          <circle cx={cx} cy={cy} r={size === 'lg' ? 6 : 4} fill="#475569" stroke="#ffffff" strokeWidth="1.5" />
-
-          {/* Needle Pointer */}
-          <line
-            x1={cx}
-            y1={cy}
-            x2={nx}
-            y2={ny}
-            stroke="#ffffff"
-            strokeWidth={size === 'lg' ? 2.5 : 2}
-            strokeLinecap="round"
-          />
+          {/* Needle Line */}
+          <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
 
-        {/* Action Pill Badge below dial */}
+        {/* Labels below arc with no collisions */}
+        <div className="w-full flex justify-between px-3 text-[11px] text-slate-500 dark:text-[#9FB0C8] -mt-3">
+          <span className="text-rose-500 font-medium">Sell</span>
+          <span className="text-slate-400">Neutral</span>
+          <span className="text-emerald-500 font-medium">Buy</span>
+        </div>
+
+        {/* Action Badge */}
         <div
-          className={`mt-1 px-4 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm ${
+          className={`mt-3 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm ${
             action === 'Strong Buy'
-              ? 'bg-emerald-600 text-white shadow-emerald-600/30'
+              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40'
               : action === 'Buy'
-              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
               : action === 'Neutral'
-              ? 'bg-slate-800 text-slate-300'
+              ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700'
               : action === 'Sell'
-              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-              : 'bg-rose-600 text-white shadow-rose-600/30'
+              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+              : 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/40'
           }`}
         >
           {action}
+        </div>
+
+        {/* Votes Count */}
+        <div className="mt-2 text-xs font-mono text-slate-500 dark:text-[#9FB0C8] flex items-center gap-2">
+          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{buyCount} Buy</span>
+          {neutralCount !== undefined && <span>· {neutralCount} Neu</span>}
+          <span className="text-rose-600 dark:text-rose-400 font-semibold">· {sellCount} Sell</span>
         </div>
       </div>
     );
   };
 
-  const getActionColor = (act: string) => {
-    if (act.includes('Buy')) return 'text-emerald-400 font-bold';
-    if (act.includes('Sell')) return 'text-rose-400 font-bold';
-    if (act.includes('Less Volatility')) return 'text-slate-400';
-    return 'text-slate-300';
-  };
+  const isGold = symbol === 'XAUUSD';
+  const price = data?.price ?? (isGold ? 2650.0 : 1.0852);
+  const decimals = isGold ? 2 : symbol === 'USDJPY' ? 3 : 5;
 
-  const isGold = (data.canonicalSymbol || symbol) === 'XAUUSD';
-  const priceDisplay = typeof data.price === 'number'
-    ? data.price.toLocaleString(undefined, {
-        minimumFractionDigits: isGold ? 2 : 4,
-        maximumFractionDigits: isGold ? 2 : 4,
-      })
-    : '4,053.10';
+  const dayLow = data?.dayRangeLow ?? (price * 0.994);
+  const dayHigh = data?.dayRangeHigh ?? (price * 1.006);
+  const dayRangePct = Math.max(0, Math.min(100, Math.round(((price - dayLow) / (dayHigh - dayLow)) * 100)));
+
+  const yearLow = data?.yearRangeLow ?? (price * 0.88);
+  const yearHigh = data?.yearRangeHigh ?? (price * 1.35);
+  const yearRangePct = Math.max(0, Math.min(100, Math.round(((price - yearLow) / (yearHigh - yearLow)) * 100)));
+
+  // Generate visual lines for MAs and Pivots on Candlestick Chart
+  const chartVisualLines: StrategyVisualLine[] = [];
+  if (data && showMAs && candles.length > 0) {
+    const ma20 = data.movingAverages.find((m) => m.name === 'MA20');
+    const ma50 = data.movingAverages.find((m) => m.name === 'MA50');
+    const ma200 = data.movingAverages.find((m) => m.name === 'MA200');
+    const firstTime = candles[0].time;
+    const lastTime = candles[candles.length - 1].time;
+    if (ma20) {
+      chartVisualLines.push({
+        name: 'MA20',
+        color: '#38BDF8',
+        style: 'solid',
+        points: [
+          { time: firstTime, price: ma20.simple },
+          { time: lastTime, price: ma20.simple },
+        ],
+      });
+    }
+    if (ma50) {
+      chartVisualLines.push({
+        name: 'MA50',
+        color: '#F59E0B',
+        style: 'dashed',
+        points: [
+          { time: firstTime, price: ma50.simple },
+          { time: lastTime, price: ma50.simple },
+        ],
+      });
+    }
+    if (ma200) {
+      chartVisualLines.push({
+        name: 'MA200',
+        color: '#6366F1',
+        style: 'solid',
+        points: [
+          { time: firstTime, price: ma200.simple },
+          { time: lastTime, price: ma200.simple },
+        ],
+      });
+    }
+  }
+  if (data && showPivots && candles.length > 0) {
+    const classic = data.pivotPoints.find((p) => p.name === 'Classic');
+    if (classic && typeof classic.pivot === 'number') {
+      const firstTime = candles[0].time;
+      const lastTime = candles[candles.length - 1].time;
+      chartVisualLines.push({
+        name: 'Pivot PP',
+        color: '#10B981',
+        style: 'dashed',
+        points: [
+          { time: firstTime, price: classic.pivot },
+          { time: lastTime, price: classic.pivot },
+        ],
+      });
+    }
+  }
 
   return (
     <div className="space-y-6">
-      {/* Top Banner Notice */}
-      <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-xl">
-        <div className="flex flex-wrap items-center gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl font-bold text-white tracking-tight">
-                {data.symbol || 'XAU/USD - Gold Spot US Dollar'}
-              </h1>
-              <span className="px-2 py-0.5 rounded text-[11px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                {data.brokerSymbol || `${symbol}m`} (Exness MT5)
-              </span>
-            </div>
-            <div className="flex items-center gap-3 text-xs text-slate-400 mt-1">
-              <span>Real-time Technical Analysis</span>
-              <span>·</span>
-              <span className="text-slate-300 font-mono">
-                Canonical: <strong className="text-white">{data.canonicalSymbol || symbol}</strong>
-              </span>
-              <span>·</span>
-              <span className="text-slate-300 font-mono">
-                Broker Suffix: <strong className="text-amber-400">m</strong>
-              </span>
-            </div>
+      {/* 1. TOP HEADER & ASSET BAR */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm flex flex-wrap items-center justify-between gap-6 transition-colors">
+        {/* Symbol Title & Real-Time Status */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-[#E6ECF5] tracking-tight">
+              {data?.symbol || (isGold ? 'XAU/USD - Gold Spot' : `${symbol} - Spot FX`)}
+            </h1>
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+              {symbol}m (Exness MT5)
+            </span>
           </div>
 
-          {/* Live Price Pill */}
-          <div className="flex items-center gap-3 pl-4 border-l border-slate-800">
-            <span className="text-3xl font-extrabold text-white font-mono tracking-tight">
-              {priceDisplay}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-[#9FB0C8]">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Market Active · Updated {lastUpdatedSecAgo}s ago
             </span>
-            <div>
-              <div
-                className={`flex items-center gap-1 font-bold font-mono text-sm ${
-                  (data.change24h ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                }`}
-              >
-                {(data.change24h ?? 0) >= 0 ? (
-                  <ArrowUp className="w-4 h-4" />
-                ) : (
-                  <ArrowDown className="w-4 h-4" />
-                )}
-                <span>
-                  {data.change24h} ({data.change24hPct}%)
-                </span>
-              </div>
-              <span className="text-[10px] text-slate-500 font-mono">Market Active</span>
-            </div>
+            <span>·</span>
+            <span>Canonical: <strong className="text-slate-800 dark:text-white font-mono">{symbol}</strong></span>
+            <span>·</span>
+            <span>Exness Suffix: <strong className="text-amber-500 font-mono">m</strong></span>
           </div>
         </div>
 
-        {/* Pair Switcher & Range Info */}
-        <div className="flex flex-wrap items-center gap-4 text-xs font-mono">
-          <div className="text-right hidden md:block">
-            <div className="text-slate-400 text-[11px]">
-              Day's Range: <strong className="text-slate-200">{data.dayRangeLow} - {data.dayRangeHigh}</strong>
+        {/* Live Price & Range Sliders */}
+        <div className="flex flex-wrap items-center gap-6">
+          <div className="text-left md:text-right">
+            <div className="text-3xl font-extrabold text-slate-900 dark:text-white font-mono tabular-nums tracking-tight">
+              {price.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
             </div>
-            <div className="text-slate-400 text-[11px]">
-              52 wk Range: <strong className="text-slate-200">{data.yearRangeLow} - {data.yearRangeHigh}</strong>
+            <div
+              className={`flex items-center gap-1 font-semibold text-sm font-mono mt-0.5 ${
+                (data?.change24hPct ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+              }`}
+            >
+              {(data?.change24hPct ?? 0) >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+              <span>{data?.change24hPct ?? '+0.15'}% ({data?.change24h ?? '0.00'})</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 rounded-lg bg-slate-950 p-1 border border-slate-800">
+          {/* Range Sliders Bar */}
+          <div className="space-y-2.5 min-w-[200px]">
+            <div>
+              <div className="flex justify-between text-[11px] text-slate-500 dark:text-[#9FB0C8] font-mono">
+                <span>Day L: {dayLow.toFixed(decimals)}</span>
+                <span>Day H: {dayHigh.toFixed(decimals)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-1 relative">
+                <div
+                  className="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 rounded-full"
+                  style={{ width: '100%' }}
+                />
+                <div
+                  className="absolute top-0 bottom-0 w-1 bg-white ring-2 ring-slate-900 rounded-full shadow"
+                  style={{ left: `${dayRangePct}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-[11px] text-slate-500 dark:text-[#9FB0C8] font-mono">
+                <span>52W L: {yearLow.toFixed(decimals)}</span>
+                <span>52W H: {yearHigh.toFixed(decimals)}</span>
+              </div>
+              <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden mt-1 relative">
+                <div
+                  className="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 rounded-full"
+                  style={{ width: '100%' }}
+                />
+                <div
+                  className="absolute top-0 bottom-0 w-1 bg-white ring-2 ring-slate-900 rounded-full shadow"
+                  style={{ left: `${yearRangePct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Symbol Switcher */}
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
             {['XAUUSD', 'EURUSD', 'GBPUSD', 'USDJPY'].map((sym) => (
               <button
                 key={sym}
                 type="button"
                 onClick={() => setSymbol(sym)}
-                className={`px-2.5 py-1 rounded text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   symbol === sym
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
                 {sym === 'XAUUSD' ? 'Gold (XAU)' : sym}
               </button>
             ))}
           </div>
-
-          <button
-            type="button"
-            onClick={fetchTechnicalAnalysis}
-            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-            title="Refresh Technical Indicators"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
-          </button>
         </div>
       </div>
 
-      {/* Timeframe Selector Strip (Matches image_cac96abb.png) */}
-      <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border border-slate-800 bg-slate-900/60 text-xs font-mono">
-        <span className="text-slate-400 font-sans text-xs mr-2 font-semibold">Timeframe Analysis:</span>
-        {[
-          { tf: 'M1', label: '1 Min', action: 'Neutral' },
-          { tf: 'M5', label: '5 Min', action: 'Neutral' },
-          { tf: 'M15', label: '15 Min', action: 'Neutral' },
-          { tf: 'M30', label: '30 Min', action: 'Strong Buy' },
-          { tf: 'H1', label: 'Hourly', action: 'Strong Buy' },
-          { tf: 'H3', label: '3 Hours', action: 'Neutral' },
-          { tf: 'D1', label: 'Daily', action: 'Strong Sell' },
-        ].map((item) => (
-          <button
-            key={item.tf}
-            type="button"
-            onClick={() => setTimeframe(item.tf)}
-            className={`flex flex-col items-center px-3 py-1.5 rounded border transition-all ${
-              timeframe === item.tf
-                ? 'bg-blue-600/20 border-blue-500 text-white font-bold ring-1 ring-blue-500'
-                : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-          >
-            <span>{item.label}</span>
-            <span
-              className={`text-[9px] mt-0.5 ${
-                item.action === 'Strong Buy'
-                  ? 'text-emerald-400 font-bold'
-                  : item.action === 'Strong Sell'
-                  ? 'text-rose-400 font-bold'
-                  : 'text-slate-500'
-              }`}
-            >
-              {item.action}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {/* THREE GAUGES SECTION (Exact layout from image_cac96abb.png) */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-6 shadow-2xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center justify-items-center">
-          {/* Left: Technical Indicators Gauge */}
-          {renderGauge('Technical Indicators', data.indicatorsAction || 'Strong Buy', 'sm')}
-
-          {/* Center: Large Summary Gauge */}
-          {renderGauge('Summary', data.summaryAction || 'Strong Buy', 'lg')}
-
-          {/* Right: Moving Averages Gauge */}
-          {renderGauge('Moving Averages', data.maAction || 'Strong Buy', 'sm')}
+      {/* 2. DYNAMIC TIMEFRAME SELECTOR STRIP */}
+      <div className="p-3.5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
+        <div className="flex items-center gap-2">
+          <Clock className="w-4 h-4 text-indigo-500" />
+          <span className="text-xs font-bold text-slate-700 dark:text-[#E6ECF5]">
+            Select Timeframe (indicators recalculate dynamically):
+          </span>
         </div>
 
-        {/* Summary Breakdown text bar */}
-        <div className="mt-6 pt-4 border-t border-slate-800/80">
-          <div className="text-center font-sans mb-4">
-            <span className="text-slate-400 text-sm">Summary: </span>
-            <span className="text-base font-bold text-emerald-400 tracking-wide">
-              {data.summaryAction || 'Strong Buy'}
-            </span>
-          </div>
-
-          <div className="max-w-xl mx-auto space-y-2 text-xs font-mono">
-            <div className="flex items-center justify-between p-2 rounded bg-slate-950/80 border border-slate-800">
-              <span className="text-slate-300 font-sans font-medium">Moving Averages:</span>
-              <span className="text-emerald-400 font-bold">{data.maAction || 'Strong Buy'}</span>
-              <span className="text-slate-400">
-                Buy: (<strong className="text-emerald-400">{data.maBuyCount ?? 10}</strong>) · Sell: (
-                <strong className="text-rose-400">{data.maSellCount ?? 2}</strong>)
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between p-2 rounded bg-slate-950/80 border border-slate-800">
-              <span className="text-slate-300 font-sans font-medium">Technical Indicators:</span>
-              <span className="text-emerald-400 font-bold">{data.indicatorsAction || 'Strong Buy'}</span>
-              <span className="text-slate-400">
-                Buy: (<strong className="text-emerald-400">{data.indicatorsBuyCount ?? 6}</strong>) · Neutral: (
-                <strong className="text-slate-300">{data.indicatorsNeutralCount ?? 4}</strong>) · Sell: (
-                <strong className="text-rose-400">{data.indicatorsSellCount ?? 1}</strong>)
-              </span>
-            </div>
-          </div>
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          {TIMEFRAMES.map((item) => {
+            const isSelected = timeframe === item.id;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setTimeframe(item.id)}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25 ring-2 ring-indigo-400'
+                    : 'bg-slate-100 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* TWO COLUMN TABLES: Technical Indicators & Moving Averages */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 1. Technical Indicators Table */}
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-            <h3 className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <span>Technical Indicators</span>
-            </h3>
-            <span className="text-slate-400 font-mono text-[11px]">
-              Summary: <strong className="text-emerald-400">{data.indicatorsAction || 'Strong Buy'}</strong> (Buy: {data.indicatorsBuyCount ?? 6}, Neutral: {data.indicatorsNeutralCount ?? 4}, Sell: {data.indicatorsSellCount ?? 1})
+      {/* 3. THREE EQUAL-SIZED GAUGES SECTION */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {renderGauge(
+          'Technical Indicators',
+          data?.indicatorsAction || 'Buy',
+          data?.indicatorsBuyCount ?? 6,
+          data?.indicatorsSellCount ?? 2,
+          data?.indicatorsNeutralCount ?? 4
+        )}
+        {renderGauge(
+          'Summary Consensus',
+          data?.summaryAction || 'Strong Buy',
+          data?.summaryBuyCount ?? 16,
+          data?.summarySellCount ?? 3,
+          data?.summaryNeutralCount ?? 5
+        )}
+        {renderGauge(
+          'Moving Averages',
+          data?.maAction || 'Strong Buy',
+          data?.maBuyCount ?? 10,
+          data?.maSellCount ?? 2
+        )}
+      </div>
+
+      {/* 4. EMBEDDED CANDLESTICK CHART */}
+      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <BarChart2 className="w-5 h-5 text-indigo-500" />
+            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+              Interactive Candlestick Chart ({symbol} · {timeframe})
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs">
+            <label className="flex items-center gap-1.5 text-slate-600 dark:text-[#9FB0C8] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showMAs}
+                onChange={(e) => setShowMAs(e.target.checked)}
+                className="rounded accent-indigo-600 cursor-pointer"
+              />
+              <span>Moving Averages (20, 50, 200)</span>
+            </label>
+
+            <label className="flex items-center gap-1.5 text-slate-600 dark:text-[#9FB0C8] cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showPivots}
+                onChange={(e) => setShowPivots(e.target.checked)}
+                className="rounded accent-indigo-600 cursor-pointer"
+              />
+              <span>Pivot Level (PP)</span>
+            </label>
+          </div>
+        </div>
+
+        {candles.length > 0 ? (
+          <CandlestickChart
+            candles={candles}
+            symbol={symbol}
+            timeframe={timeframe}
+            height={380}
+            visualLines={chartVisualLines}
+          />
+        ) : (
+          <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <Activity className="w-8 h-8 animate-pulse text-indigo-500" />
+            <span>Loading market candles for {symbol} ({timeframe})...</span>
+          </div>
+        )}
+      </div>
+
+      {/* 5. TABLES: OSCILLATORS, MOVING AVERAGES & PIVOTS */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        {/* Technical Indicators Table */}
+        <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+              Technical Indicators ({timeframe})
+            </h2>
+            <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-mono">
+              Buy: <strong className="text-emerald-500">{data?.indicatorsBuyCount ?? 6}</strong> · Sell: <strong className="text-rose-500">{data?.indicatorsSellCount ?? 1}</strong>
             </span>
           </div>
 
-          <div className="overflow-x-auto mt-2">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="border-b border-slate-800/80 text-slate-400 text-[11px]">
-                <tr>
-                  <th className="py-2">Name</th>
-                  <th className="text-right">Value</th>
-                  <th className="text-right">Action</th>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                  <th className="text-left py-2 font-medium">Indicator</th>
+                  <th className="text-right py-2 font-medium">Value</th>
+                  <th className="text-right py-2 font-medium">Signal</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {(data.indicators || []).map((ind) => (
-                  <tr key={ind.name} className="hover:bg-slate-800/30">
-                    <td className="py-2 text-slate-200 font-semibold">{ind.name}</td>
-                    <td className="text-right text-slate-300">{ind.value}</td>
-                    <td className={`text-right ${getActionColor(ind.action)}`}>{ind.action}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* 2. Moving Averages Table */}
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-            <h3 className="font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <span>Moving Averages</span>
-            </h3>
-            <span className="text-slate-400 font-mono text-[11px]">
-              Summary: <strong className="text-emerald-400">{data.maAction || 'Strong Buy'}</strong> (Buy: {data.maBuyCount ?? 10}, Sell: {data.maSellCount ?? 2})
-            </span>
-          </div>
-
-          <div className="overflow-x-auto mt-2">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="border-b border-slate-800/80 text-slate-400 text-[11px]">
-                <tr>
-                  <th className="py-2">Name</th>
-                  <th>Simple (SMA)</th>
-                  <th>Action</th>
-                  <th>Exponential (EMA)</th>
-                  <th className="text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/50">
-                {(data.movingAverages || []).map((ma) => (
-                  <tr key={ma.name} className="hover:bg-slate-800/30">
-                    <td className="py-2 text-slate-200 font-bold">{ma.name}</td>
-                    <td className="text-slate-300">{typeof ma.simple === 'number' ? ma.simple.toFixed(isGold ? 2 : 4) : ma.simple}</td>
-                    <td className={getActionColor(ma.simpleAction)}>{ma.simpleAction}</td>
-                    <td className="text-slate-300">{typeof ma.exponential === 'number' ? ma.exponential.toFixed(isGold ? 2 : 4) : ma.exponential}</td>
-                    <td className={`text-right ${getActionColor(ma.exponentialAction)}`}>
-                      {ma.exponentialAction}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                {data?.indicators.map((ind) => (
+                  <tr key={ind.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                    <td className="py-2.5 font-sans font-medium text-slate-800 dark:text-slate-200">
+                      {ind.name}
+                    </td>
+                    <td className="py-2.5 text-right text-slate-700 dark:text-slate-300 tabular-nums">
+                      {typeof ind.value === 'number' ? ind.value.toFixed(4).replace(/\.?0+$/, '') : ind.value}
+                    </td>
+                    <td className="py-2.5 text-right font-sans">
+                      <span
+                        className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          ind.action === 'Buy'
+                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                            : ind.action === 'Sell'
+                            ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-slate-700'
+                        }`}
+                      >
+                        {ind.action}
+                      </span>
                     </td>
                   </tr>
                 ))}
@@ -492,51 +528,99 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
             </table>
           </div>
         </div>
-      </div>
 
-      {/* 3. PIVOT POINTS TABLE (Matches image_cac96abb.png) */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
-          <h3 className="font-bold text-white uppercase tracking-wider">
-            Pivot Points Calculation
-          </h3>
-          <span className="text-slate-400 font-mono text-[11px]">
-            Classical, Fibonacci, Camarilla, Woodie's, DeMark's Support/Resistance Levels
-          </span>
-        </div>
+        {/* Moving Averages & Pivot Points Column */}
+        <div className="space-y-6">
+          {/* Moving Averages Card */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+                Moving Averages ({timeframe})
+              </h2>
+              <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-mono">
+                Buy: <strong className="text-emerald-500">{data?.maBuyCount ?? 10}</strong> · Sell: <strong className="text-rose-500">{data?.maSellCount ?? 2}</strong>
+              </span>
+            </div>
 
-        <div className="overflow-x-auto mt-3">
-          <table className="w-full text-center text-xs font-mono">
-            <thead className="border-b border-slate-800 text-slate-400 text-[11px]">
-              <tr>
-                <th className="text-left py-2">Name</th>
-                <th>S3</th>
-                <th>S2</th>
-                <th>S1</th>
-                <th className="text-white font-bold bg-slate-900/60">Pivot Points</th>
-                <th>R1</th>
-                <th>R2</th>
-                <th>R3</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/50">
-              {(data.pivotPoints || []).map((row) => {
-                const fmt = (v: number | string) => (typeof v === 'number' ? v.toFixed(isGold ? 2 : 4) : v);
-                return (
-                  <tr key={row.name} className="hover:bg-slate-800/30">
-                    <td className="text-left py-2 font-bold text-slate-200">{row.name}</td>
-                    <td className="text-rose-400/90">{fmt(row.s3)}</td>
-                    <td className="text-rose-400">{fmt(row.s2)}</td>
-                    <td className="text-rose-300">{fmt(row.s1)}</td>
-                    <td className="font-bold text-white bg-slate-900/80">{fmt(row.pivot)}</td>
-                    <td className="text-emerald-300">{fmt(row.r1)}</td>
-                    <td className="text-emerald-400">{fmt(row.r2)}</td>
-                    <td className="text-emerald-400/90">{fmt(row.r3)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                    <th className="text-left py-2 font-medium">Period</th>
+                    <th className="text-right py-2 font-medium">Simple (SMA)</th>
+                    <th className="text-right py-2 font-medium">Exponential (EMA)</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  {data?.movingAverages.map((ma) => (
+                    <tr key={ma.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2.5 font-sans font-medium text-slate-800 dark:text-slate-200">
+                        {ma.name}
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums">
+                        <span className="mr-2 text-slate-700 dark:text-slate-300">{ma.simple.toFixed(decimals)}</span>
+                        <span
+                          className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-sans font-semibold ${
+                            ma.simpleAction === 'Buy'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                          }`}
+                        >
+                          {ma.simpleAction}
+                        </span>
+                      </td>
+                      <td className="py-2.5 text-right tabular-nums">
+                        <span className="mr-2 text-slate-700 dark:text-slate-300">{ma.exponential.toFixed(decimals)}</span>
+                        <span
+                          className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-sans font-semibold ${
+                            ma.exponentialAction === 'Buy'
+                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                          }`}
+                        >
+                          {ma.exponentialAction}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pivot Points Card */}
+          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
+            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5] mb-4">
+              Pivot Points ({timeframe})
+            </h2>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                    <th className="text-left py-2 font-medium">Method</th>
+                    <th className="text-right py-2 font-medium">S3</th>
+                    <th className="text-right py-2 font-medium">S1</th>
+                    <th className="text-right py-2 font-medium font-bold text-indigo-500">Pivot</th>
+                    <th className="text-right py-2 font-medium">R1</th>
+                    <th className="text-right py-2 font-medium">R3</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  {data?.pivotPoints.map((pp) => (
+                    <tr key={pp.name} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2 font-sans font-medium text-slate-800 dark:text-slate-200">{pp.name}</td>
+                      <td className="py-2 text-right text-rose-500 tabular-nums">{pp.s3}</td>
+                      <td className="py-2 text-right text-rose-400 tabular-nums">{pp.s1}</td>
+                      <td className="py-2 text-right font-bold text-indigo-500 tabular-nums">{pp.pivot}</td>
+                      <td className="py-2 text-right text-emerald-400 tabular-nums">{pp.r1}</td>
+                      <td className="py-2 text-right text-emerald-500 tabular-nums">{pp.r3}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     </div>

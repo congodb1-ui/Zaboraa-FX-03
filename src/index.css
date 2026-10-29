@@ -1,15 +1,44 @@
 @import "tailwindcss";
 
+:root {
+  --canvas-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --accent-primary: #6366f1;
+}
+
+html.dark, :root.dark {
+  --canvas-bg: #0b1020;
+  --card-bg: #111a2e;
+  --card-border: #223049;
+  --text-primary: #e6ecf5;
+  --text-secondary: #9fb0c8;
+  --accent-primary: #6366f1;
+}
+
 @layer base {
   body {
-    background-color: #090D16;
-    color: #f1f5f9;
+    background-color: #0b1020;
+    color: #e6ecf5;
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
 
-  code, kbd, samp, pre, .font-mono {
+  html:not(.dark) body {
+    background-color: #f8fafc;
+    color: #0f172a;
+  }
+
+  code, kbd, samp, pre, .font-mono, [data-tabular-nums] {
     font-family: 'JetBrains Mono', monospace;
     font-feature-settings: "tnum" on, "zero" on;
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -20,16 +49,24 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: #0b1120;
+  background: #0b1020;
+}
+
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: #f1f5f9;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
+  background: #223049;
   border-radius: 3px;
 }
 
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  background: #3b4c6e;
 }
 
 /* Utility to hide scrollbar track while maintaining full touch/wheel/keyboard scrollability */
