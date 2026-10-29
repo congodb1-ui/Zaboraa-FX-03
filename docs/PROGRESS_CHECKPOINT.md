@@ -166,4 +166,15 @@ Result: PASSED (Vite v6.4.5 built dist/ in 6.45s, exit code 0)
 - `src/engine/__tests__/fixtures/indicators_reference.json` was generated via `scripts/generate-indicator-fixtures.ts` directly from `src/engine/technicalIndicators.ts`.
 - Tests in `indicatorMath.test.ts` and `fixturesParity.test.ts` are labeled **self-consistency only** (verifying regression prevention and determinism) pending external TA-Lib benchmark reference vectors.
 
+---
+
+## 6. Chart Fullscreen Mode Feature
+- **Implementation**: `src/components/PriceChart.tsx` and `src/components/CandlestickChart.tsx`.
+- **Capabilities**:
+  - Fullscreen toggle button with dynamic label and icon (`Fullscreen` / `Exit Fullscreen`).
+  - Native browser `requestFullscreen()` with graceful fallback to CSS viewport fixed overlay (`fixed inset-0 z-50 w-screen h-screen bg-surface`) for sandboxed iframe environments.
+  - Floating top-right `Exit Fullscreen (Esc)` control.
+  - Keyboard shortcuts: `F` / `f` to toggle, `Escape` to exit (strictly suppressed when user focus is in `<input>` or `<textarea>`).
+  - Unit tests: `src/engine/__tests__/chartFullscreen.test.ts` verifying keyboard handling, active element suppression, escape handling, and iframe rejection fallback.
+
 

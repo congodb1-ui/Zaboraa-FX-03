@@ -304,23 +304,47 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     subPane,
   ]);
 
-  // Fullscreen toggle ('F' key and button)
+  // Fullscreen toggle ('F' key, button, and Esc support)
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
-    if (!document.fullscreenElement) {
-      containerRef.current.requestFullscreen().catch(() => {
-        setIsFullscreen(true);
-      });
+    if (!document.fullscreenElement && !isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {
+          // Fallback to pure CSS viewport fullscreen in iframe environments
+          setIsFullscreen(true);
+        });
+      }
       setIsFullscreen(true);
     } else {
-      document.exitFullscreen().catch(() => {});
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
       setIsFullscreen(false);
     }
+  }, [isFullscreen]);
+
+  // Synchronize when browser exits fullscreen natively (e.g. Esc key)
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isNativeFs = Boolean(document.fullscreenElement);
+      if (!isNativeFs) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
   }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'f' || e.key === 'F') {
+      if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === 'f' || e.key === 'F') {
         if (
           document.activeElement?.tagName !== 'INPUT' &&
           document.activeElement?.tagName !== 'TEXTAREA'
@@ -332,7 +356,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [toggleFullscreen]);
+  }, [toggleFullscreen, isFullscreen]);
 
   // Export PNG
   const handleExportPNG = () => {
@@ -1045,7 +1069,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({
     <div
       ref={containerRef}
       className={`relative flex flex-col rounded-xl border border-border bg-surface shadow-xl overflow-hidden select-none transition-colors ${
-        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : ''
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen bg-surface' : ''
       }`}
     >
       {/* Top Header & Chart Controls */}
@@ -1213,20 +1237,52 @@ export const PriceChart: React.FC<PriceChartProps> = ({
           <button
             type="button"
             onClick={toggleFullscreen}
-            title="Toggle Fullscreen (F)"
-            className="p-1 rounded bg-bg border border-border text-text-muted hover:text-text"
+            title={isFullscreen ? 'Exit Fullscreen (Esc or F)' : 'Make Chart Fullscreen (F)'}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-bold border transition-colors cursor-pointer ${
+              isFullscreen
+                ? 'bg-primary text-white border-primary shadow-sm'
+                : 'bg-bg border-border text-text-muted hover:text-text'
+            }`}
           >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            {isFullscreen ? (
+              <>
+                <Minimize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Exit Fullscreen</span>
+              </>
+            ) : (
+              <>
+                <Maximize2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Fullscreen</span>
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      {/* Floating Exit Fullscreen Button (top-right overlay when in Fullscreen) */}
+      {isFullscreen && (
+        <div className="absolute top-3.5 right-3.5 z-50">
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title="Exit Fullscreen Mode (Esc or F)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface/95 backdrop-blur-sm border border-border text-text hover:text-white hover:bg-primary shadow-2xl text-xs font-mono font-bold transition-all cursor-pointer"
+          >
+            <Minimize2 className="w-4 h-4" />
+            <span>Exit Fullscreen (Esc)</span>
+          </button>
+        </div>
+      )}
 
       {/* Main Canvas Chart Area */}
       <div
         className={`relative flex-1 overflow-hidden ${
           isDragging ? 'cursor-grabbing' : 'cursor-crosshair'
         }`}
-        style={{ minHeight: height }}
+        style={{
+          minHeight: isFullscreen ? 'calc(100vh - 120px)' : height,
+          height: isFullscreen ? 'calc(100vh - 120px)' : undefined,
+        }}
         onMouseDown={handleMouseDown}
       >
         <canvas ref={canvasRef} className="w-full h-full block" />

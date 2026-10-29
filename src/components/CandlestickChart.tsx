@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   Target,
   Maximize2,
+  Minimize2,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -44,6 +45,60 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Fullscreen state & keyboard shortcuts
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+
+  const toggleFullscreen = useCallback(() => {
+    if (!containerRef.current) return;
+    if (!document.fullscreenElement && !isFullscreen) {
+      if (containerRef.current.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {
+          setIsFullscreen(true);
+        });
+      }
+      setIsFullscreen(true);
+    } else {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      }
+      setIsFullscreen(false);
+    }
+  }, [isFullscreen]);
+
+  useEffect(() => {
+    const handleFsChange = () => {
+      const isNativeFs = Boolean(document.fullscreenElement);
+      if (!isNativeFs) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (
+          document.activeElement?.tagName !== 'INPUT' &&
+          document.activeElement?.tagName !== 'TEXTAREA'
+        ) {
+          e.preventDefault();
+          toggleFullscreen();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggleFullscreen, isFullscreen]);
 
   // Default viewport: show newest 80 bars
   const defaultBarsCount = 80;
@@ -306,7 +361,9 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   }
 
   const svgWidth = 920;
-  const chartHeight = height - 90;
+  const chartHeight = isFullscreen
+    ? (typeof window !== 'undefined' ? Math.max(480, window.innerHeight - 180) : height - 90)
+    : height - 90;
   const candleSlotWidth = svgWidth / visibleCandles.length;
   const candleBodyWidth = Math.max(2.0, candleSlotWidth * 0.7);
 
@@ -336,8 +393,24 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative rounded-lg border border-border bg-surface p-3 shadow-2xl select-none"
+      className={`relative rounded-lg border border-border bg-surface p-3 shadow-2xl select-none transition-colors ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none w-screen h-screen overflow-y-auto bg-surface' : ''
+      }`}
     >
+      {/* Floating Exit Fullscreen Button (top-right overlay when in Fullscreen) */}
+      {isFullscreen && (
+        <div className="absolute top-3.5 right-3.5 z-50">
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            title="Exit Fullscreen Mode (Esc or F)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface/95 backdrop-blur-sm border border-border text-text hover:text-white hover:bg-primary shadow-2xl text-xs font-mono font-bold transition-all cursor-pointer"
+          >
+            <Minimize2 className="w-4 h-4" />
+            <span>Exit Fullscreen (Esc)</span>
+          </button>
+        </div>
+      )}
       {/* Top Controls & Meta Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-border text-xs">
         <div className="flex flex-wrap items-center gap-3">
@@ -455,6 +528,28 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             >
               <ChevronsRight className="w-3 h-3" />
               Latest
+            </button>
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              title={isFullscreen ? 'Exit Fullscreen (Esc or F)' : 'Make Chart Fullscreen (F)'}
+              className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition-colors cursor-pointer ${
+                isFullscreen
+                  ? 'bg-primary text-white border-primary shadow-sm'
+                  : 'bg-bg border-border text-text-muted hover:text-text'
+              }`}
+            >
+              {isFullscreen ? (
+                <>
+                  <Minimize2 className="w-3 h-3" />
+                  <span>Exit Fullscreen</span>
+                </>
+              ) : (
+                <>
+                  <Maximize2 className="w-3 h-3" />
+                  <span>Fullscreen</span>
+                </>
+              )}
             </button>
           </div>
         </div>
