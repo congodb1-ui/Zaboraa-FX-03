@@ -169,11 +169,11 @@ export const FundamentalView: React.FC = () => {
         <svg width={w} height={h} className="overflow-visible">
           <defs>
             <linearGradient id="sentiment-gauge-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#f43f5e" />
-              <stop offset="35%" stopColor="#fb923c" />
-              <stop offset="50%" stopColor="#94a3b8" />
-              <stop offset="65%" stopColor="#34d399" />
-              <stop offset="100%" stopColor="#10b981" />
+              <stop offset="0%" stopColor="var(--danger)" />
+              <stop offset="35%" stopColor="var(--warning)" />
+              <stop offset="50%" stopColor="var(--text-muted)" />
+              <stop offset="65%" stopColor="var(--success)" />
+              <stop offset="100%" stopColor="var(--success)" />
             </linearGradient>
           </defs>
 
@@ -181,7 +181,7 @@ export const FundamentalView: React.FC = () => {
           <path
             d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
             fill="none"
-            stroke="#1e293b"
+            stroke="var(--border)"
             strokeWidth={strokeW + 4}
             strokeLinecap="round"
           />
@@ -196,21 +196,21 @@ export const FundamentalView: React.FC = () => {
           />
 
           {/* Zone labels */}
-          <text x={cx - r - 4} y={cy - 6} textAnchor="end" fill="#f43f5e" fontSize="9" fontWeight="bold">
+          <text x={cx - r - 4} y={cy - 6} textAnchor="end" fill="var(--danger)" fontSize="9" fontWeight="bold">
             Bearish
           </text>
-          <text x={cx} y={cy - r - 6} textAnchor="middle" fill="#94a3b8" fontSize="9">
+          <text x={cx} y={cy - r - 6} textAnchor="middle" fill="var(--text-muted)" fontSize="9">
             Neutral
           </text>
-          <text x={cx + r + 4} y={cy - 6} textAnchor="start" fill="#10b981" fontSize="9" fontWeight="bold">
+          <text x={cx + r + 4} y={cy - 6} textAnchor="start" fill="var(--success)" fontSize="9" fontWeight="bold">
             Bullish
           </text>
 
           {/* Needle center pin */}
-          <circle cx={cx} cy={cy} r={5} fill="#475569" stroke="#ffffff" strokeWidth="1.5" />
+          <circle cx={cx} cy={cy} r={5} fill="var(--surface)" stroke="var(--text)" strokeWidth="1.5" />
 
           {/* Needle pointer */}
-          <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+          <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
 
         <div className="mt-1 flex items-center gap-2">
@@ -220,7 +220,7 @@ export const FundamentalView: React.FC = () => {
                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                 : score <= -30
                 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                : 'bg-slate-800 text-slate-300'
+                : 'bg-surface text-text-muted'
             }`}
           >
             {label.replace('_', ' ')} ({score > 0 ? `+${score}` : score})
@@ -233,14 +233,14 @@ export const FundamentalView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <Compass className="w-4 h-4 text-emerald-400" />
               Fundamentals, News Sentiment & Gold Technical Lab
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-text-muted mt-0.5">
               Natural Language news headline sentiment parsing, Exness MT5 retail gold positioning, and Investing.com technical gauges.
             </p>
           </div>
@@ -265,7 +265,7 @@ export const FundamentalView: React.FC = () => {
             <button
               type="button"
               onClick={fetchFundamentalData}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
               Refresh
@@ -281,7 +281,7 @@ export const FundamentalView: React.FC = () => {
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               activeSubTab === 'sentiment'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                : 'bg-bg text-text-muted hover:text-text border border-border'
             }`}
           >
             <Newspaper className="w-3.5 h-3.5" />
@@ -294,7 +294,7 @@ export const FundamentalView: React.FC = () => {
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               activeSubTab === 'technical'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                : 'bg-bg text-text-muted hover:text-text border border-border'
             }`}
           >
             <Activity className="w-3.5 h-3.5" />
@@ -307,7 +307,7 @@ export const FundamentalView: React.FC = () => {
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all ${
               activeSubTab === 'cot_macro'
                 ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                : 'bg-bg text-text-muted hover:text-text border border-border'
             }`}
           >
             <Scale className="w-3.5 h-3.5" />
@@ -322,8 +322,8 @@ export const FundamentalView: React.FC = () => {
           {/* Top Section: News Sentiment Gauge & Retail Gold Sentiment */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* 1. News Sentiment Analysis Gauge */}
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="rounded-lg border border-border bg-surface p-5 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Newspaper className="w-4 h-4 text-blue-400" />
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -349,7 +349,7 @@ export const FundamentalView: React.FC = () => {
                       <span className="text-emerald-400 font-bold">
                         {sentimentData.overallSentiment.bullishPct}% Bullish
                       </span>
-                      <span className="text-slate-400 font-bold">
+                      <span className="text-text-muted font-bold">
                         {sentimentData.overallSentiment.neutralPct}% Neutral
                       </span>
                       <span className="text-rose-400 font-bold">
@@ -357,14 +357,14 @@ export const FundamentalView: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="w-full h-3 rounded-full bg-slate-950 flex overflow-hidden border border-slate-800">
+                    <div className="w-full h-3 rounded-full bg-bg flex overflow-hidden border border-border">
                       <div
                         style={{ width: `${sentimentData.overallSentiment.bullishPct}%` }}
                         className="bg-emerald-500 h-full"
                       />
                       <div
                         style={{ width: `${sentimentData.overallSentiment.neutralPct}%` }}
-                        className="bg-slate-500 h-full"
+                        className="bg-text-muted h-full"
                       />
                       <div
                         style={{ width: `${sentimentData.overallSentiment.bearishPct}%` }}
@@ -372,7 +372,7 @@ export const FundamentalView: React.FC = () => {
                       />
                     </div>
 
-                    <p className="text-[11px] text-slate-400 text-center mt-2">
+                    <p className="text-[11px] text-text-muted text-center mt-2">
                       Aggregate sentiment derived from {sentimentData.overallSentiment.sampleSize} institutional financial wires and geopolitical headlines.
                     </p>
                   </div>
@@ -381,8 +381,8 @@ export const FundamentalView: React.FC = () => {
             </div>
 
             {/* 2. Retail Sentiment for Gold (XAUUSD / XAUUSDm Exness Match) */}
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="rounded-lg border border-border bg-surface p-5 shadow-xl">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
                 <div className="flex items-center gap-2">
                   <Users className="w-4 h-4 text-amber-400" />
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -390,7 +390,7 @@ export const FundamentalView: React.FC = () => {
                   </h3>
                 </div>
                 <div className="flex items-center gap-1.5 font-mono text-[10px]">
-                  <span className="text-slate-400">Exness MT5:</span>
+                  <span className="text-text-muted">Exness MT5:</span>
                   <span className="px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold border border-amber-500/30">
                     {sentimentData?.retailSentimentGold.brokerSymbol || 'XAUUSDm'}
                   </span>
@@ -412,10 +412,10 @@ export const FundamentalView: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="w-full h-4 rounded-full bg-slate-950 flex overflow-hidden border border-slate-800 shadow-inner">
+                    <div className="w-full h-4 rounded-full bg-bg flex overflow-hidden border border-border shadow-inner">
                       <div
                         style={{ width: `${sentimentData.retailSentimentGold.longPct}%` }}
-                        className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full flex items-center justify-start pl-2 text-[10px] font-bold text-slate-950"
+                        className="bg-gradient-to-r from-emerald-600 to-emerald-400 h-full flex items-center justify-start pl-2 text-[10px] font-bold text-bg"
                       >
                         {sentimentData.retailSentimentGold.longPct}%
                       </div>
@@ -430,30 +430,30 @@ export const FundamentalView: React.FC = () => {
 
                   {/* Quantitative Retail Statistics Grid */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 text-[10px] block">Net Retail Position</span>
+                    <div className="p-2.5 rounded bg-bg border border-border">
+                      <span className="text-text-muted text-[10px] block">Net Retail Position</span>
                       <strong className="text-emerald-400 text-sm">
                         +{sentimentData.retailSentimentGold.netPosition}%
                       </strong>
                     </div>
 
-                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 text-[10px] block">24h Shift</span>
+                    <div className="p-2.5 rounded bg-bg border border-border">
+                      <span className="text-text-muted text-[10px] block">24h Shift</span>
                       <strong className="text-blue-400 text-sm">
                         +{sentimentData.retailSentimentGold.dailyShiftPct}%
                       </strong>
                     </div>
 
-                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 text-[10px] block">Open Retail Lots</span>
+                    <div className="p-2.5 rounded bg-bg border border-border">
+                      <span className="text-text-muted text-[10px] block">Open Retail Lots</span>
                       <strong className="text-white text-sm">
                         {sentimentData.retailSentimentGold.volumeLots.toLocaleString()}
                       </strong>
                     </div>
 
-                    <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 text-[10px] block">Avg Long Price</span>
-                      <strong className="text-slate-200 text-sm">
+                    <div className="p-2.5 rounded bg-bg border border-border">
+                      <span className="text-text-muted text-[10px] block">Avg Long Price</span>
+                      <strong className="text-text text-sm">
                         ${sentimentData.retailSentimentGold.avgLongPrice}
                       </strong>
                     </div>
@@ -468,7 +468,7 @@ export const FundamentalView: React.FC = () => {
                         {sentimentData.retailSentimentGold.contrarianBias.replace('_', ' ')}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+                    <p className="text-[11px] text-text-muted mt-1 leading-relaxed">
                       {sentimentData.retailSentimentGold.contrarianSummary}
                     </p>
                   </div>
@@ -478,18 +478,18 @@ export const FundamentalView: React.FC = () => {
           </div>
 
           {/* Parsed Financial Headlines Feed */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 text-xs">
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-xl">
+            <div className="flex items-center justify-between pb-3 border-b border-border text-xs">
               <h3 className="font-bold text-white uppercase tracking-wider flex items-center gap-2">
                 <FileText className="w-4 h-4 text-blue-400" />
                 Parsed Financial Headlines & Algorithmic Sentiment
               </h3>
-              <span className="text-slate-400 font-mono text-[11px]">
+              <span className="text-text-muted font-mono text-[11px]">
                 Showing {sentimentData?.headlines.length || 0} parsed wires
               </span>
             </div>
 
-            <div className="divide-y divide-slate-800/60 mt-2">
+            <div className="divide-y divide-border mt-2">
               {sentimentData?.headlines.map((item) => (
                 <div key={item.id} className="py-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="space-y-1 max-w-2xl">
@@ -500,22 +500,22 @@ export const FundamentalView: React.FC = () => {
                             ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                             : item.sentiment === 'BEARISH'
                             ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                            : 'bg-slate-800 text-slate-300 border border-slate-700'
+                            : 'bg-surface text-text-muted border border-border'
                         }`}
                       >
                         {item.sentiment} ({item.score > 0 ? `+${item.score}` : item.score})
                       </span>
-                      <span className="text-slate-500 text-[11px] font-mono">
+                      <span className="text-text-muted text-[11px] font-mono">
                         {item.source} · {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      <span className="px-1.5 py-0.2 rounded font-mono text-[10px] bg-slate-900 text-blue-400 border border-slate-800">
+                      <span className="px-1.5 py-0.2 rounded font-mono text-[10px] bg-bg text-blue-400 border border-border">
                         {item.relatedSymbol}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-200 font-medium">{item.headline}</p>
+                    <p className="text-xs text-text font-medium">{item.headline}</p>
                     <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                       {item.keywords.map((kw, i) => (
-                        <span key={i} className="text-[10px] px-1.5 py-0.2 rounded bg-slate-950 text-slate-400 font-mono border border-slate-800">
+                        <span key={i} className="text-[10px] px-1.5 py-0.2 rounded bg-bg text-text-muted font-mono border border-border">
                           #{kw}
                         </span>
                       ))}
@@ -523,10 +523,10 @@ export const FundamentalView: React.FC = () => {
                   </div>
 
                   <div className="text-right">
-                    <span className="text-[10px] text-slate-500 font-mono block">Impact Weight</span>
+                    <span className="text-[10px] text-text-muted font-mono block">Impact Weight</span>
                     <span
                       className={`text-xs font-bold font-mono ${
-                        item.impact === 'HIGH' ? 'text-amber-400' : 'text-slate-400'
+                        item.impact === 'HIGH' ? 'text-amber-400' : 'text-text-muted'
                       }`}
                     >
                       {item.impact}
@@ -552,7 +552,7 @@ export const FundamentalView: React.FC = () => {
           {/* COT Report Analysis */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="space-y-2">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
                 CFTC Contract Explorer
               </h3>
               <div className="space-y-2">
@@ -564,7 +564,7 @@ export const FundamentalView: React.FC = () => {
                     className={`w-full text-left p-3 rounded-lg border transition-all ${
                       selectedCotSymbol === c.symbol
                         ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500 shadow-sm'
-                        : 'border-slate-800 bg-slate-900/60 hover:bg-slate-800/50'
+                        : 'border-border bg-bg hover:bg-surface'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -579,7 +579,7 @@ export const FundamentalView: React.FC = () => {
                         {c.speculatorBias}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-xs font-mono text-slate-400">
+                    <div className="mt-2 flex items-center justify-between text-xs font-mono text-text-muted">
                       <span>COT Index: {c.cotIndex}%</span>
                       <span>Net: {c.netSpeculatorPosition > 0 ? `+${c.netSpeculatorPosition.toLocaleString()}` : c.netSpeculatorPosition.toLocaleString()}</span>
                     </div>
@@ -590,14 +590,14 @@ export const FundamentalView: React.FC = () => {
 
             {/* Active COT Speculator vs Commercial Breakdown */}
             {activeCot && (
-              <div className="lg:col-span-2 rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+              <div className="lg:col-span-2 rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-border">
                   <div>
                     <h3 className="text-sm font-bold text-white flex items-center gap-2">
                       <BarChart2 className="w-4 h-4 text-emerald-400" />
                       CFTC Commitments of Traders: {activeCot.symbol}
                     </h3>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-xs text-text-muted">
                       Report Date: {activeCot.reportDate} · Source: US Commodity Futures Trading Commission
                     </span>
                   </div>
@@ -608,19 +608,19 @@ export const FundamentalView: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 font-mono text-xs">
-                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
-                    <span className="text-slate-400 text-[11px] block">Non-Commercial (Speculators / Hedge Funds)</span>
+                  <div className="p-3 rounded-lg bg-bg border border-border">
+                    <span className="text-text-muted text-[11px] block">Non-Commercial (Speculators / Hedge Funds)</span>
                     <div className="mt-2 space-y-1">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Long Contracts:</span>
+                        <span className="text-text-muted">Long Contracts:</span>
                         <span className="text-emerald-400">{activeCot.nonCommercialLong.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Short Contracts:</span>
+                        <span className="text-text-muted">Short Contracts:</span>
                         <span className="text-rose-400">{activeCot.nonCommercialShort.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between pt-1 border-t border-slate-800 font-bold">
-                        <span className="text-slate-300">Net Position:</span>
+                      <div className="flex justify-between pt-1 border-t border-border font-bold">
+                        <span className="text-text-muted">Net Position:</span>
                         <span className={activeCot.netSpeculatorPosition >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                           {activeCot.netSpeculatorPosition > 0 ? '+' : ''}{activeCot.netSpeculatorPosition.toLocaleString()}
                         </span>
@@ -628,19 +628,19 @@ export const FundamentalView: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-slate-950 border border-slate-800">
-                    <span className="text-slate-400 text-[11px] block">Commercial (Hedgers / Smart Money Producers)</span>
+                  <div className="p-3 rounded-lg bg-bg border border-border">
+                    <span className="text-text-muted text-[11px] block">Commercial (Hedgers / Smart Money Producers)</span>
                     <div className="mt-2 space-y-1">
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Long Contracts:</span>
+                        <span className="text-text-muted">Long Contracts:</span>
                         <span className="text-emerald-400">{activeCot.commercialLong.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-500">Short Contracts:</span>
+                        <span className="text-text-muted">Short Contracts:</span>
                         <span className="text-rose-400">{activeCot.commercialShort.toLocaleString()}</span>
                       </div>
-                      <div className="flex justify-between pt-1 border-t border-slate-800 font-bold">
-                        <span className="text-slate-300">Net Position:</span>
+                      <div className="flex justify-between pt-1 border-t border-border font-bold">
+                        <span className="text-text-muted">Net Position:</span>
                         <span className={activeCot.netCommercialPosition >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                           {activeCot.netCommercialPosition > 0 ? '+' : ''}{activeCot.netCommercialPosition.toLocaleString()}
                         </span>
@@ -654,7 +654,7 @@ export const FundamentalView: React.FC = () => {
                     <Info className="w-4 h-4 text-blue-400" />
                     <span>Institutional Flow Interpretation</span>
                   </div>
-                  <p className="text-slate-300 text-[11px] leading-relaxed">
+                  <p className="text-text-muted text-[11px] leading-relaxed">
                     {activeCot.institutionalFlow}
                   </p>
                 </div>
@@ -664,7 +664,7 @@ export const FundamentalView: React.FC = () => {
 
           {/* Central Bank Rates & Currency Bias */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+            <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
                 <Globe className="w-4 h-4 text-indigo-400" />
                 Central Bank Policy Rates
@@ -673,22 +673,22 @@ export const FundamentalView: React.FC = () => {
                 {centralBanks.map((cb) => (
                   <div
                     key={cb.bank}
-                    className="flex items-center justify-between p-2.5 rounded bg-slate-950 border border-slate-800"
+                    className="flex items-center justify-between p-2.5 rounded bg-bg border border-border"
                   >
                     <div>
                       <div className="font-bold text-white">{cb.bank}</div>
-                      <span className="text-[10px] text-slate-500">Next Meeting: {cb.nextMeeting}</span>
+                      <span className="text-[10px] text-text-muted">Next Meeting: {cb.nextMeeting}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-sm font-bold text-emerald-400">{cb.rate.toFixed(2)}%</span>
-                      <span className="block text-[10px] text-slate-400">{cb.bias}</span>
+                      <span className="block text-[10px] text-text-muted">{cb.bias}</span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+            <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
                 <Flame className="w-4 h-4 text-amber-400" />
                 Macro Currency Pair Biases
@@ -697,7 +697,7 @@ export const FundamentalView: React.FC = () => {
                 {currencyBiases.map((bias) => (
                   <div
                     key={bias.pair}
-                    className="p-2.5 rounded bg-slate-950 border border-slate-800"
+                    className="p-2.5 rounded bg-bg border border-border"
                   >
                     <div className="flex items-center justify-between font-mono">
                       <span className="font-bold text-white text-sm">{bias.pair}</span>
@@ -711,7 +711,7 @@ export const FundamentalView: React.FC = () => {
                         {bias.rating}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-snug">{bias.reason}</p>
+                    <p className="text-[11px] text-text-muted mt-1 leading-snug">{bias.reason}</p>
                   </div>
                 ))}
               </div>

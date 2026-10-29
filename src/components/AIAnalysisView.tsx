@@ -241,7 +241,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl">
+      <div className="rounded-lg border border-border bg-surface p-5 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-500 via-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/20">
@@ -257,7 +257,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                   SERVER-SIDE API
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-text-muted mt-1">
                 Deep institutional synthesis of Technicals, COT smart money positioning, SQLite historical candle quality, and strategy parameter optimization.
               </p>
             </div>
@@ -281,14 +281,14 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
         </div>
 
         {/* Sub-Tabs */}
-        <div className="flex items-center gap-2 mt-5 border-t border-slate-800/80 pt-3">
+        <div className="flex items-center gap-2 mt-5 border-t border-border pt-3">
           <button
             type="button"
             onClick={() => setActiveSubTab('market')}
             className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
               activeSubTab === 'market'
                 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                : 'text-text-muted hover:text-text hover:bg-surface'
             }`}
           >
             <TrendingUp className="w-3.5 h-3.5" />
@@ -301,7 +301,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
             className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
               activeSubTab === 'data'
                 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                : 'text-text-muted hover:text-text hover:bg-surface'
             }`}
           >
             <Database className="w-3.5 h-3.5" />
@@ -314,7 +314,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
             className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
               activeSubTab === 'strategy'
                 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                : 'text-text-muted hover:text-text hover:bg-surface'
             }`}
           >
             <Sliders className="w-3.5 h-3.5" />
@@ -327,7 +327,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
             className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all ${
               activeSubTab === 'chat'
                 ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                : 'text-text-muted hover:text-text hover:bg-surface'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -340,13 +340,13 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
       {activeSubTab === 'market' && (
         <div className="space-y-6">
           {/* Controls Bar */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-lg border border-border bg-surface p-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <label className="text-xs text-slate-400 font-medium">Instrument:</label>
+              <label className="text-xs text-text-muted font-medium">Instrument:</label>
               <select
                 value={marketSymbol}
                 onChange={(e) => setMarketSymbol(e.target.value as ForexSymbol)}
-                className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                className="bg-bg border border-border rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
               >
                 <option value="XAUUSD">XAUUSD (Gold Spot $4,053)</option>
                 <option value="EURUSD">EURUSD (Euro Spot)</option>
@@ -354,11 +354,11 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                 <option value="USDJPY">USDJPY (Yen Spot)</option>
               </select>
 
-              <label className="text-xs text-slate-400 font-medium ml-2">Timeframe:</label>
+              <label className="text-xs text-text-muted font-medium ml-2">Timeframe:</label>
               <select
                 value={marketTimeframe}
                 onChange={(e) => setMarketTimeframe(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                className="bg-bg border border-border rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
               >
                 <option value="M15">M15 (15 Min)</option>
                 <option value="H1">H1 (1 Hour - Primary)</option>
@@ -384,9 +384,9 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
               {/* Left Column: Bias & Trade Setup */}
               <div className="space-y-6">
                 {/* Bias Card */}
-                <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-4">
+                <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
                       Institutional Bias
                     </span>
                     <span
@@ -404,10 +404,10 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
 
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-slate-400">Model Confidence</span>
+                      <span className="text-text-muted">Model Confidence</span>
                       <span className="font-mono font-bold text-white">{marketAnalysisResult.confidenceScore}%</span>
                     </div>
-                    <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-surface rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full"
                         style={{ width: `${marketAnalysisResult.confidenceScore}%` }}
@@ -415,14 +415,14 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                     </div>
                   </div>
 
-                  <p className="text-xs text-slate-300 leading-relaxed border-t border-slate-800/80 pt-3">
+                  <p className="text-xs text-text-muted leading-relaxed border-t border-border pt-3">
                     {marketAnalysisResult.executiveSummary}
                   </p>
                 </div>
 
                 {/* Suggested Trade Setup Card */}
                 {marketAnalysisResult.suggestedTradeSetup && (
-                  <div className="rounded-lg border border-blue-500/30 bg-gradient-to-b from-blue-950/20 to-[#0E1524] p-5 space-y-3">
+                  <div className="rounded-lg border border-blue-500/30 bg-gradient-to-b from-blue-950/20 to-[var(--surface)] p-5 space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-xs font-bold text-blue-400 flex items-center gap-1.5 uppercase tracking-wide">
                         <TrendingUp className="w-4 h-4" />
@@ -434,29 +434,29 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                     </div>
 
                     <div className="space-y-2 text-xs">
-                      <div className="flex justify-between py-1 border-b border-slate-800/60">
-                        <span className="text-slate-400">Entry Zone</span>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-text-muted">Entry Zone</span>
                         <span className="font-mono font-semibold text-white">{marketAnalysisResult.suggestedTradeSetup.entryZone}</span>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-slate-800/60">
-                        <span className="text-slate-400">Stop Loss</span>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-text-muted">Stop Loss</span>
                         <span className="font-mono font-semibold text-rose-400">{marketAnalysisResult.suggestedTradeSetup.stopLoss}</span>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-slate-800/60">
-                        <span className="text-slate-400">Target 1 (1.5R)</span>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-text-muted">Target 1 (1.5R)</span>
                         <span className="font-mono font-semibold text-emerald-400">{marketAnalysisResult.suggestedTradeSetup.takeProfit1}</span>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-slate-800/60">
-                        <span className="text-slate-400">Target 2 (Runner)</span>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-text-muted">Target 2 (Runner)</span>
                         <span className="font-mono font-semibold text-emerald-400">{marketAnalysisResult.suggestedTradeSetup.takeProfit2}</span>
                       </div>
-                      <div className="flex justify-between py-1 border-b border-slate-800/60">
-                        <span className="text-slate-400">Risk : Reward</span>
+                      <div className="flex justify-between py-1 border-b border-border">
+                        <span className="text-text-muted">Risk : Reward</span>
                         <span className="font-mono font-bold text-indigo-400">{marketAnalysisResult.suggestedTradeSetup.riskRewardRatio}</span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-slate-400 italic pt-1">
+                    <p className="text-[11px] text-text-muted italic pt-1">
                       Invalidation: {marketAnalysisResult.suggestedTradeSetup.invalidationCondition}
                     </p>
                   </div>
@@ -467,32 +467,32 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
               <div className="lg:col-span-2 space-y-6">
                 {/* 3 Verdict Pillars */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 space-y-2">
+                  <div className="rounded-lg border border-border bg-surface p-4 space-y-2">
                     <span className="text-[11px] font-bold text-indigo-400 uppercase tracking-wider flex items-center gap-1.5">
                       <BarChart3 className="w-3.5 h-3.5" />
                       Technicals
                     </span>
-                    <p className="text-xs text-slate-300 leading-relaxed">
+                    <p className="text-xs text-text-muted leading-relaxed">
                       {marketAnalysisResult.technicalVerdict}
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 space-y-2">
+                  <div className="rounded-lg border border-border bg-surface p-4 space-y-2">
                     <span className="text-[11px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Compass className="w-3.5 h-3.5" />
                       COT Positioning
                     </span>
-                    <p className="text-xs text-slate-300 leading-relaxed">
+                    <p className="text-xs text-text-muted leading-relaxed">
                       {marketAnalysisResult.cotVerdict}
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 space-y-2">
+                  <div className="rounded-lg border border-border bg-surface p-4 space-y-2">
                     <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                       <Sliders className="w-3.5 h-3.5" />
                       Macro & Yields
                     </span>
-                    <p className="text-xs text-slate-300 leading-relaxed">
+                    <p className="text-xs text-text-muted leading-relaxed">
                       {marketAnalysisResult.macroVerdict}
                     </p>
                   </div>
@@ -500,7 +500,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
 
                 {/* Key Inflection Levels */}
                 {marketAnalysisResult.keyInflectionLevels && (
-                  <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-3">
+                  <div className="rounded-lg border border-border bg-surface p-5 space-y-3">
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                       <Layers className="w-4 h-4 text-blue-400" />
                       Key Institutional Inflection & Liquidity Levels
@@ -547,7 +547,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                       <ShieldAlert className="w-4 h-4" />
                       Risk Warnings & Traps
                     </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
+                    <ul className="space-y-1.5 text-xs text-text-muted">
                       {marketAnalysisResult.riskWarnings?.map((w: string, i: number) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="text-rose-400 mt-0.5">•</span>
@@ -562,7 +562,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                       <CheckCircle2 className="w-4 h-4" />
                       Actionable Takeaways
                     </span>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
+                    <ul className="space-y-1.5 text-xs text-text-muted">
                       {marketAnalysisResult.actionableTakeaways?.map((t: string, i: number) => (
                         <li key={i} className="flex items-start gap-2">
                           <span className="text-blue-400 mt-0.5">•</span>
@@ -575,10 +575,10 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-12 text-center space-y-3">
+            <div className="rounded-lg border border-border bg-surface p-12 text-center space-y-3">
               <Sparkles className="w-10 h-10 text-indigo-400 mx-auto opacity-60" />
               <h3 className="text-sm font-bold text-white">Click "Analyze Market Telemetry" to Review {marketSymbol}</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
+              <p className="text-xs text-text-muted max-w-md mx-auto">
                 Gemini will combine spot price action, 12 technical indicators, COT hedge fund vs dealer commitments, and central bank yield differentials to deliver a unified quantitative assessment.
               </p>
             </div>
@@ -589,13 +589,13 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
       {/* SUB-TAB 2: DATA QUALITY AUDIT */}
       {activeSubTab === 'data' && (
         <div className="space-y-6">
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-lg border border-border bg-surface p-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <label className="text-xs text-slate-400 font-medium">Dataset to Audit:</label>
+              <label className="text-xs text-text-muted font-medium">Dataset to Audit:</label>
               <select
                 value={selectedDatasetId}
                 onChange={(e) => setSelectedDatasetId(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                className="bg-bg border border-border rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
               >
                 {catalog.length > 0 ? (
                   catalog.map((c) => (
@@ -622,9 +622,9 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
 
           {dataReviewResult ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-4">
+              <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  <span className="text-xs font-semibold text-text-muted uppercase tracking-wider">
                     Data Integrity Verdict
                   </span>
                   <span
@@ -640,10 +640,10 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
 
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-slate-400">Data Health Score</span>
+                    <span className="text-text-muted">Data Health Score</span>
                     <span className="font-mono font-bold text-white">{dataReviewResult.healthScore}%</span>
                   </div>
-                  <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-surface rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-emerald-500 h-2 rounded-full"
                       style={{ width: `${dataReviewResult.healthScore}%` }}
@@ -651,47 +651,47 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed border-t border-slate-800/80 pt-3">
+                <p className="text-xs text-text-muted leading-relaxed border-t border-border pt-3">
                   {dataReviewResult.summary}
                 </p>
 
-                <div className="space-y-2 text-xs border-t border-slate-800/80 pt-3">
+                <div className="space-y-2 text-xs border-t border-border pt-3">
                   <div>
-                    <span className="text-slate-400 font-semibold block mb-0.5">Weekend & Gap Analysis:</span>
-                    <p className="text-slate-300">{dataReviewResult.gapAnalysis}</p>
+                    <span className="text-text-muted font-semibold block mb-0.5">Weekend & Gap Analysis:</span>
+                    <p className="text-text-muted">{dataReviewResult.gapAnalysis}</p>
                   </div>
                   <div>
-                    <span className="text-slate-400 font-semibold block mb-0.5">Slippage & Spread Considerations:</span>
-                    <p className="text-slate-300">{dataReviewResult.slippageSpreadRisks}</p>
+                    <span className="text-text-muted font-semibold block mb-0.5">Slippage & Spread Considerations:</span>
+                    <p className="text-text-muted">{dataReviewResult.slippageSpreadRisks}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-4">
+              <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
                 <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                   Research Cleaning Recommendations
                 </h3>
 
-                <ul className="space-y-2 text-xs text-slate-300">
+                <ul className="space-y-2 text-xs text-text-muted">
                   {dataReviewResult.cleaningRecommendations?.map((rec: string, i: number) => (
-                    <li key={i} className="flex items-start gap-2 p-2.5 rounded bg-slate-900/60 border border-slate-800">
+                    <li key={i} className="flex items-start gap-2 p-2.5 rounded bg-bg border border-border">
                       <span className="text-blue-400 mt-0.5">•</span>
                       <span>{rec}</span>
                     </li>
                   ))}
                 </ul>
 
-                <div className="border-t border-slate-800/80 pt-3 text-xs space-y-1">
-                  <span className="text-slate-400 font-semibold block">Sample Size & Statistical Power:</span>
-                  <p className="text-slate-300">{dataReviewResult.sampleSizeViability}</p>
+                <div className="border-t border-border pt-3 text-xs space-y-1">
+                  <span className="text-text-muted font-semibold block">Sample Size & Statistical Power:</span>
+                  <p className="text-text-muted">{dataReviewResult.sampleSizeViability}</p>
                 </div>
 
                 {onNavigateToTab && (
                   <button
                     type="button"
                     onClick={() => onNavigateToTab('data')}
-                    className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 rounded bg-slate-800 hover:bg-slate-700 text-xs font-medium text-white transition-colors cursor-pointer"
+                    className="w-full mt-3 flex items-center justify-center gap-2 px-3 py-2 rounded bg-surface hover:bg-surface text-xs font-medium text-white transition-colors cursor-pointer"
                   >
                     Open Data Manager to Run Autofix
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -700,10 +700,10 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-12 text-center space-y-3">
+            <div className="rounded-lg border border-border bg-surface p-12 text-center space-y-3">
               <Database className="w-10 h-10 text-blue-400 mx-auto opacity-60" />
               <h3 className="text-sm font-bold text-white">Select a Dataset and Click "Audit Selected Dataset"</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
+              <p className="text-xs text-text-muted max-w-md mx-auto">
                 AI will inspect gaps, timestamp ordering, tick volume viability, and provide cleaning instructions.
               </p>
             </div>
@@ -714,13 +714,13 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
       {/* SUB-TAB 3: STRATEGY DOCTOR & SUGGESTIONS */}
       {activeSubTab === 'strategy' && (
         <div className="space-y-6">
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="rounded-lg border border-border bg-surface p-4 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <label className="text-xs text-slate-400 font-medium">Select Strategy:</label>
+              <label className="text-xs text-text-muted font-medium">Select Strategy:</label>
               <select
                 value={selectedStrategyId}
                 onChange={(e) => setSelectedStrategyId(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
+                className="bg-bg border border-border rounded px-2.5 py-1 text-xs text-white font-mono focus:outline-none focus:border-blue-500"
               >
                 {strategies.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -744,21 +744,21 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
           {strategyAdvisorResult ? (
             <div className="space-y-6">
               {/* Executive Assessment Header */}
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-3">
+              <div className="rounded-lg border border-border bg-surface p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-400 uppercase">Assessment:</span>
+                    <span className="text-xs font-semibold text-text-muted uppercase">Assessment:</span>
                     <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                       {strategyAdvisorResult.performanceVerdict.replace(/_/g, ' ')}
                     </span>
                   </div>
                   <div className="text-xs font-mono">
-                    <span className="text-slate-400">Robustness Score: </span>
+                    <span className="text-text-muted">Robustness Score: </span>
                     <span className="font-bold text-white">{strategyAdvisorResult.overallScore}/100</span>
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">
+                <p className="text-xs text-text-muted leading-relaxed">
                   {strategyAdvisorResult.executiveCritique}
                 </p>
               </div>
@@ -766,7 +766,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
               {/* Suggestions Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Parameter Suggestions */}
-                <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-4">
+                <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                     <Sliders className="w-4 h-4 text-blue-400" />
                     Specific Parameter Adjustments
@@ -774,16 +774,16 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
 
                   <div className="space-y-3">
                     {strategyAdvisorResult.parameterSuggestions?.map((param: any, idx: number) => (
-                      <div key={idx} className="p-3 rounded bg-slate-900/80 border border-slate-800 space-y-1.5 text-xs">
+                      <div key={idx} className="p-3 rounded bg-bg border border-border space-y-1.5 text-xs">
                         <div className="flex items-center justify-between">
                           <span className="font-mono font-semibold text-indigo-400">{param.parameter}</span>
                           <div className="flex items-center gap-2 font-mono text-[11px]">
-                            <span className="text-slate-500 line-through">{String(param.currentValue)}</span>
-                            <ArrowRight className="w-3 h-3 text-slate-400" />
+                            <span className="text-text-muted line-through">{String(param.currentValue)}</span>
+                            <ArrowRight className="w-3 h-3 text-text-muted" />
                             <span className="font-bold text-emerald-400">{String(param.suggestedValue)}</span>
                           </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 leading-relaxed">{param.rationale}</p>
+                        <p className="text-[11px] text-text-muted leading-relaxed">{param.rationale}</p>
                       </div>
                     ))}
                   </div>
@@ -792,16 +792,16 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                 {/* Regime Filters & Code Optimizations */}
                 <div className="space-y-6">
                   {/* Regime Filters */}
-                  <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-3">
+                  <div className="rounded-lg border border-border bg-surface p-5 space-y-3">
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                       <Layers className="w-4 h-4 text-emerald-400" />
                       Recommended Regime & Filter Gates
                     </h3>
                     <div className="space-y-2">
                       {strategyAdvisorResult.regimeFilters?.map((rf: any, idx: number) => (
-                        <div key={idx} className="p-2.5 rounded bg-slate-900/60 border border-slate-800 text-xs space-y-1">
+                        <div key={idx} className="p-2.5 rounded bg-bg border border-border text-xs space-y-1">
                           <span className="font-semibold text-emerald-400">{rf.filterName}</span>
-                          <p className="text-slate-300 text-[11px]">{rf.description}</p>
+                          <p className="text-text-muted text-[11px]">{rf.description}</p>
                           <span className="text-[10px] text-blue-400 block italic">Impact: {rf.expectedImpact}</span>
                         </div>
                       ))}
@@ -809,12 +809,12 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                   </div>
 
                   {/* Bottlenecks & Code Improvements */}
-                  <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 space-y-3">
+                  <div className="rounded-lg border border-border bg-surface p-5 space-y-3">
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                       <Code2 className="w-4 h-4 text-purple-400" />
                       Code & Execution Improvements
                     </h3>
-                    <ul className="space-y-1.5 text-xs text-slate-300">
+                    <ul className="space-y-1.5 text-xs text-text-muted">
                       {strategyAdvisorResult.codeOptimizations?.map((co: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-2">
                           <span className="text-purple-400 mt-0.5">•</span>
@@ -827,10 +827,10 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
               </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-12 text-center space-y-3">
+            <div className="rounded-lg border border-border bg-surface p-12 text-center space-y-3">
               <Sliders className="w-10 h-10 text-indigo-400 mx-auto opacity-60" />
               <h3 className="text-sm font-bold text-white">Click "Diagnose & Suggest Optimizations"</h3>
-              <p className="text-xs text-slate-400 max-w-md mx-auto">
+              <p className="text-xs text-text-muted max-w-md mx-auto">
                 Gemini will inspect backtest metrics, parameter sensitivity, and code structure to provide mathematical advice.
               </p>
             </div>
@@ -843,7 +843,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
         <div className="space-y-4">
           {/* Quick Prompt Templates */}
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">Quick Prompts:</span>
+            <span className="text-xs text-text-muted font-medium">Quick Prompts:</span>
             {[
               'Audit Trend Pullback Pro rules on EURUSD H1',
               'Analyze Gold COT institutional saturation risk',
@@ -854,7 +854,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                 key={i}
                 type="button"
                 onClick={() => handleSendChatMessage(prompt)}
-                className="px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 transition-colors cursor-pointer"
+                className="px-2.5 py-1 rounded bg-bg hover:bg-surface border border-border text-[11px] text-text-muted transition-colors cursor-pointer"
               >
                 {prompt}
               </button>
@@ -862,7 +862,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
           </div>
 
           {/* Chat Window */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] h-[480px] flex flex-col overflow-hidden shadow-xl">
+          <div className="rounded-lg border border-border bg-surface h-[480px] flex flex-col overflow-hidden shadow-xl">
             {/* Messages Body */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
               {chatMessages.map((msg, idx) => (
@@ -882,17 +882,17 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                     className={`max-w-[85%] rounded-lg p-3.5 text-xs leading-relaxed ${
                       msg.role === 'user'
                         ? 'bg-blue-600 text-white font-medium'
-                        : 'bg-slate-900 border border-slate-800 text-slate-200 shadow-sm'
+                        : 'bg-bg border border-border text-text shadow-sm'
                     }`}
                   >
                     <div className="whitespace-pre-line">{msg.text}</div>
 
                     {msg.role === 'assistant' && (
-                      <div className="flex items-center justify-end mt-2 pt-2 border-t border-slate-800/60">
+                      <div className="flex items-center justify-end mt-2 pt-2 border-t border-border">
                         <button
                           type="button"
                           onClick={() => handleCopyText(msg.text, idx)}
-                          className="text-[10px] text-slate-400 hover:text-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                          className="text-[10px] text-text-muted hover:text-text flex items-center gap-1 transition-colors cursor-pointer"
                         >
                           {copiedIndex === idx ? (
                             <>
@@ -917,7 +917,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                   <div className="w-7 h-7 rounded bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center shrink-0">
                     <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-spin" />
                   </div>
-                  <div className="bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-xs text-slate-400 flex items-center gap-2">
+                  <div className="bg-bg border border-border rounded-lg px-4 py-2 text-xs text-text-muted flex items-center gap-2">
                     <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
                     Gemini 3.8 Flash is analyzing quantitative telemetry...
                   </div>
@@ -926,7 +926,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
             </div>
 
             {/* Input Bar */}
-            <div className="border-t border-slate-800 p-3 bg-slate-950/80 flex items-center gap-2">
+            <div className="border-t border-border p-3 bg-bg flex items-center gap-2">
               <input
                 type="text"
                 value={chatInput}
@@ -938,7 +938,7 @@ export const AIAnalysisView: React.FC<AIAnalysisViewProps> = ({
                   }
                 }}
                 placeholder="Ask Gemini to review market data, backtest metrics, or strategy rules..."
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                className="flex-1 bg-bg border border-border rounded-lg px-3.5 py-2 text-xs text-text placeholder-text-muted focus:outline-none focus:border-primary"
               />
               <button
                 type="button"

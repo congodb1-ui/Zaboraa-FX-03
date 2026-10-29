@@ -81,25 +81,25 @@ export const NAV_HUBS: HubDef[] = [
   },
   {
     id: 'trading',
-    label: 'Trading Desk',
-    icon: <Activity className="w-4 h-4 text-indigo-400" />,
+    label: 'Automated Trading Hub',
+    icon: <Activity className="w-4 h-4 text-cyan-400" />,
     defaultTab: 'markets',
-    tabIds: ['markets', 'bots'],
+    tabIds: ['markets', 'bots', 'data'],
     tabs: [
-      { id: 'markets', label: 'Order Execution Desk', icon: <Activity className="w-3.5 h-3.5 text-indigo-400" /> },
-      { id: 'bots', label: 'Automated Bot Fleet', icon: <Bot className="w-3.5 h-3.5 text-teal-400" /> },
+      { id: 'markets', label: 'Trading Desk', icon: <Activity className="w-3.5 h-3.5 text-cyan-400" /> },
+      { id: 'bots', label: 'Automated Bot Fleet', icon: <Bot className="w-3.5 h-3.5 text-emerald-400" /> },
+      { id: 'data', label: 'Historical Vault', icon: <Database className="w-3.5 h-3.5 text-amber-400" /> },
     ],
   },
   {
     id: 'admin',
-    label: 'Admin & Data',
-    icon: <Database className="w-4 h-4 text-slate-400" />,
+    label: 'System & Security',
+    icon: <ShieldAlert className="w-4 h-4 text-rose-400" />,
     defaultTab: 'accounts',
-    tabIds: ['accounts', 'data', 'settings'],
+    tabIds: ['accounts', 'settings'],
     tabs: [
-      { id: 'accounts', label: 'Multi-User & Accounts', icon: <Users className="w-3.5 h-3.5 text-indigo-400" /> },
-      { id: 'data', label: 'Historical Data Vault', icon: <Database className="w-3.5 h-3.5 text-blue-400" /> },
-      { id: 'settings', label: 'Settings & Math Tests', icon: <Settings className="w-3.5 h-3.5 text-slate-400" /> },
+      { id: 'accounts', label: 'Admin & Accounts', icon: <Users className="w-3.5 h-3.5 text-blue-400" /> },
+      { id: 'settings', label: 'Environment & Risk', icon: <Settings className="w-3.5 h-3.5 text-text-muted" /> },
     ],
   },
 ];
@@ -172,24 +172,24 @@ export const Header: React.FC<HeaderProps> = ({
   const hasConnectedAccount = brokerState.connected && Boolean(brokerState.accountLogin);
 
   return (
-    <header className="border-b border-slate-200 dark:border-[#223049] bg-white dark:bg-[#0B1020]/95 backdrop-blur sticky top-0 z-40 select-none shadow-md transition-colors">
-      {/* 1. TOP BRAND & ACCOUNT STATUS BAR (Max width aligned with content) */}
-      <div className="border-b border-slate-200 dark:border-[#223049]/70">
+    <header className="border-b border-border bg-bg/95 backdrop-blur sticky top-0 z-40 select-none shadow-xs transition-colors">
+      {/* 1. TOP BRAND & ACCOUNT STATUS BAR */}
+      <div className="border-b border-border/70">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-4">
           {/* Brand Wordmark & Global Environment Badge */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-indigo-600 text-white shadow-sm shadow-indigo-500/25">
+            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white shadow-xs">
               <TrendingUp className="w-4 h-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-base text-slate-900 dark:text-[#E6ECF5] tracking-tight">
+                <span className="font-bold text-base text-text tracking-tight font-sans">
                   Zaboraa FX
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-warning/10 text-warning border border-warning/20">
                   Sample Data
                 </span>
-                <span className="text-slate-500 dark:text-[#9FB0C8] text-xs hidden md:inline">
+                <span className="text-text-muted text-xs hidden md:inline">
                   Algorithmic Forex Portal
                 </span>
               </div>
@@ -199,28 +199,28 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Account Status, Theme Switcher & Hold-to-Confirm Kill Switch */}
           <div className="flex items-center gap-3">
             {/* Account Status Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] text-xs">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border text-xs">
               <div
                 className={`w-2 h-2 rounded-full ${
                   hasConnectedAccount
-                    ? 'bg-emerald-500'
-                    : 'bg-amber-500'
+                    ? 'bg-success'
+                    : 'bg-warning'
                 }`}
               />
               {hasConnectedAccount ? (
                 <>
-                  <span className="text-slate-700 dark:text-[#E6ECF5] font-medium">{brokerState.server}</span>
-                  <span className="text-slate-400">·</span>
-                  <span className="font-mono text-slate-600 dark:text-[#9FB0C8]">#{brokerState.accountLogin}</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  <span className="text-text font-medium">{brokerState.server}</span>
+                  <span className="text-border">·</span>
+                  <span className="font-mono tabular-nums text-text-muted">#{brokerState.accountLogin}</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase bg-warning/10 text-warning border border-warning/20">
                     {brokerState.mode}
                   </span>
                 </>
               ) : (
-                <span className="text-slate-500 dark:text-[#9FB0C8]">No broker connected</span>
+                <span className="text-text-muted">No broker connected</span>
               )}
-              <span className="text-slate-300 dark:text-slate-700">|</span>
-              <span className={brokerState.allowTrading ? 'text-emerald-600 dark:text-emerald-400 font-medium' : 'text-amber-600 dark:text-amber-400 font-medium'}>
+              <span className="text-border">|</span>
+              <span className={brokerState.allowTrading ? 'text-success font-medium' : 'text-warning font-medium'}>
                 {brokerState.allowTrading ? 'Trading: On' : 'Trading: Off (Simulated)'}
               </span>
             </div>
@@ -229,14 +229,14 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               type="button"
               onClick={onToggleTheme}
-              className="p-2 rounded-lg bg-slate-100 dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded-lg bg-surface border border-border text-text-muted hover:text-text transition-colors cursor-pointer"
               title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? (
-                <Sun className="w-4 h-4 text-amber-400" />
+                <Sun className="w-4 h-4 text-warning" />
               ) : (
-                <Moon className="w-4 h-4 text-indigo-600" />
+                <Moon className="w-4 h-4 text-primary" />
               )}
             </button>
 
@@ -249,19 +249,18 @@ export const Header: React.FC<HeaderProps> = ({
               onTouchStart={startHoldKill}
               onTouchEnd={cancelHoldKill}
               onClick={() => {
-                // If clicked directly without hold, open confirmation modal
                 onOpenKillSwitch();
               }}
-              className={`relative overflow-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all shadow-sm cursor-pointer select-none ${
+              className={`relative overflow-hidden flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold tracking-wide transition-all shadow-xs cursor-pointer select-none ${
                 brokerState.killSwitchActive
-                  ? 'bg-rose-600 text-white animate-pulse'
-                  : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white'
+                  ? 'bg-danger text-white animate-pulse'
+                  : 'bg-danger/15 text-danger border border-danger/30 hover:bg-danger hover:text-white'
               }`}
               title="Click for review modal, or press and hold for 1.5s to engage emergency halt"
             >
               {isHoldingKill && (
                 <span
-                  className="absolute inset-0 bg-rose-600/40 pointer-events-none transition-all"
+                  className="absolute inset-0 bg-danger/40 pointer-events-none transition-all"
                   style={{ width: `${holdProgress}%` }}
                 />
               )}
@@ -278,8 +277,8 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* 2. PRIMARY 4-HUB SELECTION BAR (Max width aligned with content) */}
-      <div className="border-b border-slate-200 dark:border-[#223049]/50 bg-slate-50 dark:bg-[#0E1524]">
+      {/* 2. PRIMARY 4-HUB SELECTION BAR */}
+      <div className="border-b border-border/60 bg-surface/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between">
           <nav className="flex items-center gap-2 overflow-x-auto no-scrollbar">
             {NAV_HUBS.map((hub) => {
@@ -291,8 +290,8 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => handleSelectHub(hub)}
                   className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
                     isSelectedHub
-                      ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20'
-                      : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#111A2E]'
+                      ? 'bg-primary text-white shadow-xs'
+                      : 'text-text-muted hover:text-text hover:bg-surface'
                   }`}
                 >
                   {hub.icon}
@@ -305,9 +304,9 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* 3. DEDICATED SUB-TAB STRIP */}
-      <div className="bg-slate-100 dark:bg-[#090D16] border-b border-slate-200 dark:border-[#223049]/40">
+      <div className="bg-bg border-b border-border/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-1.5 flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 mr-1 hidden sm:inline">
+          <span className="text-xs font-medium text-text-muted mr-1 hidden sm:inline">
             {activeHub.label}:
           </span>
           {activeHub.tabs.map((tab) => {
@@ -319,8 +318,8 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-white dark:bg-[#111A2E] text-indigo-600 dark:text-white font-semibold border border-indigo-200 dark:border-indigo-500/30 shadow-sm'
-                    : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-[#111A2E]/60'
+                    ? 'bg-surface text-primary font-semibold border border-primary/30 shadow-xs'
+                    : 'text-text-muted hover:text-text hover:bg-surface/60'
                 }`}
               >
                 {tab.icon}

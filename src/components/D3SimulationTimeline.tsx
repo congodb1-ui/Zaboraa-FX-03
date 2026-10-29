@@ -617,10 +617,10 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-2xl"
+      className="relative rounded-lg border border-border bg-surface p-4 shadow-2xl"
     >
       {/* Visualizer Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
             <Layers className="w-4 h-4" />
@@ -628,11 +628,11 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
           <div>
             <h3 className="text-xs font-bold text-white flex items-center gap-2">
               D3 Interactive Simulation Timeline
-              <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-blue-400 font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface text-blue-400 font-mono">
                 D3.js Vector Engine
               </span>
             </h3>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-text-muted">
               Entry/exit trajectory paths, holding durations, and peak-to-trough drawdowns mapped against market bars.
             </p>
           </div>
@@ -641,14 +641,14 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
         {/* Trade Filter & Timeframe Range Controls */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Trade Filter Toggle */}
-          <div className="flex items-center rounded bg-slate-950 p-0.5 border border-slate-800 text-[11px] font-mono">
+          <div className="flex items-center rounded bg-bg p-0.5 border border-border text-[11px] font-mono">
             <button
               type="button"
               onClick={() => setActiveFilter('ALL')}
               className={`px-2 py-0.5 rounded transition-colors ${
                 activeFilter === 'ALL'
                   ? 'bg-blue-600 text-white font-bold'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               All Trades ({trades.length})
@@ -659,7 +659,7 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
               className={`px-2 py-0.5 rounded transition-colors ${
                 activeFilter === 'WINS'
                   ? 'bg-emerald-600 text-white font-bold'
-                  : 'text-slate-400 hover:text-emerald-400'
+                  : 'text-text-muted hover:text-emerald-400'
               }`}
             >
               Wins
@@ -670,7 +670,7 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
               className={`px-2 py-0.5 rounded transition-colors ${
                 activeFilter === 'LOSSES'
                   ? 'bg-rose-600 text-white font-bold'
-                  : 'text-slate-400 hover:text-rose-400'
+                  : 'text-text-muted hover:text-rose-400'
               }`}
             >
               Losses
@@ -678,39 +678,39 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
           </div>
 
           {/* Quick Zoom Buttons */}
-          <div className="flex items-center rounded bg-slate-950 p-0.5 border border-slate-800 text-[11px] font-mono">
+          <div className="flex items-center rounded bg-bg p-0.5 border border-border text-[11px] font-mono">
             <button
               type="button"
               onClick={() => handleZoomRange(7)}
-              className="px-2 py-0.5 rounded text-slate-400 hover:text-white"
+              className="px-2 py-0.5 rounded text-text-muted hover:text-text"
             >
               7D
             </button>
             <button
               type="button"
               onClick={() => handleZoomRange(30)}
-              className="px-2 py-0.5 rounded text-slate-400 hover:text-white"
+              className="px-2 py-0.5 rounded text-text-muted hover:text-text"
             >
               1M
             </button>
             <button
               type="button"
               onClick={() => handleZoomRange(90)}
-              className="px-2 py-0.5 rounded text-slate-400 hover:text-white"
+              className="px-2 py-0.5 rounded text-text-muted hover:text-text"
             >
               3M
             </button>
             <button
               type="button"
               onClick={() => handleZoomRange(365)}
-              className="px-2 py-0.5 rounded text-slate-400 hover:text-white"
+              className="px-2 py-0.5 rounded text-text-muted hover:text-text"
             >
               1Y
             </button>
             <button
               type="button"
               onClick={handleResetZoom}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-blue-400 hover:bg-slate-800 font-bold"
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-blue-400 hover:bg-surface font-bold"
             >
               <RotateCcw className="w-3 h-3" />
               All
@@ -721,15 +721,15 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
 
       {/* Floating Info Tooltip */}
       {hoveredData && (
-        <div className="absolute top-16 left-6 z-20 pointer-events-none rounded-lg border border-slate-700 bg-slate-950/95 p-3 text-xs shadow-2xl backdrop-blur-md font-mono text-slate-200 min-w-64">
-          <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-800 text-[11px] text-slate-400">
+        <div className="absolute top-16 left-6 z-20 pointer-events-none rounded-lg border border-border bg-bg p-3 text-xs shadow-2xl backdrop-blur-md font-mono text-text min-w-64">
+          <div className="flex items-center justify-between pb-1 mb-1 border-b border-border text-[11px] text-text-muted">
             <span>{hoveredData.time.toLocaleString()}</span>
             <span className="text-blue-400 font-bold">{symbol}</span>
           </div>
 
           {hoveredData.price !== undefined && (
             <div className="flex justify-between text-[11px]">
-              <span className="text-slate-400">Market Price:</span>
+              <span className="text-text-muted">Market Price:</span>
               <strong className="text-white">
                 {hoveredData.price.toFixed(symbol === 'USDJPY' ? 3 : symbol === 'XAUUSD' ? 2 : 5)}
               </strong>
@@ -738,20 +738,20 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
 
           {hoveredData.equity !== undefined && (
             <div className="flex justify-between text-[11px]">
-              <span className="text-slate-400">Simulated Equity:</span>
+              <span className="text-text-muted">Simulated Equity:</span>
               <strong className="text-emerald-400">${hoveredData.equity.toFixed(2)}</strong>
             </div>
           )}
 
           {hoveredData.drawdownPct !== undefined && (
             <div className="flex justify-between text-[11px]">
-              <span className="text-slate-400">Drawdown from Peak:</span>
+              <span className="text-text-muted">Drawdown from Peak:</span>
               <strong className="text-rose-400">-{hoveredData.drawdownPct.toFixed(2)}%</strong>
             </div>
           )}
 
           {hoveredData.activeTrade && (
-            <div className="mt-2 pt-1.5 border-t border-slate-800/80">
+            <div className="mt-2 pt-1.5 border-t border-border">
               <div className="flex items-center justify-between text-[11px] font-bold">
                 <span className={hoveredData.activeTrade.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                   Trade #{hoveredData.activeTrade.ticket} ({hoveredData.activeTrade.side})
@@ -760,7 +760,7 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
                   {hoveredData.activeTrade.pnl >= 0 ? '+' : ''}${hoveredData.activeTrade.pnl.toFixed(2)}
                 </span>
               </div>
-              <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+              <div className="flex justify-between text-[10px] text-text-muted mt-0.5">
                 <span>
                   Entry: {hoveredData.activeTrade.openPrice} → Exit: {hoveredData.activeTrade.closePrice}
                 </span>
@@ -776,7 +776,7 @@ export const D3SimulationTimeline: React.FC<D3SimulationTimelineProps> = ({
         <svg ref={svgRef} className="w-full" style={{ height }} />
       </div>
 
-      <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80 text-[10px] font-mono text-slate-500">
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border text-[10px] font-mono text-text-muted">
         <span>Use the bottom timeline scrubber handles to pan and zoom across the entire multi-year dataset</span>
         <span>Green = Equity curve · Red shaded = Peak drawdown · Colored bands = Trade holding periods</span>
       </div>

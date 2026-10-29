@@ -5,6 +5,14 @@ import {
   StrategyVisualLine,
   StrategyVisualMarker,
 } from '../types/forex';
+import { getQuickJS } from 'quickjs-emscripten';
+
+let quickjsInstance: any = null;
+try {
+  quickjsInstance = await getQuickJS();
+} catch (e) {
+  console.warn('[QuickJS Sandbox] WASM load warning:', e);
+}
 
 export interface StrategySignal {
   action: 'BUY' | 'SELL' | 'CLOSE' | 'MODIFY' | 'HOLD';
@@ -737,46 +745,131 @@ export function executeStrategyBar(
 
   try {
     const startTime = Date.now();
-    const wrappedCode = `
-      "use strict";
-      ${code}
-      if (typeof onBar === 'function') {
-        onBar(ctx, bar);
+    const currentBar = candles[barIndex];
+    const prevCandlesSlice = candles.slice(0, barIndex + 1);
+
+    if (quickjsInstance) {
+      const script = `
+        (function() {
+          "use strict";
+          const __signals = [];
+          const __logs = [];
+          const __visualBlocks = [];
+          const __visualLines = [];
+          const __visualMarkers = [];
+          const __candles = ${JSON.stringify(prevCandlesSlice)};
+          const __bar = ${JSON.stringify(currentBar)};
+          const __currentBarIndex = ${barIndex};
+
+          const ctx = {
+            symbol: ${JSON.stringify(context.symbol)},
+            balance: ${context.balance},
+            equity: ${context.equity},
+            currentBarIndex: ${barIndex},
+            openPositions: ${JSON.stringify(context.openPositions)},
+            getBar: function(idx) {
+              if (idx > __currentBarIndex) {
+                throw new Error("CANARY_LOOKAHEAD_VIOLATION: Cheating script attempted to read future bar index " + idx + " when current is " + __currentBarIndex);
+              }
+              if (idx < 0 || idx >= __candles.length) return null;
+              return __candles[idx];
+            },
+            buy: function(symbol, lots, sl, tp1, tp2, tp3, reason) {
+              if (!sl || sl <= 0) {
+                __logs.push("MANDATORY_STOP_LOSS_REJECT: Buy order rejected because SL is missing or zero.");
+                return;
+              }
+              __signals.push({
+                action: 'BUY',
+                symbol: symbol,
+                lots: lots,
+                sl: sl,
+                tp: tp1,
+                tp2: tp2,
+                tp3: tp3,
+                reason: reason || 'BREAKOUT ↑'
+              });
+            },
+            sell: function(symbol, lots, sl, tp1, tp2, tp3, reason) {
+              if (!sl || sl <= 0) {
+                __logs.push("MANDATORY_STOP_LOSS_REJECT: Sell order rejected because SL is missing or zero.");
+                return;
+              }
+              __signals.push({
+                action: 'SELL',
+                symbol: symbol,
+                lots: lots,
+                sl: sl,
+                tp: tp1,
+                tp2: tp2,
+                tp3: tp3,
+                reason: reason || 'BREAKDOWN ↓'
+              });
+            },
+            close: function(ticket) {
+              __signals.push({ action: 'CLOSE', symbol: ${JSON.stringify(context.symbol)}, lots: 0, sl: 0, ticket: ticket });
+            },
+            addVisualBlock: function(block) {
+              __visualBlocks.push(block);
+            },
+            addVisualLine: function(name, points, color) {
+              __visualLines.push({ name: name, points: points, color: color || '#3b82f6', style: 'solid' });
+            },
+            addVisualMarker: function(marker) {
+              __visualMarkers.push(marker);
+            },
+            log: function(msg) {
+              __logs.push(msg);
+            }
+          };
+
+          ${code}
+
+          if (typeof onBar === 'function') {
+            onBar(ctx, __bar);
+          }
+
+          return JSON.stringify({
+            signals: __signals,
+            logs: __logs,
+            visualBlocks: __visualBlocks,
+            visualLines: __visualLines,
+            visualMarkers: __visualMarkers
+          });
+        })()
+      `;
+
+      const rawResult = quickjsInstance.evalCode(script);
+      const parsed = typeof rawResult === 'string' ? JSON.parse(rawResult) : rawResult;
+
+      const elapsed = Date.now() - startTime;
+      if (elapsed > 50) {
+        return {
+          signals: [],
+          logs: parsed.logs || [],
+          visualBlocks: [],
+          visualLines: [],
+          visualMarkers: [],
+          error: `CPU_TIMEOUT: Strategy execution took ${elapsed}ms, exceeding 50ms per-bar budget.`,
+        };
       }
-    `;
 
-    // Strict sandboxed function with isolated argument scope
-    const fn = new Function(
-      'ctx',
-      'bar',
-      'Date',
-      'Math',
-      'Number',
-      'String',
-      'Array',
-      'Boolean',
-      'parseInt',
-      'parseFloat',
-      'isNaN',
-      'isFinite',
-      wrappedCode
-    );
-
-    fn(ctx, candles[barIndex], Date, Math, Number, String, Array, Boolean, parseInt, parseFloat, isNaN, isFinite);
-
-    const elapsed = Date.now() - startTime;
-    if (elapsed > 50) {
       return {
-        signals: [],
-        logs,
-        visualBlocks: [],
-        visualLines: [],
-        visualMarkers: [],
-        error: `CPU_TIMEOUT: Strategy execution took ${elapsed}ms, exceeding 50ms per-bar budget.`,
+        signals: parsed.signals || [],
+        logs: parsed.logs || [],
+        visualBlocks: parsed.visualBlocks || [],
+        visualLines: parsed.visualLines || [],
+        visualMarkers: parsed.visualMarkers || [],
       };
     }
 
-    return { signals, logs, visualBlocks, visualLines, visualMarkers };
+    return {
+      signals,
+      logs: ['QuickJS WASM runtime initializing...'],
+      visualBlocks: [],
+      visualLines: [],
+      visualMarkers: [],
+    };
   } catch (err: any) {
     return {
       signals: [],

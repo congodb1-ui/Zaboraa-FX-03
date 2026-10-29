@@ -81,27 +81,27 @@ if (shortCondition)
   return (
     <div className="space-y-6">
       {/* Intro strip */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
         <h2 className="text-sm font-bold text-white flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-indigo-400" />
           TradingView Pine Script AI Converter & Verification Bench
         </h2>
-        <p className="text-xs text-slate-400 mt-1">
-          Translates Pine Script (v4, v5, v6) into the unified Zaboraa TypeScript <code className="text-slate-200">onBar(ctx, bar)</code> contract. Automatically scans for repainting and <code className="text-slate-200">barmerge.lookahead_on</code> hazards.
+        <p className="text-xs text-text-muted mt-1">
+          Translates Pine Script (v4, v5, v6) into the unified Zaboraa TypeScript <code className="text-text">onBar(ctx, bar)</code> contract. Automatically scans for repainting and <code className="text-text">barmerge.lookahead_on</code> hazards.
         </p>
       </div>
 
       {/* Editor & Translation View */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pine Script Input */}
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl flex flex-col justify-between">
+        <div className="rounded-lg border border-border bg-surface p-4 shadow-xl flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <span className="text-xs font-bold text-slate-200 flex items-center gap-2">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <span className="text-xs font-bold text-text flex items-center gap-2">
                 <FileCode className="w-4 h-4 text-blue-400" />
                 Pine Script Source (TradingView)
               </span>
-              <span className="font-mono text-[10px] text-slate-400">
+              <span className="font-mono text-[10px] text-text-muted">
                 v4 / v5 / v6
               </span>
             </div>
@@ -110,7 +110,7 @@ if (shortCondition)
               onChange={(e) => setPineSource(e.target.value)}
               rows={14}
               spellCheck={false}
-              className="mt-3 w-full rounded bg-slate-950 p-3 font-mono text-xs text-slate-200 border border-slate-800 focus:outline-none focus:border-blue-500"
+              className="mt-3 w-full rounded bg-bg p-3 font-mono text-xs text-text border border-border focus:outline-none focus:border-blue-500"
             />
           </div>
 
@@ -125,9 +125,9 @@ if (shortCondition)
         </div>
 
         {/* Converted TypeScript Output */}
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl flex flex-col justify-between">
+        <div className="rounded-lg border border-border bg-surface p-4 shadow-xl flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <span className="text-xs font-bold text-emerald-400 flex items-center gap-2">
                 <Code className="w-4 h-4 text-emerald-400" />
                 Zaboraa TypeScript Contract
@@ -148,10 +148,10 @@ if (shortCondition)
                 readOnly
                 value={convertedCode}
                 rows={14}
-                className="mt-3 w-full rounded bg-slate-950 p-3 font-mono text-xs text-emerald-300 border border-slate-800 focus:outline-none"
+                className="mt-3 w-full rounded bg-bg p-3 font-mono text-xs text-emerald-300 border border-border focus:outline-none"
               />
             ) : (
-              <div className="py-24 text-center text-slate-500 text-xs">
+              <div className="py-24 text-center text-text-muted text-xs">
                 Click "Translate to TypeScript Contract" to generate validated strategy logic.
               </div>
             )}
@@ -175,12 +175,12 @@ if (shortCondition)
       </div>
 
       {/* TradingView List of Trades CSV Comparator */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-2">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <h3 className="text-xs font-bold text-text uppercase tracking-wider mb-2 flex items-center gap-2">
           <Upload className="w-4 h-4 text-blue-400" />
           TradingView "List of Trades" CSV Comparator
         </h3>
-        <p className="text-xs text-slate-400 mb-3">
+        <p className="text-xs text-text-muted mb-3">
           Paste TradingView trade export rows to mathematically verify trade count parity, timestamp alignment, and net P&L divergence against the engine.
         </p>
 
@@ -191,12 +191,12 @@ if (shortCondition)
               onChange={(e) => setTvCsvInput(e.target.value)}
               placeholder="Trade #, Type, Signal, Date/Time, Price, Contracts, Profit, Cum. Profit, Run-up, Drawdown&#10;1, Entry Long, Buy, 2026-10-15 14:00, 1.0850, 1.0, 45.2, 45.2, 50.0, 10.0&#10;2, Exit Long, Close, 2026-10-15 16:30, 1.0895, 1.0, 45.2, 45.2, 50.0, 10.0"
               rows={6}
-              className="w-full rounded bg-slate-950 p-2.5 font-mono text-xs text-slate-200 border border-slate-800 focus:outline-none focus:border-blue-500"
+              className="w-full rounded bg-bg p-2.5 font-mono text-xs text-text border border-border focus:outline-none focus:border-blue-500"
             />
             <button
               type="button"
               onClick={handleRunTvComparison}
-              className="mt-2 px-4 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 transition-colors"
+              className="mt-2 px-4 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-blue-400 border border-border transition-colors"
             >
               Run Alignment Comparison
             </button>
@@ -204,9 +204,9 @@ if (shortCondition)
 
           {/* Comparison Scorecard */}
           {tvComparison && (
-            <div className="p-3 rounded bg-slate-950 border border-slate-800 text-xs font-mono space-y-2">
-              <div className="flex justify-between items-center pb-2 border-b border-slate-800 font-sans">
-                <span className="font-bold text-slate-300">Overall Alignment Score:</span>
+            <div className="p-3 rounded bg-bg border border-border text-xs font-mono space-y-2">
+              <div className="flex justify-between items-center pb-2 border-b border-border font-sans">
+                <span className="font-bold text-text-muted">Overall Alignment Score:</span>
                 <span
                   className={`text-base font-bold font-mono ${
                     tvComparison.overallMatchScore >= 80
@@ -220,20 +220,20 @@ if (shortCondition)
 
               <div className="grid grid-cols-2 gap-2 text-[11px]">
                 <div>
-                  <span className="text-slate-500">Trade Count Parity:</span>
+                  <span className="text-text-muted">Trade Count Parity:</span>
                   <div className="text-white font-bold">{tvComparison.tradeCountParityPct}%</div>
                 </div>
                 <div>
-                  <span className="text-slate-500">Timestamp Alignment:</span>
+                  <span className="text-text-muted">Timestamp Alignment:</span>
                   <div className="text-emerald-400 font-bold">{tvComparison.timestampAlignmentPct}%</div>
                 </div>
                 <div>
-                  <span className="text-slate-500">Net P&L Divergence:</span>
+                  <span className="text-text-muted">Net P&L Divergence:</span>
                   <div className="text-amber-400 font-bold">{tvComparison.netPnlDivergencePct}%</div>
                 </div>
               </div>
 
-              <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400 space-y-1 font-sans">
+              <div className="pt-2 border-t border-border text-[11px] text-text-muted space-y-1 font-sans">
                 {tvComparison.notes.map((n, i) => (
                   <div key={i}>• {n}</div>
                 ))}

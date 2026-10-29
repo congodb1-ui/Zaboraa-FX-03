@@ -77,20 +77,20 @@ export const BotsView: React.FC<BotsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <Bot className="w-4 h-4 text-blue-400" />
               Automated Bot Fleet & Execution State Machine
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-text-muted mt-0.5">
               Strict closed-bar execution, deterministic idempotency keys, and bidirectional MT5 position reconciliation.
             </p>
           </div>
 
           <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300">
+            <span className="px-2 py-1 rounded bg-bg border border-border text-text-muted">
               Active Bots: <strong>{bots.filter((b) => b.status === 'RUNNING').length}</strong> / {bots.length}
             </span>
           </div>
@@ -108,17 +108,17 @@ export const BotsView: React.FC<BotsViewProps> = ({
               key={b.id}
               className={`rounded-lg border p-4 shadow-lg transition-all ${
                 isRunning
-                  ? 'border-emerald-500/40 bg-slate-900/90 ring-1 ring-emerald-500/20'
+                  ? 'border-emerald-500/40 bg-bg ring-1 ring-emerald-500/20'
                   : isPaused
-                  ? 'border-amber-500/40 bg-slate-900/80'
-                  : 'border-slate-800 bg-slate-900/60'
+                  ? 'border-amber-500/40 bg-bg'
+                  : 'border-border bg-bg'
               }`}
             >
               {/* Card Header */}
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-white">{b.name}</h3>
-                  <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                  <div className="text-[11px] text-text-muted font-mono mt-0.5">
                     Magic #{b.magicNumber} · {b.symbol} {b.timeframe}
                   </div>
                 </div>
@@ -142,7 +142,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                         ? 'text-emerald-400'
                         : isPaused
                         ? 'text-amber-400'
-                        : 'text-slate-500'
+                        : 'text-text-muted'
                     }`}
                   >
                     ● {b.status}
@@ -151,18 +151,18 @@ export const BotsView: React.FC<BotsViewProps> = ({
               </div>
 
               {/* Bot Strategy Details */}
-              <div className="mt-3 p-2.5 rounded bg-slate-950/80 border border-slate-800 text-xs font-mono space-y-1.5">
-                <div className="flex justify-between text-slate-400">
+              <div className="mt-3 p-2.5 rounded bg-bg border border-border text-xs font-mono space-y-1.5">
+                <div className="flex justify-between text-text-muted">
                   <span>Strategy:</span>
-                  <strong className="text-slate-200">{b.strategyName}</strong>
+                  <strong className="text-text">{b.strategyName}</strong>
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-text-muted">
                   <span>Max Lots / Spread:</span>
-                  <strong className="text-slate-200">
+                  <strong className="text-text">
                     {b.riskLimits.maxLots} lots · {b.riskLimits.maxSpreadPips} pt
                   </strong>
                 </div>
-                <div className="flex justify-between text-slate-400">
+                <div className="flex justify-between text-text-muted">
                   <span>Today P&L:</span>
                   <strong
                     className={`tabular-nums font-bold ${
@@ -175,7 +175,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
               </div>
 
               {/* Controls */}
-              <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-slate-800">
+              <div className="mt-4 flex items-center justify-between gap-2 pt-3 border-t border-border">
                 <div className="flex items-center gap-1">
                   {isRunning ? (
                     <button
@@ -199,7 +199,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onToggleBotStatus(b.id, 'STOPPED')}
-                    className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                    className="p-1.5 rounded bg-surface hover:bg-surface text-text-muted hover:text-text transition-colors"
                     title="Stop Bot"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
@@ -214,7 +214,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     className={`px-2 py-1 rounded font-bold ${
                       b.mode === 'PAPER'
                         ? 'bg-blue-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                        : 'bg-surface text-text-muted hover:text-text'
                     }`}
                   >
                     PAPER
@@ -225,7 +225,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     className={`px-2 py-1 rounded font-bold ${
                       b.mode === 'DEMO'
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:text-white'
+                        : 'bg-surface text-text-muted hover:text-text'
                     }`}
                   >
                     DEMO
@@ -236,7 +236,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     className={`px-2 py-1 rounded font-bold ${
                       b.mode === 'LIVE'
                         ? 'bg-rose-600 text-white'
-                        : 'bg-slate-800 text-rose-400 hover:bg-rose-950'
+                        : 'bg-surface text-rose-400 hover:bg-rose-950'
                     }`}
                   >
                     LIVE
@@ -249,14 +249,14 @@ export const BotsView: React.FC<BotsViewProps> = ({
       </div>
 
       {/* Risk Events & Firewall Audit Trail */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-2">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <h3 className="text-xs font-bold text-text uppercase tracking-wider mb-2 flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-amber-400" />
           Authoritative Risk Firewall Audit Events ({riskEvents.length})
         </h3>
         <div className="overflow-x-auto max-h-56 overflow-y-auto">
           {riskEvents.length === 0 ? (
-            <div className="py-6 text-center text-slate-500 text-xs">
+            <div className="py-6 text-center text-text-muted text-xs">
               No risk events recorded. Firewall operating normally.
             </div>
           ) : (
@@ -269,17 +269,17 @@ export const BotsView: React.FC<BotsViewProps> = ({
                       ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
                       : e.severity === 'WARNING'
                       ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
-                      : 'bg-slate-900 border-slate-800 text-slate-300'
+                      : 'bg-bg border-border text-text-muted'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[10px] uppercase px-1.5 py-0.2 rounded bg-slate-950">
+                    <span className="font-bold text-[10px] uppercase px-1.5 py-0.2 rounded bg-bg">
                       {e.severity}
                     </span>
                     <strong className="text-white">[{e.rule}]</strong>
                     <span>{e.message}</span>
                   </div>
-                  <span className="text-[10px] text-slate-500 whitespace-nowrap">
+                  <span className="text-[10px] text-text-muted whitespace-nowrap">
                     {new Date(e.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
@@ -292,7 +292,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
       {/* Live Safety Gate Modal */}
       {selectedBotForLive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-lg border border-rose-500/50 bg-[#0E1524] p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-md rounded-lg border border-rose-500/50 bg-surface p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3 text-rose-400 border-b border-rose-500/30 pb-3">
               <AlertOctagon className="w-6 h-6 text-rose-500 animate-pulse" />
               <div>
@@ -301,22 +301,22 @@ export const BotsView: React.FC<BotsViewProps> = ({
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-text-muted leading-relaxed">
               Promoting bot <strong>"{selectedBotForLive.name}"</strong> to <strong>LIVE</strong> mode enables automated order execution with real financial exposure on broker server <strong>{brokerState.server}</strong>.
             </p>
 
-            <div className="p-3 rounded bg-slate-950 border border-slate-800 text-xs font-mono space-y-1.5">
-              <div className="flex justify-between text-slate-400">
+            <div className="p-3 rounded bg-bg border border-border text-xs font-mono space-y-1.5">
+              <div className="flex justify-between text-text-muted">
                 <span>Account Number:</span>
                 <strong className="text-white">{brokerState.accountLogin}</strong>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-text-muted">
                 <span>Mandatory Stop-Loss:</span>
                 <strong className="text-emerald-400">HARD BROKER ENFORCED</strong>
               </div>
-              <div className="flex justify-between text-slate-400">
+              <div className="flex justify-between text-text-muted">
                 <span>Max Lot Ceiling:</span>
-                <strong className="text-slate-200">{selectedBotForLive.riskLimits.maxLots} lots</strong>
+                <strong className="text-text">{selectedBotForLive.riskLimits.maxLots} lots</strong>
               </div>
             </div>
 
@@ -329,7 +329,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                 value={typedConfirmationLogin}
                 onChange={(e) => setTypedConfirmationLogin(e.target.value)}
                 placeholder={brokerState.accountLogin}
-                className="w-full px-3 py-2 rounded bg-slate-950 border border-rose-500/40 font-mono text-xs text-white focus:outline-none focus:border-rose-500"
+                className="w-full px-3 py-2 rounded bg-bg border border-rose-500/40 font-mono text-xs text-white focus:outline-none focus:border-rose-500"
               />
             </div>
 
@@ -339,11 +339,11 @@ export const BotsView: React.FC<BotsViewProps> = ({
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setSelectedBotForLive(null)}
-                className="px-4 py-2 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="px-4 py-2 rounded text-xs font-semibold bg-surface hover:bg-surface text-text-muted"
               >
                 Cancel
               </button>

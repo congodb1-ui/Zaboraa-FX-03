@@ -289,14 +289,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Configuration Bar */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <BarChart2 className="w-4 h-4 text-blue-400" />
               Quantitative Backtest Lab
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-text-muted mt-0.5">
               Strict intrabar worst-case SL execution, realistic transaction costs, and 20% holdout isolation.
             </p>
           </div>
@@ -307,7 +307,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 <button
                   type="button"
                   onClick={handleSaveReportClick}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                 >
                   <Download className="w-3.5 h-3.5 text-blue-400" />
                   Save Report
@@ -315,7 +315,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 <button
                   type="button"
                   onClick={handleExportTradesCsv}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                   title="Export completed trades to CSV"
                 >
                   <Download className="w-3.5 h-3.5 text-emerald-400" />
@@ -324,7 +324,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 <button
                   type="button"
                   onClick={handlePrintPdf}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                 >
                   <Printer className="w-3.5 h-3.5 text-emerald-400" />
                   Print / Save PDF
@@ -344,7 +344,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
         </div>
 
         {/* Subtabs Switcher Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-border">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -352,7 +352,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 subTab === 'single'
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
               Single Backtest & Charts
@@ -363,7 +363,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subTab === 'batch'
                   ? 'bg-violet-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
               <Table className="w-3.5 h-3.5" />
@@ -379,7 +379,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subTab === 'comparison'
                   ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
               <GitCompare className="w-3.5 h-3.5" />
@@ -391,7 +391,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subTab === 'walkforward'
                   ? 'bg-emerald-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -399,7 +399,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </button>
           </div>
 
-          <span className="text-[11px] font-mono text-slate-500">
+          <span className="text-[11px] font-mono text-text-muted">
             Intrabar Tick & Bar Resolution
           </span>
         </div>
@@ -426,13 +426,13 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             {/* Parameter Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 text-xs font-mono">
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-[11px] mb-1 font-sans">
               Historical Dataset
             </label>
             <select
               value={selectedDatasetId}
               onChange={(e) => setSelectedDatasetId(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
             >
               {datasets.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -444,7 +444,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-slate-400 text-[11px] font-sans">
+              <label className="block text-text-muted text-[11px] font-sans">
                 Strategy Algorithm
               </label>
               {onNavigateToStrategyStudio && (
@@ -462,7 +462,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             <select
               value={selectedStrategyId}
               onChange={(e) => setSelectedStrategyId(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
             >
               {strategies.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -473,7 +473,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
 
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-[11px] mb-1 font-sans">
               Broker Spread (pips)
             </label>
             <input
@@ -481,12 +481,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               step="0.1"
               value={spreadPips}
               onChange={(e) => setSpreadPips(parseFloat(e.target.value) || 0)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-[11px] mb-1 font-sans">
               Commission ($/lot)
             </label>
             <input
@@ -494,12 +494,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               step="0.5"
               value={commission}
               onChange={(e) => setCommission(parseFloat(e.target.value) || 0)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-[11px] mb-1 font-sans">
               Slippage (pips)
             </label>
             <input
@@ -507,16 +507,16 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               step="0.1"
               value={slippagePips}
               onChange={(e) => setSlippagePips(parseFloat(e.target.value) || 0)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
             />
           </div>
         </div>
 
         {/* Selected Dataset Provenance Banner */}
         {selectedDataset && (
-          <div className="mt-3 flex flex-wrap items-center justify-between px-3 py-2 rounded bg-slate-950 border border-slate-800/80 text-xs">
+          <div className="mt-3 flex flex-wrap items-center justify-between px-3 py-2 rounded bg-bg border border-border text-xs">
             <div className="flex items-center gap-3">
-              <span className="text-slate-400 font-sans">Provenance:</span>
+              <span className="text-text-muted font-sans">Provenance:</span>
               <span
                 className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider font-mono uppercase ${
                   selectedDataset.provenance === 'MT5 BRIDGE'
@@ -528,16 +528,16 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               >
                 {selectedDataset.provenance}
               </span>
-              <span className="text-slate-500 font-mono">
+              <span className="text-text-muted font-mono">
                 {selectedDataset.candleCount} candles · {selectedDataset.symbol} {selectedDataset.timeframe}
               </span>
-              <span className="text-slate-500 font-mono">
+              <span className="text-text-muted font-mono">
                 UTC+{selectedDataset.utcOffsetHours}
               </span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-400">Quality Score:</span>
+              <span className="text-[11px] text-text-muted">Quality Score:</span>
               <span className="font-mono font-bold text-emerald-400">
                 {selectedDataset.qualityScore}%
               </span>
@@ -568,20 +568,20 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
         <>
           {/* Chart View Switcher Bar */}
       {selectedDataset && (
-        <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-slate-900/60 border border-slate-800">
-          <div className="flex items-center gap-1.5 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-bg border border-border">
+          <div className="flex items-center gap-1.5 text-xs text-text-muted">
             <Layers className="w-4 h-4 text-blue-400" />
-            <span className="font-semibold text-slate-300">Simulation Visualizer Engines:</span>
+            <span className="font-semibold text-text-muted">Simulation Visualizer Engines:</span>
           </div>
 
-          <div className="flex items-center rounded-lg bg-slate-950 p-1 border border-slate-800 text-xs font-mono">
+          <div className="flex items-center rounded-lg bg-bg p-1 border border-border text-xs font-mono">
             <button
               type="button"
               onClick={() => setChartViewMode('both')}
               className={`px-3 py-1 rounded transition-colors ${
                 chartViewMode === 'both'
                   ? 'bg-blue-600 text-white font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               Stacked View (Both Engines)
@@ -592,7 +592,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               className={`px-3 py-1 rounded transition-colors ${
                 chartViewMode === 'candles'
                   ? 'bg-blue-600 text-white font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               Candlesticks (Pan & Zoom)
@@ -603,7 +603,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               className={`px-3 py-1 rounded transition-colors ${
                 chartViewMode === 'timeline'
                   ? 'bg-blue-600 text-white font-bold shadow-sm'
-                  : 'text-slate-400 hover:text-white'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               D3 Simulation Timeline
@@ -653,7 +653,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           {/* Performance Header with AI Doctor trigger */}
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-text-muted">
                 Audited Performance Attribution
               </h3>
               <button
@@ -668,7 +668,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </div>
 
             {aiAdvice && (
-              <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-r from-indigo-950/20 via-[#0E1524] to-slate-900 p-5 shadow-xl space-y-4">
+              <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 via-surface to-surface p-5 shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-indigo-400" />
@@ -677,7 +677,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     </h4>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-bold text-slate-400">
+                    <span className="text-xs font-mono font-bold text-text-muted">
                       Score: {aiAdvice.overallScore}/100
                     </span>
                     <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -686,42 +686,42 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setAiAdvice(null)}
-                      className="text-xs text-slate-500 hover:text-slate-300 ml-2 cursor-pointer"
+                      className="text-xs text-text-muted hover:text-text-muted ml-2 cursor-pointer"
                     >
                       ✕
                     </button>
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed">{aiAdvice.executiveCritique}</p>
+                <p className="text-xs text-text-muted leading-relaxed">{aiAdvice.executiveCritique}</p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {/* Parameter Tuning Suggestions */}
-                  <div className="p-3.5 rounded bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
+                  <div className="p-3.5 rounded bg-bg border border-border space-y-2 text-xs">
                     <span className="font-semibold text-blue-400 uppercase text-[11px] block">
                       Parameter Tuning Suggestions
                     </span>
                     <div className="space-y-2">
                       {aiAdvice.parameterSuggestions?.map((p: any, i: number) => (
-                        <div key={i} className="p-2 rounded bg-slate-950/60 border border-slate-800 space-y-1">
+                        <div key={i} className="p-2 rounded bg-bg border border-border space-y-1">
                           <div className="flex justify-between font-mono text-[11px]">
                             <span className="text-indigo-400">{p.parameter}</span>
-                            <span className="text-slate-400">
+                            <span className="text-text-muted">
                               {p.currentValue} → <strong className="text-emerald-400">{p.suggestedValue}</strong>
                             </span>
                           </div>
-                          <p className="text-[10px] text-slate-400">{p.rationale}</p>
+                          <p className="text-[10px] text-text-muted">{p.rationale}</p>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   {/* Bottlenecks & Regime Filters */}
-                  <div className="p-3.5 rounded bg-slate-900/80 border border-slate-800 space-y-2 text-xs">
+                  <div className="p-3.5 rounded bg-bg border border-border space-y-2 text-xs">
                     <span className="font-semibold text-amber-400 uppercase text-[11px] block">
                       Bottlenecks & Regime Gates
                     </span>
-                    <ul className="space-y-1 text-slate-300 text-[11px]">
+                    <ul className="space-y-1 text-text-muted text-[11px]">
                       {aiAdvice.bottlenecks?.map((b: string, i: number) => (
                         <li key={i} className="flex items-start gap-1.5">
                           <span className="text-amber-400">•</span>
@@ -730,11 +730,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                       ))}
                     </ul>
                     {aiAdvice.regimeFilters?.length > 0 && (
-                      <div className="pt-2 border-t border-slate-800/80 space-y-1">
+                      <div className="pt-2 border-t border-border space-y-1">
                         <span className="font-semibold text-emerald-400 text-[11px] block">
                           Suggested Filter: {aiAdvice.regimeFilters[0].filterName}
                         </span>
-                        <p className="text-[10px] text-slate-400">{aiAdvice.regimeFilters[0].description}</p>
+                        <p className="text-[10px] text-text-muted">{aiAdvice.regimeFilters[0].description}</p>
                       </div>
                     )}
                   </div>
@@ -743,8 +743,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
-              <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <span className="text-[11px] font-sans text-slate-400">Net Profit</span>
+              <div className="rounded-lg border border-border bg-bg p-3">
+                <span className="text-[11px] font-sans text-text-muted">Net Profit</span>
                 <div
                   className={`mt-1 text-base font-bold tabular-nums ${
                     activeReport.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
@@ -752,22 +752,22 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 >
                   {activeReport.netProfit >= 0 ? '+' : ''}${activeReport.netProfit.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-slate-500 font-mono">
+                <div className="text-[10px] text-text-muted font-mono">
                   {activeReport.netProfitPct >= 0 ? '+' : ''}
                   {activeReport.netProfitPct}%
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <span className="text-[11px] font-sans text-slate-400">Profit Factor</span>
+              <div className="rounded-lg border border-border bg-bg p-3">
+                <span className="text-[11px] font-sans text-text-muted">Profit Factor</span>
                 <div className="mt-1 text-base font-bold text-white tabular-nums">
                   {activeReport.profitFactor.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-slate-500">Gross Win / Gross Loss</div>
+                <div className="text-[10px] text-text-muted">Gross Win / Gross Loss</div>
               </div>
 
-              <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <span className="text-[11px] font-sans text-slate-400">Max Drawdown</span>
+              <div className="rounded-lg border border-border bg-bg p-3">
+                <span className="text-[11px] font-sans text-text-muted">Max Drawdown</span>
                 <div className="mt-1 text-base font-bold text-rose-400 tabular-nums">
                   ${activeReport.maxDrawdown.toFixed(2)}
                 </div>
@@ -776,81 +776,81 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <span className="text-[11px] font-sans text-slate-400">Win Rate</span>
+              <div className="rounded-lg border border-border bg-bg p-3">
+                <span className="text-[11px] font-sans text-text-muted">Win Rate</span>
                 <div className="mt-1 text-base font-bold text-blue-400 tabular-nums">
                   {activeReport.winRate.toFixed(1)}%
                 </div>
-                <div className="text-[10px] text-slate-500">
+                <div className="text-[10px] text-text-muted">
                   {activeReport.winningTrades}W / {activeReport.losingTrades}L ({activeReport.totalTrades})
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <span className="text-[11px] font-sans text-slate-400">Sharpe Ratio</span>
+              <div className="rounded-lg border border-border bg-bg p-3">
+                <span className="text-[11px] font-sans text-text-muted">Sharpe Ratio</span>
                 <div className="mt-1 text-base font-bold text-emerald-400 tabular-nums">
                   {activeReport.sharpeRatio.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-slate-500">Sortino: {activeReport.sortinoRatio.toFixed(2)}</div>
+                <div className="text-[10px] text-text-muted">Sortino: {activeReport.sortinoRatio.toFixed(2)}</div>
               </div>
 
-              <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
-                <span className="text-[11px] font-sans text-slate-400">Expectancy</span>
+              <div className="rounded-lg border border-border bg-bg p-3">
+                <span className="text-[11px] font-sans text-text-muted">Expectancy</span>
                 <div className="mt-1 text-base font-bold text-indigo-400 tabular-nums">
                   ${activeReport.expectancy.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-slate-500">Avg Trade: ${activeReport.avgTrade.toFixed(2)}</div>
+                <div className="text-[10px] text-text-muted">Avg Trade: ${activeReport.avgTrade.toFixed(2)}</div>
               </div>
             </div>
           </div>
 
           {/* Friction Costs Breakdown & Holdout Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <div className="rounded-lg border border-border bg-bg p-4">
+              <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                 Friction Cost Deductions
               </h4>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400">Spread Deductions:</span>
+                <div className="p-2 rounded bg-bg border border-border">
+                  <span className="text-text-muted">Spread Deductions:</span>
                   <div className="text-rose-400 font-bold">${activeReport.totalSpreadCost.toFixed(2)}</div>
                 </div>
-                <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400">Commission ($7/lot):</span>
+                <div className="p-2 rounded bg-bg border border-border">
+                  <span className="text-text-muted">Commission ($7/lot):</span>
                   <div className="text-rose-400 font-bold">${activeReport.totalCommission.toFixed(2)}</div>
                 </div>
-                <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400">Swap Financing:</span>
-                  <div className="text-slate-200 font-bold">${activeReport.totalSwapCost.toFixed(2)}</div>
+                <div className="p-2 rounded bg-bg border border-border">
+                  <span className="text-text-muted">Swap Financing:</span>
+                  <div className="text-text font-bold">${activeReport.totalSwapCost.toFixed(2)}</div>
                 </div>
-                <div className="p-2 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400">Modeled Slippage:</span>
+                <div className="p-2 rounded bg-bg border border-border">
+                  <span className="text-text-muted">Modeled Slippage:</span>
                   <div className="text-rose-400 font-bold">${activeReport.totalSlippageCost.toFixed(2)}</div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-              <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+            <div className="rounded-lg border border-border bg-bg p-4">
+              <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                 20% Holdout & Overfitting Analysis
               </h4>
               {activeReport.holdoutInfo && (
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between font-mono">
-                    <span className="text-slate-400">Holdout Bars Reserved:</span>
+                    <span className="text-text-muted">Holdout Bars Reserved:</span>
                     <strong className="text-white">{activeReport.holdoutInfo.holdoutBarsCount} bars (20%)</strong>
                   </div>
                   <div className="flex justify-between font-mono">
-                    <span className="text-slate-400">In-Sample Sharpe:</span>
+                    <span className="text-text-muted">In-Sample Sharpe:</span>
                     <strong className="text-emerald-400">{activeReport.holdoutInfo.inSampleSharpe}</strong>
                   </div>
                   <div className="flex justify-between font-mono">
-                    <span className="text-slate-400">Out-of-Sample Sharpe:</span>
+                    <span className="text-text-muted">Out-of-Sample Sharpe:</span>
                     <strong className="text-blue-400">{activeReport.holdoutInfo.outOfSampleSharpe}</strong>
                   </div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800 mt-2">
+                  <div className="p-2 rounded bg-bg border border-border mt-2">
                     <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-300">Overfitting Score:</span>
+                      <span className="text-text-muted">Overfitting Score:</span>
                       <span
                         className={`font-mono ${
                           activeReport.overfitting.score < 25
@@ -863,7 +863,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         {activeReport.overfitting.score} / 100 ({activeReport.overfitting.label})
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 mt-1">
+                    <p className="text-[11px] text-text-muted mt-1">
                       {activeReport.overfitting.plainExplanation}
                     </p>
                   </div>
@@ -873,7 +873,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
 
           {/* Promotion Gate Evaluation Checklist */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-3">
+          <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <Shield className="w-4 h-4 text-emerald-400" />
@@ -901,8 +901,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs font-mono">
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] font-sans">Min Trades (&ge;30)</span>
+                <div className="p-2.5 rounded bg-bg border border-border">
+                  <span className="text-text-muted block text-[10px] font-sans">Min Trades (&ge;30)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.totalTrades >= 30 ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -913,8 +913,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] font-sans">Profit Factor (&ge;1.25)</span>
+                <div className="p-2.5 rounded bg-bg border border-border">
+                  <span className="text-text-muted block text-[10px] font-sans">Profit Factor (&ge;1.25)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.profitFactor >= 1.25 ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -925,8 +925,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] font-sans">Max DD (&le;15%)</span>
+                <div className="p-2.5 rounded bg-bg border border-border">
+                  <span className="text-text-muted block text-[10px] font-sans">Max DD (&le;15%)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.maxDrawdownPct <= 15 ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -937,8 +937,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] font-sans">Sharpe Ratio (&ge;1.0)</span>
+                <div className="p-2.5 rounded bg-bg border border-border">
+                  <span className="text-text-muted block text-[10px] font-sans">Sharpe Ratio (&ge;1.0)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.sharpeRatio >= 1.0 ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -949,8 +949,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block text-[10px] font-sans">OOS Sharpe (&gt;0)</span>
+                <div className="p-2.5 rounded bg-bg border border-border">
+                  <span className="text-text-muted block text-[10px] font-sans">OOS Sharpe (&gt;0)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {(activeReport.holdoutInfo?.outOfSampleSharpe ?? 1) > 0 ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -967,9 +967,9 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
             {/* Underwater Drawdown Curve */}
             {activeReport.equityCurve && activeReport.equityCurve.length > 0 && (
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-2">
+              <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+                  <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans">
                     Underwater Drawdown Profile (% Depth from Highest Equity Highwater Mark)
                   </h4>
                   <span className="text-xs font-mono text-rose-400 font-bold">
@@ -980,11 +980,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <svg className="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 50">
                     <defs>
                       <linearGradient id="underwaterGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#f43f5e" stopOpacity="0.05" />
+                        <stop offset="0%" stopColor="var(--danger)" stopOpacity="0.4" />
+                        <stop offset="100%" stopColor="var(--danger)" stopOpacity="0.05" />
                       </linearGradient>
                     </defs>
-                    <line x1="0" y1="2" x2="100" y2="2" stroke="#475569" strokeDasharray="2,2" strokeWidth="0.5" />
+                    <line x1="0" y1="2" x2="100" y2="2" stroke="var(--border)" strokeDasharray="2,2" strokeWidth="0.5" />
                     <path
                       d={`M 0,2 ${activeReport.equityCurve
                         .map((pt, i) => {
@@ -1006,7 +1006,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         })
                         .join(' ')}`}
                       fill="none"
-                      stroke="#f43f5e"
+                      stroke="var(--danger)"
                       strokeWidth="1"
                     />
                   </svg>
@@ -1015,13 +1015,13 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             )}
 
             {/* Trade Execution Ledger */}
-            <div className="rounded-lg border border-slate-800 bg-slate-900/90 p-4 shadow-xl">
-            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+            <div className="rounded-lg border border-border bg-bg p-4 shadow-xl">
+            <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">
               Executed Trades ({activeReport.trades.length})
             </h4>
             <div className="overflow-x-auto max-h-72 overflow-y-auto">
               <table className="w-full text-left text-xs font-mono">
-                <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-[11px]">
                   <tr>
                     <th className="py-2">Ticket</th>
                     <th>Side</th>
@@ -1035,12 +1035,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <th>Net P&L ($)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-border">
                   {activeReport.trades.map((t) => {
                     const isWin = t.pnl >= 0;
                     return (
-                      <tr key={t.id} className="hover:bg-slate-800/30">
-                        <td className="py-2 text-slate-300 font-semibold">#{t.ticket}</td>
+                      <tr key={t.id} className="hover:bg-surface">
+                        <td className="py-2 text-text-muted font-semibold">#{t.ticket}</td>
                         <td>
                           <span
                             className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
@@ -1065,7 +1065,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                           {t.riskRewardRatio ? `1:${t.riskRewardRatio}` : '1:2.0'}
                         </td>
                         <td>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300 font-sans">
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-surface text-text-muted font-sans">
                             {t.exitReason}
                           </span>
                         </td>
@@ -1089,7 +1089,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
         </div>
       ) : (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-8 text-center text-slate-500 text-xs">
+        <div className="rounded-lg border border-border bg-bg p-8 text-center text-text-muted text-xs">
           Configure strategy settings above and click <strong>Run Simulation</strong> to compute 10-part metrics and render trade markers.
         </div>
       )}
@@ -1099,14 +1099,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
       {/* 2. Batch Test Suite Tab */}
       {subTab === 'batch' && (
         <div className="space-y-6">
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Table className="w-4 h-4 text-indigo-400" />
                   Cross-Asset & Strategy Matrix Runner (N × M)
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   Execute multiple algorithmic strategies across all stored SQLite historical datasets concurrently.
                 </p>
               </div>
@@ -1124,9 +1124,9 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             {/* Matrix Selectors */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               {/* Strategies Select */}
-              <div className="p-3.5 rounded bg-slate-950/80 border border-slate-800 space-y-2">
+              <div className="p-3.5 rounded bg-bg border border-border space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-300">Select Strategies ({batchStrategies.length}/{strategies.length})</span>
+                  <span className="font-semibold text-text-muted">Select Strategies ({batchStrategies.length}/{strategies.length})</span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -1138,7 +1138,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setBatchStrategies([])}
-                      className="text-[10px] text-slate-500 hover:underline cursor-pointer"
+                      className="text-[10px] text-text-muted hover:underline cursor-pointer"
                     >
                       None
                     </button>
@@ -1146,7 +1146,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 </div>
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {strategies.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer">
+                    <label key={s.id} className="flex items-center gap-2 text-xs text-text-muted hover:text-text cursor-pointer">
                       <input
                         type="checkbox"
                         checked={batchStrategies.includes(s.id)}
@@ -1154,7 +1154,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                           if (e.target.checked) setBatchStrategies((prev) => [...prev, s.id]);
                           else setBatchStrategies((prev) => prev.filter((id) => id !== s.id));
                         }}
-                        className="rounded border-slate-700 bg-slate-900 text-indigo-600"
+                        className="rounded border-border bg-bg text-indigo-600"
                       />
                       <span className="font-mono text-[11px] truncate">{s.name}</span>
                     </label>
@@ -1163,9 +1163,9 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               </div>
 
               {/* Datasets Select */}
-              <div className="p-3.5 rounded bg-slate-950/80 border border-slate-800 space-y-2">
+              <div className="p-3.5 rounded bg-bg border border-border space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-semibold text-slate-300">Select Stored Datasets ({batchDatasets.length}/{datasets.length})</span>
+                  <span className="font-semibold text-text-muted">Select Stored Datasets ({batchDatasets.length}/{datasets.length})</span>
                   <div className="flex gap-2">
                     <button
                       type="button"
@@ -1177,7 +1177,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setBatchDatasets([])}
-                      className="text-[10px] text-slate-500 hover:underline cursor-pointer"
+                      className="text-[10px] text-text-muted hover:underline cursor-pointer"
                     >
                       None
                     </button>
@@ -1185,7 +1185,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 </div>
                 <div className="space-y-1.5 max-h-40 overflow-y-auto">
                   {datasets.map((d) => (
-                    <label key={d.id} className="flex items-center gap-2 text-xs text-slate-300 hover:text-white cursor-pointer">
+                    <label key={d.id} className="flex items-center gap-2 text-xs text-text-muted hover:text-text cursor-pointer">
                       <input
                         type="checkbox"
                         checked={batchDatasets.includes(d.id)}
@@ -1193,7 +1193,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                           if (e.target.checked) setBatchDatasets((prev) => [...prev, d.id]);
                           else setBatchDatasets((prev) => prev.filter((id) => id !== d.id));
                         }}
-                        className="rounded border-slate-700 bg-slate-900 text-indigo-600"
+                        className="rounded border-border bg-bg text-indigo-600"
                       />
                       <span className="font-mono text-[11px] truncate">
                         {d.symbol} {d.timeframe} ({d.candles.length} bars)
@@ -1207,11 +1207,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             {/* Progress Bar */}
             {isBatchRunning && (
               <div className="space-y-1 pt-2">
-                <div className="flex justify-between text-xs font-mono text-slate-400">
+                <div className="flex justify-between text-xs font-mono text-text-muted">
                   <span>Batch Simulation Progress</span>
                   <span>{batchProgress}%</span>
                 </div>
-                <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-surface h-2 rounded-full overflow-hidden">
                   <div
                     className="bg-indigo-500 h-full transition-all duration-200"
                     style={{ width: `${batchProgress}%` }}
@@ -1223,15 +1223,15 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
           {/* Batch Results Leaderboard */}
           {batchResults.length > 0 && (
-            <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-3">
+            <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-3">
               <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">
                   Batch Execution Leaderboard ({batchResults.length} Runs Ranked by Sharpe Ratio)
                 </h4>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-slate-900/90 border-b border-slate-800 text-slate-400 text-[11px]">
+                  <thead className="bg-bg border-b border-border text-text-muted text-[11px]">
                     <tr>
                       <th className="py-2.5 px-3">Rank</th>
                       <th className="px-3">Strategy</th>
@@ -1246,15 +1246,15 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                       <th className="px-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-border">
                     {batchResults.map((r, idx) => {
                       const isWin = r.netProfit >= 0;
                       return (
-                        <tr key={idx} className="hover:bg-slate-800/30">
+                        <tr key={idx} className="hover:bg-surface">
                           <td className="py-2.5 px-3 font-bold text-indigo-400">#{idx + 1}</td>
                           <td className="px-3 text-white font-sans font-semibold">{r.strategyName}</td>
-                          <td className="px-3 text-slate-300">{r.symbol}</td>
-                          <td className="px-3 text-slate-400">{r.timeframe}</td>
+                          <td className="px-3 text-text-muted">{r.symbol}</td>
+                          <td className="px-3 text-text-muted">{r.timeframe}</td>
                           <td className="px-3">{r.totalTrades}</td>
                           <td className="px-3">{r.winRate.toFixed(1)}%</td>
                           <td className="px-3 font-bold">{r.profitFactor.toFixed(2)}</td>
@@ -1270,7 +1270,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                                 setActiveReport(r);
                                 setSubTab('single');
                               }}
-                              className="px-2.5 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-white font-sans text-[11px] font-semibold transition-colors cursor-pointer"
+                              className="px-2.5 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-text font-sans text-[11px] font-semibold transition-colors cursor-pointer"
                             >
                               Load in Lab
                             </button>
@@ -1289,25 +1289,25 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
       {/* 3. Side-by-Side Comparison Tab */}
       {subTab === 'comparison' && (
         <div className="space-y-6">
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <GitCompare className="w-4 h-4 text-indigo-400" />
               Side-by-Side Strategy Run Comparison
             </h3>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-text-muted">
               Benchmark two backtest simulations directly against one another with automated differential scoring.
             </p>
 
             {/* Run Selection Dropdowns */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+              <div className="p-4 rounded-lg bg-bg border border-border space-y-2">
                 <label className="text-xs font-semibold text-indigo-400 block uppercase tracking-wider">
                   Run A (Benchmark Candidate)
                 </label>
                 <select
                   value={compareReportAId}
                   onChange={(e) => setCompareReportAId(e.target.value)}
-                  className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono"
+                  className="w-full px-3 py-2 rounded bg-bg border border-border text-text text-xs font-mono"
                 >
                   <option value="">-- Select Run A --</option>
                   {activeReport && <option value={activeReport.id}>[Active] {activeReport.strategyName} ({activeReport.symbol} {activeReport.timeframe})</option>}
@@ -1324,14 +1324,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 </select>
               </div>
 
-              <div className="p-4 rounded-lg bg-slate-950 border border-slate-800 space-y-2">
+              <div className="p-4 rounded-lg bg-bg border border-border space-y-2">
                 <label className="text-xs font-semibold text-emerald-400 block uppercase tracking-wider">
                   Run B (Challenger Candidate)
                 </label>
                 <select
                   value={compareReportBId}
                   onChange={(e) => setCompareReportBId(e.target.value)}
-                  className="w-full px-3 py-2 rounded bg-slate-900 border border-slate-800 text-slate-200 text-xs font-mono"
+                  className="w-full px-3 py-2 rounded bg-bg border border-border text-text text-xs font-mono"
                 >
                   <option value="">-- Select Run B --</option>
                   {activeReport && <option value={activeReport.id}>[Active] {activeReport.strategyName} ({activeReport.symbol} {activeReport.timeframe})</option>}
@@ -1362,7 +1362,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
             if (!reportA || !reportB) {
               return (
-                <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-8 text-center text-slate-500 text-xs">
+                <div className="rounded-lg border border-border bg-bg p-8 text-center text-text-muted text-xs">
                   Select both Run A and Run B above to render the side-by-side comparative matrix.
                 </div>
               );
@@ -1383,10 +1383,10 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             ];
 
             return (
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
+              <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-slate-900 border-b border-slate-800 text-slate-400">
+                    <thead className="bg-bg border-b border-border text-text-muted">
                       <tr>
                         <th className="py-3 px-4 font-sans font-semibold">Evaluation Metric</th>
                         <th className="px-4 text-indigo-400 font-bold">Run A: {reportA.strategyName}</th>
@@ -1394,7 +1394,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         <th className="px-4 text-right font-sans">Attribution Advantage</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-border">
                       {metrics.map((m, i) => {
                         let advantage = '-';
                         let winA = false;
@@ -1413,13 +1413,13 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         }
 
                         return (
-                          <tr key={i} className="hover:bg-slate-800/20">
-                            <td className="py-2.5 px-4 font-sans font-semibold text-slate-300">{m.label}</td>
-                            <td className={`px-4 ${winA ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>
+                          <tr key={i} className="hover:bg-surface">
+                            <td className="py-2.5 px-4 font-sans font-semibold text-text-muted">{m.label}</td>
+                            <td className={`px-4 ${winA ? 'text-emerald-400 font-bold' : 'text-text-muted'}`}>
                               {m.format ? m.format(m.a as number) : m.a}
                               {winA && <span className="ml-1.5 text-[10px] text-emerald-400">★</span>}
                             </td>
-                            <td className={`px-4 ${winB ? 'text-emerald-400 font-bold' : 'text-slate-300'}`}>
+                            <td className={`px-4 ${winB ? 'text-emerald-400 font-bold' : 'text-text-muted'}`}>
                               {m.format ? m.format(m.b as number) : m.b}
                               {winB && <span className="ml-1.5 text-[10px] text-emerald-400">★</span>}
                             </td>
@@ -1430,7 +1430,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                                     ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                                     : winB
                                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                                    : 'text-slate-500'
+                                    : 'text-text-muted'
                                 }`}
                               >
                                 {advantage}
@@ -1451,14 +1451,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
       {/* 4. Walk-Forward Isolation Tab */}
       {subTab === 'walkforward' && (
         <div className="space-y-6">
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Clock className="w-4 h-4 text-emerald-400" />
                   Walk-Forward Out-of-Sample (OOS) Generalization Tester
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-text-muted mt-1">
                   Protects against curve-fitting and data snooping by dividing the dataset into 70% In-Sample (Optimization) and 30% Out-of-Sample (Blind Forward Test).
                 </p>
               </div>
@@ -1474,12 +1474,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <div className="p-3.5 rounded bg-slate-950/80 border border-slate-800 text-xs space-y-1">
-                <span className="text-slate-400 font-semibold block">Target Strategy:</span>
+              <div className="p-3.5 rounded bg-bg border border-border text-xs space-y-1">
+                <span className="text-text-muted font-semibold block">Target Strategy:</span>
                 <span className="text-white font-mono">{selectedStrategy?.name || 'None'}</span>
               </div>
-              <div className="p-3.5 rounded bg-slate-950/80 border border-slate-800 text-xs space-y-1">
-                <span className="text-slate-400 font-semibold block">Target Dataset:</span>
+              <div className="p-3.5 rounded bg-bg border border-border text-xs space-y-1">
+                <span className="text-text-muted font-semibold block">Target Dataset:</span>
                 <span className="text-white font-mono">
                   {selectedDataset ? `${selectedDataset.symbol} ${selectedDataset.timeframe} (${selectedDataset.candles.length} bars)` : 'None'}
                 </span>
@@ -1500,7 +1500,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 }`}
               >
                 <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block mb-1">
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block mb-1">
                     Walk-Forward Robustness Verdict
                   </span>
                   <h4
@@ -1514,7 +1514,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   >
                     {wfResult.verdict}
                   </h4>
-                  <p className="text-xs text-slate-300 mt-1">
+                  <p className="text-xs text-text-muted mt-1">
                     {wfResult.verdict === 'ROBUST GENERALIZATION'
                       ? 'The strategy maintains over 60% of its Sharpe ratio and stays profitable on completely unseen forward bars.'
                       : wfResult.verdict === 'MODERATE DECAY'
@@ -1523,19 +1523,19 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </p>
                 </div>
                 <div className="text-right font-mono">
-                  <span className="text-xs text-slate-400 block">Sharpe Retention</span>
+                  <span className="text-xs text-text-muted block">Sharpe Retention</span>
                   <span className="text-xl font-black text-white">{wfResult.sharpeDegradation.toFixed(1)}%</span>
                 </div>
               </div>
 
               {/* IS vs OOS Metrics Table */}
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-3">
-                <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+              <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-3">
+                <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider">
                   Partition Breakdown (70% In-Sample vs 30% Out-of-Sample)
                 </h4>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs font-mono">
-                    <thead className="bg-slate-900 border-b border-slate-800 text-slate-400">
+                    <thead className="bg-bg border-b border-border text-text-muted">
                       <tr>
                         <th className="py-2.5 px-3">Window</th>
                         <th className="px-3">Bars</th>
@@ -1547,8 +1547,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         <th className="px-3">Sharpe</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      <tr className="hover:bg-slate-800/20">
+                    <tbody className="divide-y divide-border">
+                      <tr className="hover:bg-surface">
                         <td className="py-2.5 px-3 font-bold text-blue-400">In-Sample (70%)</td>
                         <td className="px-3">{wfResult.isCandleCount}</td>
                         <td className="px-3">{wfResult.isReport.totalTrades}</td>
@@ -1560,7 +1560,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         <td className="px-3 text-rose-400">{wfResult.isReport.maxDrawdownPct.toFixed(1)}%</td>
                         <td className="px-3 font-bold text-blue-400">{wfResult.isReport.sharpeRatio.toFixed(2)}</td>
                       </tr>
-                      <tr className="hover:bg-slate-800/20">
+                      <tr className="hover:bg-surface">
                         <td className="py-2.5 px-3 font-bold text-emerald-400">Out-of-Sample (30%)</td>
                         <td className="px-3">{wfResult.oosCandleCount}</td>
                         <td className="px-3">{wfResult.oosReport.totalTrades}</td>
@@ -1583,34 +1583,34 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
       {/* Saved Reports Drawer */}
       {savedReports.length > 0 && (
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-3">
+        <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+          <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">
             Saved Backtest Reports Archive ({savedReports.length})
           </h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {savedReports.map((r) => (
               <div
                 key={r.id}
-                className="rounded border border-slate-800 bg-slate-950 p-3 text-xs font-mono space-y-1.5 hover:border-slate-700"
+                className="rounded border border-border bg-bg p-3 text-xs font-mono space-y-1.5 hover:border-border"
               >
                 <div className="flex justify-between items-start">
                   <div>
                     <strong className="text-white font-sans block">{r.strategyName}</strong>
-                    <span className="text-[10px] text-slate-400">
+                    <span className="text-[10px] text-text-muted">
                       {r.symbol} {r.timeframe} · {r.provenance}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => onDeleteReport(r.id)}
-                    className="text-slate-500 hover:text-rose-400 p-1"
+                    className="text-text-muted hover:text-rose-400 p-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
-                <div className="flex justify-between pt-1 border-t border-slate-800">
-                  <span className="text-slate-400">Net Profit:</span>
+                <div className="flex justify-between pt-1 border-t border-border">
+                  <span className="text-text-muted">Net Profit:</span>
                   <span
                     className={`font-bold ${
                       r.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
@@ -1620,7 +1620,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-400">Profit Factor:</span>
+                  <span className="text-text-muted">Profit Factor:</span>
                   <span className="text-white font-bold">{r.profitFactor.toFixed(2)}</span>
                 </div>
 
@@ -1628,7 +1628,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveReport(r)}
-                    className="flex-1 py-1 rounded text-[11px] font-sans font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 transition-colors"
+                    className="flex-1 py-1 rounded text-[11px] font-sans font-bold bg-surface hover:bg-surface text-blue-400 transition-colors"
                   >
                     Load Report
                   </button>
@@ -1636,7 +1636,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onNavigateToStrategyStudio(r.strategyId)}
-                      className="px-2.5 py-1 rounded text-[11px] font-sans font-medium bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 flex items-center gap-1 transition-colors"
+                      className="px-2.5 py-1 rounded text-[11px] font-sans font-medium bg-bg hover:bg-surface text-text-muted border border-border flex items-center gap-1 transition-colors"
                       title="Edit this strategy in Strategy Studio"
                     >
                       <Code2 className="w-3 h-3 text-blue-400" />

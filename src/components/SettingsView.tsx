@@ -81,8 +81,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Engine Mathematical Self-Test Card */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <div className="flex items-center gap-2">
               <Cpu className="w-4 h-4 text-emerald-400" />
@@ -99,7 +99,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 {allPassed ? 'ALL 9 TESTS PASSING' : 'TESTS FAILING'}
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-text-muted mt-1">
               Rigorous hand-calculated known-answer fixtures proving Pip Math, Friction Deductions, Intrabar Worst-Case SL Conflicts, and Zero-Lookahead Isolation.
             </p>
           </div>
@@ -107,7 +107,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={handleRunTests}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-blue-400 border border-border transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Re-run Self-Tests
@@ -118,7 +118,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="overflow-x-auto mt-3">
           <table className="w-full text-left text-xs font-mono">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+              <tr className="border-b border-border text-text-muted text-[11px]">
                 <th className="py-2">Test Case</th>
                 <th>Category</th>
                 <th>Expected Value</th>
@@ -127,14 +127,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <th>Verification Note</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-border">
               {selfTests.map((t) => {
                 const isPass = t.status === 'PASS';
                 return (
-                  <tr key={t.id} className="hover:bg-slate-800/30">
+                  <tr key={t.id} className="hover:bg-surface">
                     <td className="py-2.5 font-bold text-white font-sans">{t.name}</td>
                     <td>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-surface text-text-muted">
                         {t.category}
                       </span>
                     </td>
@@ -156,7 +156,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         {t.status}
                       </span>
                     </td>
-                    <td className="text-[11px] text-slate-400 font-sans">{t.note}</td>
+                    <td className="text-[11px] text-text-muted font-sans">{t.note}</td>
                   </tr>
                 );
               })}
@@ -167,35 +167,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* MT5 Bridge Diagnostics & Windows Setup Commands */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+        <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h3 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
               <Server className="w-4 h-4 text-blue-400" />
               Exness MT5 Python Bridge Diagnostics
             </h3>
-            <span className="text-xs font-mono text-slate-400">127.0.0.1:8001</span>
+            <span className="text-xs font-mono text-text-muted">127.0.0.1:8001</span>
           </div>
 
-          <p className="text-xs text-slate-300 leading-relaxed">
-            The bridge connects to the local Exness MT5 desktop terminal on Windows via IPC. By design, the browser calls the bridge through Bearer authentication with <code className="text-slate-200">ALLOW_TRADING=false</code> protection by default.
+          <p className="text-xs text-text-muted leading-relaxed">
+            The bridge connects to the local Exness MT5 desktop terminal on Windows via IPC. By design, the browser calls the bridge through Bearer authentication with <code className="text-text">ALLOW_TRADING=false</code> protection by default.
           </p>
 
-          <div className="p-3 rounded bg-slate-950 border border-slate-800 text-xs font-mono space-y-2">
+          <div className="p-3 rounded bg-bg border border-border text-xs font-mono space-y-2">
             <div className="flex justify-between">
-              <span className="text-slate-400">Server Endpoint:</span>
+              <span className="text-text-muted">Server Endpoint:</span>
               <strong className="text-white">http://127.0.0.1:8001</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Broker Server:</span>
+              <span className="text-text-muted">Broker Server:</span>
               <strong className="text-emerald-400">{brokerState.server}</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Account Login:</span>
+              <span className="text-text-muted">Account Login:</span>
               <strong className="text-white">{brokerState.accountLogin} (Demo)</strong>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Dynamic UTC Offset:</span>
-              <strong className="text-slate-200">+{brokerState.utcOffsetHours} Hours</strong>
+              <span className="text-text-muted">Dynamic UTC Offset:</span>
+              <strong className="text-text">+{brokerState.utcOffsetHours} Hours</strong>
             </div>
           </div>
 
@@ -221,20 +221,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
 
         {/* Windows PowerShell Setup Commands */}
-        <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-3">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-2">
+        <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-3">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h3 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
               <Terminal className="w-4 h-4 text-emerald-400" />
               Windows Terminal Launch Guide
             </h3>
-            <span className="text-[10px] font-mono text-slate-400">PowerShell 7+</span>
+            <span className="text-[10px] font-mono text-text-muted">PowerShell 7+</span>
           </div>
 
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-text-muted">
             To run the live bridge locally with Exness MetaTrader 5:
           </p>
 
-          <pre className="p-3 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-slate-300 overflow-x-auto leading-relaxed">
+          <pre className="p-3 rounded bg-bg border border-border font-mono text-xs text-text-muted overflow-x-auto leading-relaxed">
 {`# 1. Open Windows PowerShell in project root
 cd mt5-bridge
 
@@ -245,7 +245,7 @@ cd mt5-bridge
 uvicorn main:app --host 127.0.0.1 --port 8001`}
           </pre>
 
-          <div className="text-[11px] text-slate-400">
+          <div className="text-[11px] text-text-muted">
             Note: In Exness MT5, ensure <strong>"Allow algorithmic trading"</strong> is ticked under Tools → Options → Expert Advisors.
           </div>
         </div>

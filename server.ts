@@ -875,7 +875,18 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       openPositionsCount = 0,
     } = req.body || {};
 
-    const requiredPerm = accountType === 'live' ? 'order.place_live' : 'order.place_demo';
+    const rawAccountType = String(accountType || 'UNKNOWN').toUpperCase();
+    const isLive = rawAccountType !== 'DEMO';
+    const effectiveType: 'live' | 'demo' = isLive ? 'live' : 'demo';
+
+    if (isLive && process.env.ALLOW_LIVE !== 'true') {
+      return res.status(403).json({
+        error: 'LIVE_TRADING_DISABLED',
+        message: 'Live execution gate is locked. ALLOW_LIVE=true is required in environment.',
+      });
+    }
+
+    const requiredPerm = isLive ? 'order.place_live' : 'order.place_demo';
     if (actor && actor.role !== 'master_admin' && !actor.permissions.includes(requiredPerm)) {
       return res.status(403).json({
         error: 'FORBIDDEN',
@@ -914,7 +925,7 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
 
     const scope = accountId;
     const firewallState = getFirewallState(scope);
-    const limits = getFirewallSettings(scope, accountType === 'live' ? 'live' : 'demo');
+    const limits = getFirewallSettings(scope, effectiveType);
 
     const defaultPrices: Record<string, number> = {
       EURUSD: 1.0852,

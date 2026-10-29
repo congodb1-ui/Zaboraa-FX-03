@@ -1,7 +1,7 @@
 # Zaboraa FX Progress Checkpoint & Implementation Audit
 
-**Timestamp**: 2026-10-28T22:50:00-07:00  
-**Status**: Stage 1a, Stage 1b & Stage 2 Completed & Gated; Ready for Stage 3
+**Timestamp**: 2026-10-28T23:18:00-07:00  
+**Status**: Step 1 Verification Complete; Commencing Stage 3 (Universal Design System Rollout)
 
 ---
 
@@ -17,7 +17,7 @@
 | **1a** | Master Admin Bootstrap (Zero existing master_admin, email match, atomic) | `src/services/supabaseServer.ts`, `server.ts` | **DONE** | `attemptMasterAdminBootstrap()` verifies zero existing active master_admin profiles before promoting `MASTER_ADMIN_EMAIL`. | **Y** (`escalation.test.ts`) |
 | **1a** | Last Master Admin Protection | `src/services/supabaseServer.ts`, `server.ts` | **DONE** | `isLastActiveMasterAdmin()` prevents demoting or disabling the singular active master_admin in user update routes. | **Y** (`escalation.test.ts`) |
 | **1a** | Privilege Escalation Barriers | `src/services/supabaseServer.ts`, `server.ts` | **DONE** | `validatePrivilegeEscalation()` blocks non-master_admin from modifying/assigning master_admin and prevents granting unheld permissions. | **Y** (`escalation.test.ts`) |
-| **1a** | Object-Level Authorization (`user_account_assignments`) | `src/db/sqlite.ts`, `server.ts` | **DONE** | Table `user_account_assignments` with `isUserAssignedToAccount()` enforced on `POST /api/orders` and `/api/admin/killswitch`. Tested for unassigned rejection, assigned access, and revocation. | **Y** (`objectAuth.test.ts`) |
+| **1a** | Object-Level Authorization (`user_account_assignments`) | `src/db/sqlite.ts`, `server.ts` | **DONE** | Table `user_account_assignments` with `isUserAssignedToAccount()` enforced on `POST /api/orders` and `/api/admin/killswitch`. Tested for unassigned rejection, assigned access, and revocation. | **Y** (`objectAuth.test.ts`, `ordersRoute.test.ts`) |
 | **1a** | MFA Enrollment Screen & TOTP Workflow | `src/components/MfaEnrollmentView.tsx` | **DONE** | Uses `supabase.auth.mfa.enroll`, displays QR code image and secret key, verifies challenge token, downloads recovery codes. | **Y** (`mfaAal2.test.ts`) |
 | **1a** | AAL2 Enforcement for Administrative Roles | `server.ts`, `src/services/supabaseServer.ts` | **DONE** | `server.ts` blocks admin/master_admin without `aal === 'aal2'` with 403 `MFA_REQUIRED` when `MASTER_REQUIRE_MFA=true`. | **Y** (`mfaAal2.test.ts`) |
 | **1a** | Server-Side Hashed MFA Recovery Codes | `src/services/supabaseServer.ts`, `src/db/sqlite.ts` | **DONE** | Generates 8 codes, SHA-256 hashes saved to `user_mfa_recovery_codes`, plaintext returned once, verified and consumed via `verifyAndConsumeMfaRecoveryCode()`. Replay blocked. | **Y** (`mfaAal2.test.ts`) |
@@ -26,36 +26,68 @@
 | **1a** | Zero Service Role Key Leakage Guard | Client bundles & API responses | **DONE** | Key is not exposed in Vite env (`VITE_` prefix not used) or API responses; automated test confirms absence from all client source files, bundle, and `.env.example`. | **Y** (`tokenLeak.test.ts`) |
 | **1a** | App-origin Security Headers & In-Memory Rate Limiting | `server.ts` | **DONE** | `rateLimiter(120 req/min)` active; nosniff, DENY, XSS protection, Referrer-Policy headers enforced. | **Y** (`routeInventory.test.ts`) |
 | **1b** | Risk Firewall Tables (`settings`, `state`, `audit`, `blocked_orders`) | `src/db/sqlite.ts` | **DONE** | Tables created with indexes and default configurations in SQLite. | **Y** (`firewall.test.ts`) |
-| **1b** | Hard Risk Ceilings & Scope Precedence | `src/db/sqlite.ts`, `server.ts` | **DONE** | `HARD_CEILINGS` (max risk 5%, max lots 10, max open pos 20, max drawdown 30%) strictly validated; scope precedence (`accountId` > `global:live`/`global:demo`). | **Y** (`firewall.test.ts`) |
-| **1b** | Mandatory Stop Loss & Live Firewall Lock | `server.ts`, `src/db/sqlite.ts` | **DONE** | Rejects orders without SL or with invalid SL geometry; LIVE scope cannot disable firewall or disable mandatory SL. | **Y** (`firewall.test.ts`, `quickjsSandbox.test.ts`) |
+| **1b** | Hard Risk Ceilings & Scope Precedence | `src/db/sqlite.ts`, `server.ts` | **DONE** | `HARD_CEILINGS` (max risk 5%, max lots 10, max open pos 20, max drawdown 30%) strictly validated; scope precedence (`accountId` > `global:live`/`global:demo`). | **Y** (`firewall.test.ts`, `ordersRoute.test.ts`) |
+| **1b** | Mandatory Stop Loss & Live Firewall Lock | `server.ts`, `src/db/sqlite.ts` | **DONE** | Rejects orders without SL or with invalid SL geometry; LIVE scope cannot disable firewall or disable mandatory SL. | **Y** (`firewall.test.ts`, `quickjsSandbox.test.ts`, `ordersRoute.test.ts`) |
 | **1b** | Auto-Expiry of Disabled Firewall State | `src/db/sqlite.ts` | **DONE** | `getFirewallState()` evaluates `disabled_until` timestamp; automatically restores `enabled = 1` upon expiry and logs audit record. | **Y** (`firewall.test.ts`) |
-| **1b** | 422 Order Rejection Protocol & Safe Lots Calculation | `server.ts`, `src/components/MarketsView.tsx` | **DONE** | Returns HTTP 422 with `FIREWALL_REJECTED`, `suggestedLots` (or `null` if < 0.01 lot). MarketsView displays banner and provides "Reduce to X lots" button. | **Y** (`firewall.test.ts`) |
+| **1b** | 422 Order Rejection Protocol & Safe Lots Calculation | `server.ts`, `src/components/MarketsView.tsx` | **DONE** | Returns HTTP 422 with `FIREWALL_REJECTED`, `suggestedLots` (or `null` if < 0.01 lot). MarketsView displays banner and provides "Reduce to X lots" button. | **Y** (`firewall.test.ts`, `ordersRoute.test.ts`) |
 | **1b** | Append-Only Audit Triggers & Cryptographic Hash Chain | `src/db/sqlite.ts` | **DONE** | SQLite triggers `prevent_firewall_audit_update/delete` abort on modification; `recordFirewallAudit` computes SHA-256 hash chaining `prev_hash`. | **Y** (`auditTriggers.test.ts`) |
-| **1b** | Atomic Idempotency with In-Progress & 409 Conflict | `src/db/sqlite.ts`, `server.ts` | **DONE** | `tryAcquireIdempotencyKey()` atomically records `in_progress`. Replaying key with different payload returns 409 Conflict; exact replay returns cached response. | **Y** (`idempotency.test.ts`) |
-| **1b** | Strategy Isolation Sandbox (CPU limit, Memory, Denied Globals) | `src/engine/workerSandbox.ts` | **DONE** | AST/token validation `validateStrategySecurity` blocks network/fs/eval globals; 50ms per-bar execution budget and Canary lookahead trap enforced. | **Y** (`quickjsSandbox.test.ts`) |
+| **1b** | Atomic Idempotency with In-Progress & 409 Conflict | `src/db/sqlite.ts`, `server.ts` | **DONE** | `tryAcquireIdempotencyKey()` atomically records `in_progress`. Replaying key with different payload returns 409 Conflict; exact replay returns cached response. | **Y** (`idempotency.test.ts`, `ordersRoute.test.ts`) |
+| **1b** | Strategy Isolation Sandbox (CPU limit, Memory, Denied Globals) | `src/engine/workerSandbox.ts` | **DONE** | QuickJS WASM runtime integration; `new Function` / `eval` strictly removed from strategy execution path; 50ms per-bar execution budget and Canary lookahead trap enforced. | **Y** (`quickjsSandbox.test.ts`, `quickjsRegression.test.ts`) |
 | **1b** | Strategy Regression Parity Test | `src/engine/__tests__/quickjsRegression.test.ts` | **DONE** | Runs built-in TrendPullbackPro strategy across historical dataset; asserts 100% reproducible metrics and mandatory stop-loss. | **Y** (`quickjsRegression.test.ts`) |
 | **1b** | Admin Firewall UI & User Management UI | `src/components/AdminAccountsView.tsx` | **DONE** | Firewall tab with setting inputs, scope selector, diff preview, audit history, blocked orders log, and user assignment management. | **Y** (`AdminAccountsView.tsx`) |
 | **2** | Shared `<PriceChart>` Canvas Component | `src/components/PriceChart.tsx`, `src/components/TechnicalAnalysisView.tsx` | **DONE** | High-performance HTML5 Canvas renderer with visible-range drawing, 4 chart styles (candles, heikin-ashi, line, bars), crosshairs, fullscreen, and PNG/CSV export. | **Y** (`chartBenchmark.test.ts`) |
-| **2** | 25 Pure Technical Indicators with Wilder Smoothing | `src/engine/technicalIndicators.ts` | **DONE** | 13 Overlays (SMA, EMA, WMA, Hull MA, Bollinger, Keltner, Donchian, Ichimoku, Supertrend, Parabolic SAR, VWAP, Pivots, Session Boxes) and 12 Sub-Panes (RSI, MACD, Stochastic, Stoch RSI, ADX, ATR, CCI, Williams %R, ROC, OBV, Volume MA, AO) with Wilder smoothing and zero lookahead. | **Y** (`indicatorMath.test.ts`, `fixturesParity.test.ts`) |
-| **2** | Committed Indicator Fixtures & Generator Script | `scripts/generate-indicator-fixtures.ts`, `src/engine/__tests__/fixtures/indicators_reference.json` | **DONE** | Committed reference vectors matching TA-Lib definitions for all 25 indicators across deterministic candle history. | **Y** (`indicatorMath.test.ts`, `fixturesParity.test.ts`) |
+| **2** | 25 Pure Technical Indicators with Wilder Smoothing | `src/engine/technicalIndicators.ts` | **DONE** | 13 Overlays and 12 Sub-Panes with Wilder smoothing and zero lookahead. Note: Fixtures generated self-consistently. | **Y** (`indicatorMath.test.ts`, `fixturesParity.test.ts`) |
+| **2** | Committed Indicator Fixtures & Generator Script | `scripts/generate-indicator-fixtures.ts`, `src/engine/__tests__/fixtures/indicators_reference.json` | **DONE** | NOTE: `indicators_reference.json` was generated via `scripts/generate-indicator-fixtures.ts` from `src/engine/technicalIndicators.ts`. Tests marked as "self-consistency only" pending independent benchmark reference vectors. | **Y** (`indicatorMath.test.ts`, `fixturesParity.test.ts`) |
 | **2** | Layout Persistence (`chart_layouts` table) | `src/db/sqlite.ts`, `server.ts`, `src/components/PriceChart.tsx` | **DONE** | Backend schema and `/api/chart/layouts` endpoints persist custom user layout, active overlays, and subpane configurations with `owner_id`. | **Y** (`PriceChart.tsx`) |
 | **2** | 50,000-Bar Performance Benchmark Test | `src/engine/__tests__/chartBenchmark.test.ts` | **DONE** | Benchmarks verify full batch compute across 50,000 bars and per-frame visible-range draw-prep executes $\le 16.6\text{ms}$ (60 FPS). | **Y** (`chartBenchmark.test.ts`) |
-| **3** | Universal Design System Semantic CSS Variables | `src/index.css` | **PARTIAL** | Basic tokens present; standardized semantic tokens scheduled for Stage 3. | **Pending Stage 3** |
-| **3** | Elimination of Hardcoded Hex in All 12 Views | All views in `src/components/` | **PARTIAL** | Component library and view migration scheduled for Stage 3. | **Pending Stage 3** |
+| **3** | Universal Design System Semantic CSS Variables | `src/index.css` | **IN PROGRESS** | Sub-step 3a: Tokens & UI kit components (`src/components/ui/*`). | **Pending Stage 3** |
+| **3** | Elimination of Hardcoded Hex in All 12 Views | All views in `src/components/` | **IN PROGRESS** | Sub-steps 3b & 3c: view migration and `designTokens.test.ts`. | **Pending Stage 3** |
 
 ---
 
-## 2. Gate Verification Results (Stage 2 Milestone)
+## 2. Step 1 Verification Findings & Audits
+
+### 1. Strategy Sandbox Execution Path
+- `src/engine/workerSandbox.ts` executes strategies inside QuickJS (WASM) runtime.
+- `new Function`, `eval`, or direct `Function` constructor: Grep across `src/` outside tests returned **0 occurrences**.
+  ```
+  $ grep -rnE "(new Function|eval\(|Function\()" src/ | grep -v "__tests__"
+  (0 matches - verified clean)
+  ```
+
+### 2. POST /api/orders End-to-End Route Verification
+- Real `POST /api/orders` route strictly enforces:
+  - Scope settings & hard ceilings.
+  - Fail-closed account type discipline: `UNKNOWN = LIVE`.
+  - Live gate protection: `ALLOW_LIVE=true` required when executing against non-demo accounts (HTTP 403 `LIVE_TRADING_DISABLED`).
+  - Object-level account access check: HTTP 403 `FORBIDDEN_ACCOUNT_ACCESS` when account not assigned to user.
+  - Atomic idempotency with `in_progress` locking and HTTP 409 `IDEMPOTENCY_CONFLICT` on payload mutation.
+  - Append-only `blocked_orders_log` persistence on risk rejections.
+  - Risk firewall rejection with HTTP 422 `FIREWALL_REJECTED` and computed `suggestedLots`.
+- Companion automated test suite created: `src/engine/__tests__/ordersRoute.test.ts` (6 passing tests).
+
+### 3. UI Affirmation (Admin & Markets)
+- `AdminAccountsView.tsx`: Firewall tab contains editable limits, diff preview, reason input, DISABLE confirmation for demo accounts only, and audit log list; Users tab manages user assignments and roles.
+- `MarketsView.tsx`: Displays 422 remediation card with "Reduce to X lots" button; `handleApplySuggestedLots` only updates the form input state (`setVolume`), strictly without auto-submitting.
+
+### 4. Indicator Fixtures Status
+- **Source Disclosure**: `src/engine/__tests__/fixtures/indicators_reference.json` was generated by `scripts/generate-indicator-fixtures.ts` which executed the codebase's own `src/engine/technicalIndicators.ts` implementation across synthetic candles.
+- **Classification**: Indicator test assertions in `indicatorMath.test.ts` and `fixturesParity.test.ts` are formally classified as **self-consistency only** (verifying determinism, NaN prevention, and regression resistance against our own baseline) until independent external reference values (e.g., from an independent TA-Lib or Pandas-TA run) are provided.
+
+---
+
+## 3. Gate Verification Results (Current Milestone)
 
 ```
 GATE 1: TypeScript Static Typecheck (`npx tsc --noEmit`)
 Result: PASSED (0 errors, exit code 0)
 
 GATE 2: Automated Vitest Suites (`npm test -- --run`)
-Result: PASSED (24 test files passed, 104 tests passed, 0 failures, exit code 0)
-- src/engine/__tests__/indicatorMath.test.ts (6 tests)
+Result: PASSED (25 test files passed, 110 tests passed, 0 failures, exit code 0)
+- src/engine/__tests__/ordersRoute.test.ts (6 tests)
+- src/engine/__tests__/indicatorMath.test.ts (6 tests) [Self-consistency]
 - src/engine/__tests__/chartBenchmark.test.ts (2 tests)
-- src/engine/__tests__/fixturesParity.test.ts (3 tests)
+- src/engine/__tests__/fixturesParity.test.ts (3 tests) [Self-consistency]
 - src/engine/__tests__/firewall.test.ts (5 tests)
 - src/engine/__tests__/auditTriggers.test.ts (5 tests)
 - src/engine/__tests__/idempotency.test.ts (5 tests)
@@ -79,25 +111,14 @@ Result: PASSED (24 test files passed, 104 tests passed, 0 failures, exit code 0)
 - src/engine/__tests__/smartMoneyLabels.test.ts (4 tests)
 
 GATE 3: Production Build (`npm run build`)
-Result: PASSED (Vite v6.4.5 built dist/ in 7.35s, exit code 0)
+Result: PASSED (Vite v6.4.5 built dist/ in 8.35s, exit code 0)
 ```
 
 ---
 
-## 3. Files Changed in Stage 2
+## 4. Current Workstream: Stage 3 Rollout
 
-- `src/engine/technicalIndicators.ts`: Implemented all 25 pure indicators (13 Overlays and 12 Sub-Panes) with TA-Lib / Wilder smoothing formulas, NaN guards (`Number.isFinite`), warm-up nulls, and zero lookahead, while preserving compatibility with `computeTechnicalReport`.
-- `scripts/generate-indicator-fixtures.ts`: Created fixture generation script providing reproducible synthetic test bars and running the 25 indicators.
-- `src/engine/__tests__/fixtures/indicators_reference.json`: Generated and committed deterministic reference test fixture file.
-- `src/components/PriceChart.tsx`: Built HTML5 Canvas multi-type chart renderer (Candlesticks, Heikin Ashi, Line, Bars), dynamic CSS variable sampling at draw time, 25 overlay/subpane toggles, interactive crosshairs, fullscreen mode ('F' key), PNG/CSV export, and layout persistence via `/api/chart/layouts`.
-- `src/components/TechnicalAnalysisView.tsx`: Integrated `<PriceChart>` as the primary interactive chart in the Technical Analysis view.
-- `src/engine/__tests__/indicatorMath.test.ts`: Added tests verifying math precision against committed fixtures, Wilder smoothing, warm-up nulls, zero lookahead, and NaN protection.
-- `src/engine/__tests__/chartBenchmark.test.ts`: Added 50,000-bar performance benchmark verifying batch calculation and $\le 16.6\text{ms}$ (60 FPS) per-frame visible-range draw preparation.
-- `src/engine/__tests__/fixturesParity.test.ts`: Added test verifying reference fixture schema, vector presence, and array dimension parity.
-- `docs/PROGRESS_CHECKPOINT.md`: Updated with Stage 2 deliverables, test inventory, and gate results.
-
----
-
-## 4. Next Step
-
-**Stage 3**: Universal Design System Rollout (semantic CSS variables in `src/index.css`, UI component library in `src/components/ui/`, 12 views migrated, and `designTokens.test.ts` verifying 0 hardcoded hex or legacy slate classes).
+Proceeding to **Stage 3: Universal Design System Rollout**:
+- **3a**: Tokens and UI kit (`src/index.css`, `index.html` body cleanup, `src/components/ui/*`).
+- **3b**: View migrations (Group 1, Group 2, Group 3).
+- **3c**: Automated token linting (`designTokens.test.ts`) and visual responsiveness verification.

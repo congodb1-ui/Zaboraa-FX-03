@@ -295,10 +295,10 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
     return (
       <div
         style={{ height }}
-        className="flex flex-col items-center justify-center rounded-lg border border-slate-800 bg-[#0E1524] p-6 text-center shadow-xl"
+        className="flex flex-col items-center justify-center rounded-lg border border-border bg-surface p-6 text-center shadow-xl"
       >
-        <span className="text-sm font-medium text-slate-400">No Historical Market Bars Loaded</span>
-        <span className="mt-1 text-xs text-slate-500">
+        <span className="text-sm font-medium text-text-muted">No Historical Market Bars Loaded</span>
+        <span className="mt-1 text-xs text-text-muted">
           Load or download a dataset in the Data Manager to display live simulation candles and strategy visuals.
         </span>
       </div>
@@ -336,32 +336,32 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative rounded-lg border border-slate-800 bg-[#0E1524] p-3 shadow-2xl select-none"
+      className="relative rounded-lg border border-border bg-surface p-3 shadow-2xl select-none"
     >
       {/* Top Controls & Meta Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-slate-800/80 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-border text-xs">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-slate-100 font-mono text-sm">{symbol}</span>
-            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-slate-800 text-blue-400 font-bold border border-slate-700">
+            <span className="font-bold text-text font-mono text-sm">{symbol}</span>
+            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-surface text-blue-400 font-bold border border-border">
               {timeframe}
             </span>
-            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-slate-900 text-slate-400 border border-slate-800">
+            <span className="px-1.5 py-0.5 rounded font-mono text-[10px] bg-bg text-text-muted border border-border">
               {visibleCandles.length} / {totalBars} bars
             </span>
           </div>
 
           {hoveredCandle ? (
-            <div className="flex items-center gap-2 font-mono text-[11px] text-slate-300 bg-slate-950/70 px-2.5 py-1 rounded border border-slate-800">
+            <div className="flex items-center gap-2 font-mono text-[11px] text-text-muted bg-bg px-2.5 py-1 rounded border border-border">
               <span>O: <strong className="text-white">{hoveredCandle.open.toFixed(precision)}</strong></span>
               <span>H: <strong className="text-emerald-400">{hoveredCandle.high.toFixed(precision)}</strong></span>
               <span>L: <strong className="text-rose-400">{hoveredCandle.low.toFixed(precision)}</strong></span>
               <span>C: <strong className="text-white">{hoveredCandle.close.toFixed(precision)}</strong></span>
-              <span>Vol: <strong className="text-slate-400">{hoveredCandle.tickVolume}</strong></span>
+              <span>Vol: <strong className="text-text-muted">{hoveredCandle.tickVolume}</strong></span>
               <span>Spr: <strong className="text-blue-400">{hoveredCandle.spread}</strong></span>
             </div>
           ) : (
-            <div className="text-slate-500 text-[11px] font-mono flex items-center gap-1.5">
+            <div className="text-text-muted text-[11px] font-mono flex items-center gap-1.5">
               <MoveHorizontal className="w-3.5 h-3.5 text-blue-400" />
               <span>Scroll wheel to zoom · Drag horizontally to pan across 2-year history</span>
             </div>
@@ -376,7 +376,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
               showPositionBoxes
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-bold'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                : 'bg-bg border-border text-text-muted'
             }`}
           >
             <Target className="w-3 h-3" />
@@ -389,7 +389,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
               showRanges
                 ? 'bg-rose-500/15 border-rose-500/40 text-rose-300 font-bold'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                : 'bg-bg border-border text-text-muted'
             }`}
           >
             <Layers className="w-3 h-3" />
@@ -402,7 +402,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
               showTrendRibbon
                 ? 'bg-blue-500/15 border-blue-500/40 text-blue-300 font-bold'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                : 'bg-bg border-border text-text-muted'
             }`}
           >
             <TrendingUp className="w-3 h-3" />
@@ -415,19 +415,19 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
             className={`flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
               showSweepMarkers
                 ? 'bg-amber-500/15 border-amber-500/40 text-amber-300 font-bold'
-                : 'bg-slate-900 border-slate-800 text-slate-500'
+                : 'bg-bg border-border text-text-muted'
             }`}
           >
             <span>✕ Sweeps</span>
           </button>
 
           {/* Quick Zoom In/Out Buttons */}
-          <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+          <div className="flex items-center gap-1 pl-2 border-l border-border">
             <button
               type="button"
               onClick={handleZoomIn}
               title="Zoom In"
-              className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
+              className="p-1 rounded bg-bg hover:bg-surface text-text-muted border border-border"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
@@ -435,7 +435,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               type="button"
               onClick={handleZoomOut}
               title="Zoom Out"
-              className="p-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800"
+              className="p-1 rounded bg-bg hover:bg-surface text-text-muted border border-border"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
@@ -443,7 +443,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
               type="button"
               onClick={handleFitAll}
               title="Fit Entire History (2Y)"
-              className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-blue-400 border border-slate-800 text-[10px] font-bold"
+              className="px-1.5 py-0.5 rounded bg-bg hover:bg-surface text-blue-400 border border-border text-[10px] font-bold"
             >
               Fit All
             </button>
@@ -470,40 +470,40 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       >
         {/* Floating Tooltip Card */}
         {(hoveredBlock || hoveredTrade) && (
-          <div className="absolute top-3 left-4 z-20 pointer-events-none rounded-lg border border-slate-700 bg-slate-950/95 p-3 text-xs shadow-2xl backdrop-blur-md font-mono text-slate-200 min-w-56">
+          <div className="absolute top-3 left-4 z-20 pointer-events-none rounded-lg border border-border bg-bg p-3 text-xs shadow-2xl backdrop-blur-md font-mono text-text min-w-56">
             {hoveredBlock && hoveredBlock.type === 'POSITION_BOX' && (
               <div className="space-y-1">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-800 font-bold">
+                <div className="flex items-center justify-between pb-1 border-b border-border font-bold">
                   <span className={hoveredBlock.direction === 'LONG' ? 'text-emerald-400' : 'text-rose-400'}>
                     {hoveredBlock.label || (hoveredBlock.direction === 'LONG' ? 'LONG BREAKOUT' : 'SHORT BREAKDOWN')}
                   </span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface text-text-muted">
                     {hoveredBlock.direction}
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Entry Price:</span>
+                  <span className="text-text-muted">Entry Price:</span>
                   <strong className="text-white">{hoveredBlock.entryPrice?.toFixed(precision)}</strong>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Stop Loss (SL):</span>
+                  <span className="text-text-muted">Stop Loss (SL):</span>
                   <strong className="text-rose-400">{hoveredBlock.slPrice?.toFixed(precision)}</strong>
                 </div>
                 {hoveredBlock.tp1Price && (
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Take Profit 1:</span>
+                    <span className="text-text-muted">Take Profit 1:</span>
                     <strong className="text-emerald-400">{hoveredBlock.tp1Price.toFixed(precision)}</strong>
                   </div>
                 )}
                 {hoveredBlock.tp2Price && (
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Take Profit 2:</span>
+                    <span className="text-text-muted">Take Profit 2:</span>
                     <strong className="text-emerald-300">{hoveredBlock.tp2Price.toFixed(precision)}</strong>
                   </div>
                 )}
                 {hoveredBlock.tp3Price && (
                   <div className="flex justify-between text-[11px]">
-                    <span className="text-slate-400">Take Profit 3:</span>
+                    <span className="text-text-muted">Take Profit 3:</span>
                     <strong className="text-emerald-200">{hoveredBlock.tp3Price.toFixed(precision)}</strong>
                   </div>
                 )}
@@ -512,21 +512,21 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
 
             {hoveredBlock && hoveredBlock.type === 'CONSOLIDATION_RANGE' && (
               <div className="space-y-1">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-800 font-bold text-rose-400">
+                <div className="flex items-center justify-between pb-1 border-b border-border font-bold text-rose-400">
                   <span>CONSOLIDATION RANGE</span>
-                  <span className="text-[10px] text-slate-400">Order Block</span>
+                  <span className="text-[10px] text-text-muted">Order Block</span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Range High:</span>
+                  <span className="text-text-muted">Range High:</span>
                   <strong className="text-rose-300">{hoveredBlock.highPrice.toFixed(precision)}</strong>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Range Low:</span>
+                  <span className="text-text-muted">Range Low:</span>
                   <strong className="text-emerald-300">{hoveredBlock.lowPrice.toFixed(precision)}</strong>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Range Height:</span>
-                  <strong className="text-slate-200">
+                  <span className="text-text-muted">Range Height:</span>
+                  <strong className="text-text">
                     {((hoveredBlock.highPrice - hoveredBlock.lowPrice) * (symbol === 'USDJPY' ? 100 : symbol === 'XAUUSD' ? 1 : 10000)).toFixed(1)} pips
                   </strong>
                 </div>
@@ -535,7 +535,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
 
             {hoveredTrade && (
               <div className="space-y-1">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-800 font-bold">
+                <div className="flex items-center justify-between pb-1 border-b border-border font-bold">
                   <span className={hoveredTrade.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                     Ticket #{hoveredTrade.ticket} ({hoveredTrade.side})
                   </span>
@@ -544,18 +544,18 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">P&L Pips:</span>
+                  <span className="text-text-muted">P&L Pips:</span>
                   <strong className={hoveredTrade.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400'}>
                     {hoveredTrade.pnlPips ? `${hoveredTrade.pnlPips >= 0 ? '+' : ''}${hoveredTrade.pnlPips} pips` : 'N/A'}
                   </strong>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">R:R Ratio:</span>
+                  <span className="text-text-muted">R:R Ratio:</span>
                   <strong className="text-blue-400">{hoveredTrade.riskRewardRatio || 2.0} R</strong>
                 </div>
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-400">Exit Reason:</span>
-                  <strong className="text-slate-300">{hoveredTrade.exitReason}</strong>
+                  <span className="text-text-muted">Exit Reason:</span>
+                  <strong className="text-text-muted">{hoveredTrade.exitReason}</strong>
                 </div>
               </div>
             )}
@@ -878,7 +878,7 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
         </svg>
 
         {/* X-axis date labels */}
-        <div className="flex justify-between pt-1 border-t border-slate-800 text-[10px] font-mono text-slate-500">
+        <div className="flex justify-between pt-1 border-t border-border text-[10px] font-mono text-text-muted">
           <span>{new Date(visibleCandles[0].time * 1000).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
           <span>
             {new Date(
@@ -894,20 +894,20 @@ export const CandlestickChart: React.FC<CandlestickChartProps> = ({
       </div>
 
       {/* FULL TIMELINE MINI-MAP / SCRUBBER BAR */}
-      <div className="mt-2.5 pt-2 border-t border-slate-800/80">
-        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mb-1">
+      <div className="mt-2.5 pt-2 border-t border-border">
+        <div className="flex items-center justify-between text-[10px] font-mono text-text-muted mb-1">
           <span className="flex items-center gap-1">
             <Calendar className="w-3 h-3 text-blue-400" />
             <span>2-Year Full Simulation Timeline ({totalBars} total candles)</span>
           </span>
-          <span className="text-slate-500">
+          <span className="text-text-muted">
             Viewing bars {clampedStart + 1} - {clampedEnd + 1} ({Math.round(((clampedEnd - clampedStart + 1) / totalBars) * 100)}% span)
           </span>
         </div>
 
         {/* Interactive Scrubber Track */}
         <div
-          className="relative h-6 rounded bg-slate-950 border border-slate-800 cursor-pointer overflow-hidden"
+          className="relative h-6 rounded bg-bg border border-border cursor-pointer overflow-hidden"
           onClick={(e) => {
             const rect = e.currentTarget.getBoundingClientRect();
             const clickRatio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));

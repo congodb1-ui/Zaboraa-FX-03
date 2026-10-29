@@ -252,55 +252,55 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
     <div className="space-y-6">
       {/* 1. TOP BROKER ACCOUNT SUMMARY KPI STRIP */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
-          <div className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium">Account Balance</div>
-          <div className="text-2xl font-bold font-mono text-slate-900 dark:text-[#E6ECF5] tabular-nums mt-1">
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs transition-colors">
+          <div className="text-xs text-text-muted font-medium font-sans">Account Balance</div>
+          <div className="text-2xl font-bold font-mono text-text tabular-nums mt-1">
             ${brokerState.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Demo Equity Base</div>
+          <div className="text-[11px] text-text-muted mt-0.5 font-sans">Demo Equity Base</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
-          <div className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium">Floating Equity</div>
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs transition-colors">
+          <div className="text-xs text-text-muted font-medium font-sans">Floating Equity</div>
           <div
             className={`text-2xl font-bold font-mono tabular-nums mt-1 ${
               brokerState.equity >= brokerState.balance
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : 'text-rose-600 dark:text-rose-400'
+                ? 'text-success'
+                : 'text-danger'
             }`}
           >
             ${brokerState.equity.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">
+          <div className="text-[11px] text-text-muted mt-0.5 font-sans">
             P&L: {(brokerState.equity - brokerState.balance >= 0 ? '+' : '')}$
             {(brokerState.equity - brokerState.balance).toFixed(2)}
           </div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
-          <div className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium">Margin in Use</div>
-          <div className="text-2xl font-bold font-mono text-slate-900 dark:text-[#E6ECF5] tabular-nums mt-1">
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs transition-colors">
+          <div className="text-xs text-text-muted font-medium font-sans">Margin in Use</div>
+          <div className="text-2xl font-bold font-mono text-text tabular-nums mt-1">
             ${brokerState.margin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-slate-400 mt-0.5">Leverage 1:100</div>
+          <div className="text-[11px] text-text-muted mt-0.5 font-sans">Leverage 1:100</div>
         </div>
 
-        <div className="p-4 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors">
-          <div className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium">Free Margin</div>
-          <div className="text-2xl font-bold font-mono text-slate-900 dark:text-[#E6ECF5] tabular-nums mt-1">
+        <div className="p-4 rounded-2xl bg-surface border border-border shadow-xs transition-colors">
+          <div className="text-xs text-text-muted font-medium font-sans">Free Margin</div>
+          <div className="text-2xl font-bold font-mono text-text tabular-nums mt-1">
             ${brokerState.freeMargin.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
-          <div className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 font-medium">Margin Nominal</div>
+          <div className="text-[11px] text-success mt-0.5 font-medium font-sans">Margin Nominal</div>
         </div>
       </div>
 
       {/* 2. LIVE MARKET QUOTE CARDS */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+          <h2 className="text-base font-bold text-text font-sans">
             Market Quotes
           </h2>
-          <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">Updated 2s ago</span>
+          <span className="text-xs text-text-muted font-sans">Updated 2s ago</span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -314,17 +314,17 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
               <div
                 key={sym}
                 onClick={() => setSelectedSymbol(sym)}
-                className={`p-4 rounded-2xl bg-white dark:bg-[#111A2E] border transition-all cursor-pointer shadow-sm ${
+                className={`p-4 rounded-2xl bg-surface border transition-all cursor-pointer shadow-xs ${
                   isSelected
-                    ? 'border-indigo-500 ring-2 ring-indigo-500/30'
-                    : 'border-slate-200 dark:border-[#223049] hover:border-slate-300 dark:hover:border-slate-700'
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-border hover:border-text-muted/40'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="font-bold text-base text-slate-900 dark:text-[#E6ECF5]">{sym}</div>
+                  <div className="font-bold text-base text-text font-sans">{sym}</div>
                   <div
-                    className={`flex items-center gap-1 font-semibold text-xs font-mono ${
-                      q.change24h >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                    className={`flex items-center gap-1 font-semibold text-xs font-mono tabular-nums ${
+                      q.change24h >= 0 ? 'text-success' : 'text-danger'
                     }`}
                   >
                     {q.change24h >= 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
@@ -333,16 +333,16 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 </div>
 
                 {/* BID / ASK Display with unified styling */}
-                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-[#223049]/60">
+                <div className="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-border/60">
                   <div>
-                    <div className="text-[11px] text-slate-400 font-medium">BID</div>
-                    <div className="text-lg font-bold font-mono text-slate-800 dark:text-slate-100 tabular-nums">
+                    <div className="text-[11px] text-text-muted font-medium font-sans">BID</div>
+                    <div className="text-lg font-bold font-mono text-text tabular-nums">
                       {q.bid.toFixed(symDecimals)}
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-[11px] text-slate-400 font-medium">ASK</div>
-                    <div className="text-lg font-bold font-mono text-slate-800 dark:text-slate-100 tabular-nums">
+                    <div className="text-[11px] text-text-muted font-medium font-sans">ASK</div>
+                    <div className="text-lg font-bold font-mono text-text tabular-nums">
                       {q.ask.toFixed(symDecimals)}
                     </div>
                   </div>
@@ -350,13 +350,13 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
 
                 {/* Micro Day Range Bar & Pip Spread */}
                 <div className="mt-3">
-                  <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden relative">
+                  <div className="h-1.5 rounded-full bg-border overflow-hidden relative">
                     <div
-                      className="h-full bg-indigo-500 rounded-full"
+                      className="h-full bg-primary rounded-full"
                       style={{ width: `${Math.max(5, Math.min(95, rangePct))}%` }}
                     />
                   </div>
-                  <div className="flex justify-between items-center text-[11px] text-slate-500 dark:text-[#9FB0C8] font-mono mt-1.5">
+                  <div className="flex justify-between items-center text-[11px] text-text-muted font-mono mt-1.5">
                     <span>Spread: {q.spreadPips} pips</span>
                     <span>Range: {rangePct}%</span>
                   </div>
@@ -370,12 +370,12 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
       {/* 3. ORDER DESK & POSITIONS AREA */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left: Order Desk Card (5 cols) */}
-        <div className="lg:col-span-5 p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
-            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+        <div className="lg:col-span-5 p-5 rounded-2xl bg-surface border border-border shadow-sm transition-colors space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <h2 className="text-base font-bold text-text">
               Order Execution Desk
             </h2>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#0B1020] text-slate-700 dark:text-[#9FB0C8] border border-slate-200 dark:border-[#223049]">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-bg text-text-muted border border-border">
               {selectedSymbol}
             </span>
           </div>
@@ -388,8 +388,8 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 onClick={() => setSide('BUY')}
                 className={`py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   side === 'BUY'
-                    ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30 ring-2 ring-emerald-500'
-                    : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20'
+                    ? 'bg-success text-white shadow-sm ring-2 ring-success/50'
+                    : 'bg-success/10 text-success border border-success/20 hover:bg-success/20'
                 }`}
               >
                 <span>Buy</span>
@@ -401,8 +401,8 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 onClick={() => setSide('SELL')}
                 className={`py-2.5 rounded-xl font-bold text-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                   side === 'SELL'
-                    ? 'bg-rose-600 text-white shadow-sm shadow-rose-600/30 ring-2 ring-rose-500'
-                    : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/20 hover:bg-rose-500/20'
+                    ? 'bg-danger text-white shadow-sm ring-2 ring-danger/50'
+                    : 'bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20'
                 }`}
               >
                 <span>Sell</span>
@@ -413,7 +413,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
             {/* Volume & Quick Lot Presets */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Volume (Lots)</label>
+                <label className="text-xs font-semibold text-text-muted">Volume (Lots)</label>
                 <div className="flex gap-1">
                   {[0.01, 0.1, 0.5, 1.0].map((preset) => (
                     <button
@@ -422,8 +422,8 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                       onClick={() => setVolume(preset)}
                       className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium transition-colors cursor-pointer ${
                         volume === preset
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                          ? 'bg-primary text-white'
+                          : 'bg-bg text-text-muted hover:text-text border border-border'
                       }`}
                     >
                       {preset}
@@ -438,16 +438,16 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 max="100"
                 value={volume}
                 onChange={(e) => setVolume(parseFloat(e.target.value) || 0.01)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white font-mono tabular-nums text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text font-mono tabular-nums text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
             {/* Stop Loss (Neutral Styling with Amber Warning) */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-text-muted flex items-center gap-1.5">
                   <span>Stop Loss Price</span>
-                  <span className="text-[11px] font-normal text-amber-600 dark:text-amber-400 font-sans">
+                  <span className="text-[11px] font-normal text-warning font-sans">
                     (Required by safety rule)
                   </span>
                 </label>
@@ -455,14 +455,14 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => applyPipPreset('SL', 20)}
-                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-bg text-text-muted hover:text-text border border-border cursor-pointer"
                   >
                     20 pips
                   </button>
                   <button
                     type="button"
                     onClick={() => applyPipPreset('SL', 30)}
-                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-bg text-text-muted hover:text-text border border-border cursor-pointer"
                   >
                     30 pips
                   </button>
@@ -474,20 +474,20 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 value={slPrice}
                 onChange={(e) => setSlPrice(e.target.value)}
                 placeholder="Enter SL price..."
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-[#223049] text-slate-900 dark:text-white font-mono tabular-nums text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text font-mono tabular-nums text-sm focus:outline-none focus:ring-2 focus:ring-warning"
               />
             </div>
 
             {/* Take Profit (Optional) */}
             <div>
               <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Take Profit Price <span className="text-slate-400 font-normal">(Optional)</span>
+                <label className="text-xs font-semibold text-text-muted">
+                  Take Profit Price <span className="text-text-muted/70 font-normal">(Optional)</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => applyPipPreset('TP', 50)}
-                  className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  className="px-2 py-0.5 rounded text-[10px] font-mono bg-bg text-text-muted hover:text-text border border-border cursor-pointer"
                 >
                   50 pips
                 </button>
@@ -498,33 +498,33 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 value={tpPrice}
                 onChange={(e) => setTpPrice(e.target.value)}
                 placeholder="Enter TP price..."
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white font-mono tabular-nums text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text font-mono tabular-nums text-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
 
             {/* Risk Firewall Rejection Remediation Banner */}
             {remediation && (
-              <div className="p-3.5 rounded-xl text-xs bg-rose-500/15 border-2 border-rose-500/50 text-rose-900 dark:text-rose-200 space-y-2 animate-in fade-in">
+              <div className="p-3.5 rounded-xl text-xs bg-danger/15 border-2 border-danger/50 text-danger space-y-2 animate-in fade-in">
                 <div className="flex items-start gap-2">
-                  <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <ShieldAlert className="w-4 h-4 text-danger shrink-0 mt-0.5" />
                   <div className="flex-1">
-                    <div className="font-bold text-rose-600 dark:text-rose-400">
+                    <div className="font-bold text-danger">
                       Risk Firewall Violation: {remediation.ruleName}
                     </div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-300 mt-0.5">
+                    <div className="text-[11px] text-text-muted mt-0.5">
                       {remediation.message}
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono bg-white/60 dark:bg-black/30 p-2 rounded-lg">
+                <div className="grid grid-cols-2 gap-2 text-[11px] font-mono bg-bg/80 p-2 rounded-lg border border-border">
                   <div>
-                    <span className="text-slate-500">Allowed Limit:</span>{' '}
-                    <span className="font-bold text-slate-800 dark:text-slate-200">{String(remediation.limit)}</span>
+                    <span className="text-text-muted">Allowed Limit:</span>{' '}
+                    <span className="font-bold text-text">{String(remediation.limit)}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500">Attempted:</span>{' '}
-                    <span className="font-bold text-rose-600 dark:text-rose-400">{String(remediation.attempted)}</span>
+                    <span className="text-text-muted">Attempted:</span>{' '}
+                    <span className="font-bold text-danger">{String(remediation.attempted)}</span>
                   </div>
                 </div>
 
@@ -532,13 +532,13 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                   <button
                     type="button"
                     onClick={handleApplySuggestedLots}
-                    className="w-full py-2 px-3 rounded-lg font-semibold text-xs bg-rose-600 hover:bg-rose-500 text-white shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="w-full py-2 px-3 rounded-lg font-semibold text-xs bg-danger hover:opacity-90 text-white shadow-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <span>Reduce to {remediation.suggestedLots} {remediation.suggestedLots === 1 ? 'lot' : 'lots'}</span>
                     <span className="text-[10px] opacity-80">(within risk budget)</span>
                   </button>
                 ) : (
-                  <div className="text-[11px] text-amber-700 dark:text-amber-300 italic bg-amber-500/10 p-1.5 rounded">
+                  <div className="text-[11px] text-warning italic bg-warning/10 p-1.5 rounded border border-warning/20">
                     Stop-loss distance exceeds risk limit for minimum allowable 0.01 lot. Tighten stop loss to proceed.
                   </div>
                 )}
@@ -550,14 +550,14 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
               <div
                 className={`p-3 rounded-xl text-xs flex items-start gap-2 ${
                   orderFeedback.success
-                    ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
-                    : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-500/30'
+                    ? 'bg-success/10 text-success border border-success/30'
+                    : 'bg-danger/10 text-danger border border-danger/30'
                 }`}
               >
                 {orderFeedback.success ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-success shrink-0 mt-0.5" />
                 ) : (
-                  <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <AlertTriangle className="w-4 h-4 text-danger shrink-0 mt-0.5" />
                 )}
                 <span>{orderFeedback.message}</span>
               </div>
@@ -569,10 +569,10 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
               disabled={!brokerState.allowTrading || brokerState.killSwitchActive}
               className={`w-full py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all cursor-pointer ${
                 !brokerState.allowTrading || brokerState.killSwitchActive
-                  ? 'bg-slate-400 dark:bg-slate-800 cursor-not-allowed opacity-60'
+                  ? 'bg-surface border border-border text-text-muted cursor-not-allowed opacity-60'
                   : side === 'BUY'
-                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20'
-                  : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/20'
+                  ? 'bg-success hover:opacity-90'
+                  : 'bg-danger hover:opacity-90'
               }`}
             >
               {!brokerState.allowTrading
@@ -585,13 +585,13 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
         </div>
 
         {/* Right: Open Positions Table & Actions (7 cols) */}
-        <div className="lg:col-span-7 p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100 dark:border-[#223049]">
+        <div className="lg:col-span-7 p-5 rounded-2xl bg-surface border border-border shadow-sm transition-colors space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+              <h2 className="text-base font-bold text-text">
                 Active Positions ({positions.length})
               </h2>
-              <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">Real-time MTM valuation</span>
+              <span className="text-xs text-text-muted">Real-time MTM valuation</span>
             </div>
 
             {positions.length > 0 && (
@@ -599,7 +599,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => positions.forEach((p) => onClosePosition(p.ticket))}
-                  className="px-2.5 py-1 rounded-lg text-xs font-medium text-rose-600 dark:text-rose-400 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg text-xs font-medium text-danger bg-danger/10 hover:bg-danger/20 border border-danger/30 transition-colors cursor-pointer"
                 >
                   Close all
                 </button>
@@ -607,7 +607,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                   <button
                     type="button"
                     onClick={() => profitablePositions.forEach((p) => onClosePosition(p.ticket))}
-                    className="px-2.5 py-1 rounded-lg text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 rounded-lg text-xs font-medium text-success bg-success/10 hover:bg-success/20 border border-success/30 transition-colors cursor-pointer"
                   >
                     Close profitable ({profitablePositions.length})
                   </button>
@@ -618,9 +618,9 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
 
           {positions.length === 0 ? (
             <div className="py-12 flex flex-col items-center justify-center text-center space-y-2">
-              <Clock className="w-8 h-8 text-slate-400" />
-              <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">No active positions</div>
-              <p className="text-xs text-slate-500 dark:text-[#9FB0C8] max-w-sm">
+              <Clock className="w-8 h-8 text-text-muted" />
+              <div className="text-sm font-semibold text-text">No active positions</div>
+              <p className="text-xs text-text-muted max-w-sm">
                 Configure your trade parameters on the order desk to open a new simulated or demo market position.
               </p>
             </div>
@@ -628,7 +628,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                  <tr className="border-b border-border text-text-muted">
                     <th className="text-left py-2 font-medium">Ticket</th>
                     <th className="text-left py-2 font-medium">Side / Pair</th>
                     <th className="text-right py-2 font-medium">Lots</th>
@@ -638,36 +638,36 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                     <th className="text-center py-2 font-medium">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                <tbody className="divide-y divide-border font-mono">
                   {positions.map((pos) => {
                     const isGain = pos.pnl >= 0;
                     return (
-                      <tr key={pos.ticket} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                        <td className="py-2.5 text-slate-500">#{pos.ticket}</td>
+                      <tr key={pos.ticket} className="hover:bg-bg/50 transition-colors">
+                        <td className="py-2.5 text-text-muted">#{pos.ticket}</td>
                         <td className="py-2.5 font-sans">
                           <span
                             className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-bold mr-1.5 ${
                               pos.side === 'BUY'
-                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                ? 'bg-success/15 text-success'
+                                : 'bg-danger/15 text-danger'
                             }`}
                           >
                             {pos.side}
                           </span>
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">{pos.symbol}</span>
+                          <span className="font-semibold text-text">{pos.symbol}</span>
                         </td>
-                        <td className="py-2.5 text-right text-slate-700 dark:text-slate-300 tabular-nums">
+                        <td className="py-2.5 text-right text-text-muted tabular-nums">
                           {pos.volume.toFixed(2)}
                         </td>
-                        <td className="py-2.5 text-right text-slate-600 dark:text-slate-400 tabular-nums">
+                        <td className="py-2.5 text-right text-text-muted tabular-nums">
                           {pos.openPrice.toFixed(pos.symbol === 'XAUUSD' ? 2 : 5)}
                         </td>
-                        <td className="py-2.5 text-right text-slate-800 dark:text-slate-200 font-semibold tabular-nums">
+                        <td className="py-2.5 text-right text-text font-semibold tabular-nums">
                           {pos.currentPrice.toFixed(pos.symbol === 'XAUUSD' ? 2 : 5)}
                         </td>
                         <td
                           className={`py-2.5 text-right font-bold tabular-nums ${
-                            isGain ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                            isGain ? 'text-success' : 'text-danger'
                           }`}
                         >
                           {isGain ? '+' : ''}${pos.pnl.toFixed(2)}
@@ -681,14 +681,14 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                                   onClosePosition(pos.ticket);
                                   setPendingCloseTicket(null);
                                 }}
-                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white cursor-pointer"
+                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-danger text-white cursor-pointer"
                               >
                                 Confirm
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setPendingCloseTicket(null)}
-                                className="px-2 py-0.5 rounded text-[10px] text-slate-500 hover:text-slate-800 dark:hover:text-white cursor-pointer"
+                                className="px-2 py-0.5 rounded text-[10px] text-text-muted hover:text-text cursor-pointer"
                               >
                                 Cancel
                               </button>
@@ -697,7 +697,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                             <button
                               type="button"
                               onClick={() => setPendingCloseTicket(pos.ticket)}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-rose-500/10 hover:text-rose-600 transition-colors cursor-pointer"
+                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-text-muted bg-bg border border-border hover:bg-danger/10 hover:text-danger hover:border-danger/30 transition-colors cursor-pointer"
                             >
                               Close
                             </button>
@@ -709,15 +709,15 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
                 </tbody>
                 {/* Totals Row */}
                 <tfoot>
-                  <tr className="border-t-2 border-slate-200 dark:border-slate-700 font-semibold font-mono text-xs">
-                    <td colSpan={2} className="py-2.5 font-sans text-slate-800 dark:text-slate-200">Total</td>
-                    <td className="py-2.5 text-right text-slate-800 dark:text-slate-200 tabular-nums">
+                  <tr className="border-t-2 border-border font-semibold font-mono text-xs">
+                    <td colSpan={2} className="py-2.5 font-sans text-text">Total</td>
+                    <td className="py-2.5 text-right text-text tabular-nums">
                       {totalLots.toFixed(2)}
                     </td>
                     <td colSpan={2} />
                     <td
                       className={`py-2.5 text-right font-bold tabular-nums ${
-                        totalPnl >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                        totalPnl >= 0 ? 'text-success' : 'text-danger'
                       }`}
                     >
                       {totalPnl >= 0 ? '+' : ''}${totalPnl.toFixed(2)}
@@ -733,70 +733,70 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
 
       {/* 4. TWO-STEP ORDER REVIEW MODAL */}
       {isReviewModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-5">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+                <ShieldCheck className="w-5 h-5 text-primary" />
+                <h3 className="text-base font-bold text-text">
                   Order Confirmation & Risk Review
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setIsReviewModalOpen(false)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                className="text-text-muted hover:text-text cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800">
-                <span className="text-slate-500 dark:text-[#9FB0C8]">Intent</span>
-                <span className="font-bold text-slate-900 dark:text-white">
+              <div className="flex justify-between py-1.5 border-b border-border">
+                <span className="text-text-muted">Intent</span>
+                <span className="font-bold text-text">
                   {side} {volume.toFixed(2)} {volume === 1 ? 'lot' : 'lots'} {selectedSymbol}
                 </span>
               </div>
 
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 font-mono">
-                <span className="text-slate-500 dark:text-[#9FB0C8] font-sans">Est. Execution Price</span>
-                <span className="font-bold text-slate-900 dark:text-white tabular-nums">
+              <div className="flex justify-between py-1.5 border-b border-border font-mono">
+                <span className="text-text-muted font-sans">Est. Execution Price</span>
+                <span className="font-bold text-text tabular-nums">
                   {entryPrice.toFixed(decimals)}
                 </span>
               </div>
 
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 font-mono">
-                <span className="text-slate-500 dark:text-[#9FB0C8] font-sans">Stop Loss</span>
-                <span className="font-bold text-amber-500 tabular-nums">
+              <div className="flex justify-between py-1.5 border-b border-border font-mono">
+                <span className="text-text-muted font-sans">Stop Loss</span>
+                <span className="font-bold text-warning tabular-nums">
                   {slNum.toFixed(decimals)} ({slPips.toFixed(1)} pips)
                 </span>
               </div>
 
               {tpNum && (
-                <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 font-mono">
-                  <span className="text-slate-500 dark:text-[#9FB0C8] font-sans">Take Profit</span>
-                  <span className="font-bold text-emerald-500 tabular-nums">
+                <div className="flex justify-between py-1.5 border-b border-border font-mono">
+                  <span className="text-text-muted font-sans">Take Profit</span>
+                  <span className="font-bold text-success tabular-nums">
                     {tpNum.toFixed(decimals)} ({tpPips.toFixed(1)} pips)
                   </span>
                 </div>
               )}
 
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 font-mono">
-                <span className="text-slate-500 dark:text-[#9FB0C8] font-sans">Dollar Risk</span>
-                <span className="font-bold text-rose-500 tabular-nums">
+              <div className="flex justify-between py-1.5 border-b border-border font-mono">
+                <span className="text-text-muted font-sans">Dollar Risk</span>
+                <span className="font-bold text-danger tabular-nums">
                   ${dollarRisk} ({riskPct}% of balance)
                 </span>
               </div>
 
-              <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-800 font-mono">
-                <span className="text-slate-500 dark:text-[#9FB0C8] font-sans">Reward-to-Risk</span>
-                <span className="font-bold text-indigo-500 tabular-nums">{rrRatio}</span>
+              <div className="flex justify-between py-1.5 border-b border-border font-mono">
+                <span className="text-text-muted font-sans">Reward-to-Risk</span>
+                <span className="font-bold text-primary tabular-nums">{rrRatio}</span>
               </div>
 
               <div className="flex justify-between py-1.5 font-mono">
-                <span className="text-slate-500 dark:text-[#9FB0C8] font-sans">Margin Required</span>
-                <span className="text-slate-700 dark:text-slate-300 tabular-nums">
+                <span className="text-text-muted font-sans">Margin Required</span>
+                <span className="text-text-muted tabular-nums">
                   ${marginRequired.toFixed(2)} (Spread: {currentQuote.spreadPips} pips)
                 </span>
               </div>
@@ -806,14 +806,14 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsReviewModalOpen(false)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl border border-border text-text font-semibold text-xs hover:bg-bg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={handleConfirmOrder}
-                className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 transition-all cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-primary hover:opacity-90 text-white font-bold text-xs shadow-md shadow-primary/20 transition-all cursor-pointer"
               >
                 Confirm & Send
               </button>

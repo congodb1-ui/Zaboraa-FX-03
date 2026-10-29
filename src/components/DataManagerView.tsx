@@ -353,14 +353,14 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Action Bar */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <Database className="w-4 h-4 text-blue-400" />
               Historical Market Data Catalog (SQLite Local Source of Truth)
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-text-muted mt-0.5">
               Strict 3-tier provenance tracking (<code className="text-emerald-400">MT5 BRIDGE</code>, <code className="text-blue-400">USER CSV</code>, <code className="text-amber-400">SIMULATED</code>) across all 8 broker timeframes.
             </p>
           </div>
@@ -396,7 +396,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <button
                   type="button"
                   onClick={handleExportCsv}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-all"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-text border border-border transition-all"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Export CSV
@@ -404,7 +404,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <button
                   type="button"
                   onClick={handleRunAutofix}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-amber-300 border border-border transition-all cursor-pointer"
                 >
                   <Wrench className="w-3.5 h-3.5" />
                   Run Integrity Autofix
@@ -424,7 +424,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
         </div>
 
         {/* Navigation Switcher: Catalog vs Complete Stored Historical Vault */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-3 mt-3 pt-3 border-t border-border">
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -432,7 +432,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTabMode === 'catalog'
                   ? 'bg-blue-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
               Catalog Datasets ({catalog.length})
@@ -447,7 +447,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeTabMode === 'vault'
                   ? 'bg-emerald-600 text-white shadow-md'
-                  : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                  : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
               <Database className="w-3.5 h-3.5" />
@@ -463,10 +463,10 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
         {/* Catalog List / Tabs */}
         {catalog.length === 0 ? (
-          <div className="mt-6 py-10 text-center rounded-lg border border-dashed border-slate-800 bg-slate-950/40 p-6">
-            <Database className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-            <h3 className="text-sm font-semibold text-slate-300">Catalog is Currently Empty</h3>
-            <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+          <div className="mt-6 py-10 text-center rounded-lg border border-dashed border-border bg-bg p-6">
+            <Database className="w-8 h-8 text-text-muted mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-text-muted">Catalog is Currently Empty</h3>
+            <p className="text-xs text-text-muted mt-1 max-w-md mx-auto">
               No historical datasets are stored in SQLite yet. Click <strong>"Fetch from MT5 Bridge"</strong> to dynamically download genuine broker candles from Exness MT5, or <strong>"Import Custom CSV"</strong> to load your own data.
             </p>
           </div>
@@ -480,12 +480,12 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 className={`px-3 py-2 rounded-lg border text-xs font-mono whitespace-nowrap text-left transition-all ${
                   selectedDatasetId === d.id
                     ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
-                    : 'border-slate-800 bg-slate-950 hover:bg-slate-900'
+                    : 'border-border bg-bg hover:bg-bg'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-white">{d.symbol}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface text-text-muted">
                     {d.timeframe}
                   </span>
                   <span
@@ -500,7 +500,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                     {d.provenance}
                   </span>
                 </div>
-                <div className="text-[10px] text-slate-400 mt-1">
+                <div className="text-[10px] text-text-muted mt-1">
                   {d.candleCount} bars · Score: {d.qualityScore}%
                 </div>
               </button>
@@ -513,7 +513,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
       {activeDs && (
         <>
           {aiReview && (
-            <div className="rounded-lg border border-indigo-500/30 bg-gradient-to-r from-indigo-950/20 via-[#0E1524] to-slate-900 p-5 shadow-xl space-y-3">
+            <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 via-surface to-surface p-5 shadow-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-indigo-400" />
@@ -522,7 +522,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-slate-400">Score: {aiReview.healthScore}%</span>
+                  <span className="text-xs text-text-muted">Score: {aiReview.healthScore}%</span>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
                       aiReview.verdict === 'PRODUCTION_READY'
@@ -535,32 +535,32 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setAiReview(null)}
-                    className="text-xs text-slate-500 hover:text-slate-300 ml-2 cursor-pointer"
+                    className="text-xs text-text-muted hover:text-text-muted ml-2 cursor-pointer"
                   >
                     ✕
                   </button>
                 </div>
               </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed">{aiReview.summary}</p>
+              <p className="text-xs text-text-muted leading-relaxed">{aiReview.summary}</p>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
-                <div className="p-3 rounded bg-slate-900/80 border border-slate-800 space-y-1">
+                <div className="p-3 rounded bg-bg border border-border space-y-1">
                   <span className="font-semibold text-indigo-400">Weekend & Gap Analysis:</span>
-                  <p className="text-slate-300 text-[11px]">{aiReview.gapAnalysis}</p>
+                  <p className="text-text-muted text-[11px]">{aiReview.gapAnalysis}</p>
                 </div>
-                <div className="p-3 rounded bg-slate-900/80 border border-slate-800 space-y-1">
+                <div className="p-3 rounded bg-bg border border-border space-y-1">
                   <span className="font-semibold text-emerald-400">Slippage & Spread Considerations:</span>
-                  <p className="text-slate-300 text-[11px]">{aiReview.slippageSpreadRisks}</p>
+                  <p className="text-text-muted text-[11px]">{aiReview.slippageSpreadRisks}</p>
                 </div>
               </div>
 
               {aiReview.cleaningRecommendations?.length > 0 && (
                 <div className="pt-1 text-xs">
-                  <span className="font-semibold text-slate-400 block mb-1">AI Cleaning Suggestions:</span>
+                  <span className="font-semibold text-text-muted block mb-1">AI Cleaning Suggestions:</span>
                   <ul className="space-y-1">
                     {aiReview.cleaningRecommendations.map((r: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-1.5 text-slate-300 text-[11px]">
+                      <li key={idx} className="flex items-start gap-1.5 text-text-muted text-[11px]">
                         <span className="text-indigo-400">•</span>
                         <span>{r}</span>
                       </li>
@@ -573,20 +573,20 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Metadata Card */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl space-y-3 font-mono text-xs">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+          <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-3 font-mono text-xs">
+            <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans">
               Dataset Provenance & Verification
             </h3>
 
-            <div className="p-3 rounded bg-slate-950 border border-slate-800 space-y-2">
+            <div className="p-3 rounded bg-bg border border-border space-y-2">
               <div className="flex justify-between">
-                <span className="text-slate-400">Symbol & Timeframe:</span>
+                <span className="text-text-muted">Symbol & Timeframe:</span>
                 <strong className="text-white">
                   {activeDs.symbol} {activeDs.timeframe}
                 </strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Provenance Tier:</span>
+                <span className="text-text-muted">Provenance Tier:</span>
                 <strong
                   className={
                     activeDs.provenance === 'MT5 BRIDGE'
@@ -598,7 +598,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 </strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Research Eligibility:</span>
+                <span className="text-text-muted">Research Eligibility:</span>
                 <strong
                   className={
                     activeDs.isResearchEligible ? 'text-emerald-400' : 'text-rose-400'
@@ -608,46 +608,46 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 </strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Candle Count:</span>
+                <span className="text-text-muted">Candle Count:</span>
                 <strong className="text-white">{activeDs.candleCount}</strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Broker Server:</span>
-                <strong className="text-slate-300">
+                <span className="text-text-muted">Broker Server:</span>
+                <strong className="text-text-muted">
                   {activeDs.brokerServer || 'Local Import'}
                 </strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Quality Score:</span>
+                <span className="text-text-muted">Quality Score:</span>
                 <strong className="text-emerald-400">{activeDs.qualityScore}%</strong>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Gaps Detected:</span>
-                <strong className="text-slate-300">{activeDs.gapCount}</strong>
+                <span className="text-text-muted">Gaps Detected:</span>
+                <strong className="text-text-muted">{activeDs.gapCount}</strong>
               </div>
-              <div className="pt-2 border-t border-slate-800 text-[10px] text-slate-500 break-all">
+              <div className="pt-2 border-t border-border text-[10px] text-text-muted break-all">
                 SHA-256: {activeDs.sha256}
               </div>
             </div>
 
             {/* Autofix Logs */}
             {autofixLogs.length > 0 && (
-              <div className="p-3 rounded bg-slate-950 border border-slate-800 space-y-1 text-[11px]">
+              <div className="p-3 rounded bg-bg border border-border space-y-1 text-[11px]">
                 <strong className="text-amber-400 block font-sans">
                   Autofix Actions Executed:
                 </strong>
                 {autofixLogs.map((log, i) => (
-                  <div key={i} className="text-slate-400">• {log}</div>
+                  <div key={i} className="text-text-muted">• {log}</div>
                 ))}
               </div>
             )}
           </div>
 
           {/* Stored OHLC Table */}
-          <div className="lg:col-span-2 rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-            <div className="flex flex-wrap items-center justify-between pb-2 border-b border-slate-800 gap-2">
+          <div className="lg:col-span-2 rounded-lg border border-border bg-surface p-4 shadow-xl">
+            <div className="flex flex-wrap items-center justify-between pb-2 border-b border-border gap-2">
               <div>
-                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider font-sans">
+                <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans">
                   Stored OHLC Market Bars ({loadedCandles.length} Bars in Dataset)
                 </h3>
                 <span className="text-[10px] text-emerald-400 font-mono">
@@ -661,7 +661,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                     setCatalogPageSize(Number(e.target.value));
                     setCatalogPage(1);
                   }}
-                  className="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-xs font-mono text-slate-300"
+                  className="px-2 py-1 rounded bg-bg border border-border text-xs font-mono text-text-muted"
                 >
                   <option value={50}>50 / page</option>
                   <option value={100}>100 / page</option>
@@ -673,18 +673,18 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                     type="button"
                     disabled={catalogPage <= 1}
                     onClick={() => setCatalogPage((p) => Math.max(1, p - 1))}
-                    className="px-2 py-1 rounded bg-slate-900 border border-slate-800 disabled:opacity-40 text-slate-300 hover:text-white cursor-pointer"
+                    className="px-2 py-1 rounded bg-bg border border-border disabled:opacity-40 text-text-muted hover:text-text cursor-pointer"
                   >
                     Prev
                   </button>
-                  <span className="px-1.5 text-slate-400 text-[11px]">
+                  <span className="px-1.5 text-text-muted text-[11px]">
                     {catalogPage} / {Math.max(1, Math.ceil(loadedCandles.length / catalogPageSize))}
                   </span>
                   <button
                     type="button"
                     disabled={catalogPage >= Math.ceil(loadedCandles.length / catalogPageSize)}
                     onClick={() => setCatalogPage((p) => p + 1)}
-                    className="px-2 py-1 rounded bg-slate-900 border border-slate-800 disabled:opacity-40 text-slate-300 hover:text-white cursor-pointer"
+                    className="px-2 py-1 rounded bg-bg border border-border disabled:opacity-40 text-text-muted hover:text-text cursor-pointer"
                   >
                     Next
                   </button>
@@ -693,17 +693,17 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             </div>
 
             {isLoadingCandles ? (
-              <div className="py-20 text-center text-slate-500 text-xs">
+              <div className="py-20 text-center text-text-muted text-xs">
                 Loading candles from SQLite database...
               </div>
             ) : loadedCandles.length === 0 ? (
-              <div className="py-20 text-center text-slate-500 text-xs">
+              <div className="py-20 text-center text-text-muted text-xs">
                 No candle records found in SQLite for this dataset.
               </div>
             ) : (
               <div className="overflow-x-auto max-h-96 overflow-y-auto mt-2">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                  <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-[11px]">
                     <tr>
                       <th className="py-2">Time (UTC)</th>
                       <th>Open</th>
@@ -714,12 +714,12 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                       <th>Spread</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-border">
                     {loadedCandles
                       .slice((catalogPage - 1) * catalogPageSize, catalogPage * catalogPageSize)
                       .map((c, i) => (
-                        <tr key={c.time + '-' + i} className="hover:bg-slate-800/30">
-                          <td className="py-1.5 text-slate-400">
+                        <tr key={c.time + '-' + i} className="hover:bg-surface">
+                          <td className="py-1.5 text-text-muted">
                             {new Date(c.time * 1000)
                               .toISOString()
                               .replace('T', ' ')
@@ -729,7 +729,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                           <td className="text-emerald-400">{c.high}</td>
                           <td className="text-rose-400">{c.low}</td>
                           <td className="text-white">{c.close}</td>
-                          <td className="text-slate-400">{c.tickVolume}</td>
+                          <td className="text-text-muted">{c.tickVolume}</td>
                           <td className="text-blue-400">{c.spread}</td>
                         </tr>
                       ))}
@@ -747,32 +747,32 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
         <div className="space-y-6">
           {/* Storage Summary Highlights */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
-              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+            <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
+              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
                 Total Historical Bars in SQLite
               </span>
               <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">
                 {storageSummary?.totalCandles?.toLocaleString() || '0'}
               </span>
-              <span className="text-[10px] text-slate-500 mt-1 block">
+              <span className="text-[10px] text-text-muted mt-1 block">
                 Permanently persisted in data/zaboraa.sqlite
               </span>
             </div>
 
-            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
-              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+            <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
+              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
                 Tracked Pair Series
               </span>
               <span className="text-2xl font-bold font-mono text-white mt-1 block">
                 {storageSummary?.datasets?.length || 0} Sets
               </span>
-              <span className="text-[10px] text-slate-500 mt-1 block">
+              <span className="text-[10px] text-text-muted mt-1 block">
                 Unique symbol + timeframe combinations
               </span>
             </div>
 
-            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
-              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+            <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
+              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
                 Persistence Policy
               </span>
               <span className="text-base font-bold font-mono text-blue-400 mt-1 block">
@@ -783,29 +783,29 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </span>
             </div>
 
-            <div className="p-4 rounded-lg border border-slate-800 bg-[#0E1524] shadow-md">
-              <span className="text-[11px] font-sans text-slate-400 uppercase tracking-wider block">
+            <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
+              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
                 Disk Integrity
               </span>
               <span className="text-base font-bold font-mono text-emerald-400 mt-1 block flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4" />
                 Synchronous WAL
               </span>
-              <span className="text-[10px] text-slate-500 mt-1 block">
+              <span className="text-[10px] text-text-muted mt-1 block">
                 Index: (symbol, timeframe, time)
               </span>
             </div>
           </div>
 
           {/* Stored Datasets Matrix */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Database className="w-4 h-4 text-emerald-400" />
                   Stored Historical Series Overview
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-text-muted mt-0.5">
                   All historical candles stored locally in the database. Select any row to inspect bars in the universal browser.
                 </p>
               </div>
@@ -815,7 +815,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   loadStorageSummary();
                   loadVaultData(1, vaultSymbol, vaultTimeframe, vaultPageSize);
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-slate-900 border border-slate-800 text-slate-300 hover:text-white cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-bg border border-border text-text-muted hover:text-text cursor-pointer"
               >
                 <RefreshCw className="w-3.5 h-3.5" />
                 Refresh Vault
@@ -824,7 +824,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono border-collapse">
-                <thead className="bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                <thead className="bg-bg border-b border-border text-text-muted text-[11px]">
                   <tr>
                     <th className="p-3">Symbol</th>
                     <th className="p-3">Timeframe</th>
@@ -835,18 +835,18 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                     <th className="p-3">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-border">
                   {storageSummary?.datasets?.map((ds) => (
-                    <tr key={ds.symbol + '-' + ds.timeframe} className="hover:bg-slate-800/20">
+                    <tr key={ds.symbol + '-' + ds.timeframe} className="hover:bg-surface">
                       <td className="p-3 font-bold text-white font-sans">{ds.symbol}</td>
-                      <td className="p-3 text-slate-300">{ds.timeframe}</td>
+                      <td className="p-3 text-text-muted">{ds.timeframe}</td>
                       <td className="p-3 font-bold text-emerald-400">
                         {ds.candleCount.toLocaleString()}
                       </td>
-                      <td className="p-3 text-slate-400 text-[11px]">
+                      <td className="p-3 text-text-muted text-[11px]">
                         {ds.minDateIso ? ds.minDateIso.replace('T', ' ').substring(0, 19) : 'N/A'}
                       </td>
-                      <td className="p-3 text-slate-400 text-[11px]">
+                      <td className="p-3 text-text-muted text-[11px]">
                         {ds.maxDateIso ? ds.maxDateIso.replace('T', ' ').substring(0, 19) : 'N/A'}
                       </td>
                       <td className="p-3">
@@ -862,7 +862,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                             setVaultTimeframe(ds.timeframe);
                             loadVaultData(1, ds.symbol, ds.timeframe, vaultPageSize);
                           }}
-                          className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-sans font-semibold cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-surface hover:bg-surface text-text text-[11px] font-sans font-semibold cursor-pointer"
                         >
                           Inspect Bars
                         </button>
@@ -875,14 +875,14 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           </div>
 
           {/* Universal Historical Candle Browser */}
-          <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-xl space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+          <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
                   <Search className="w-4 h-4 text-blue-400" />
                   Universal Historical Candle Explorer
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-text-muted mt-0.5">
                   Browse and verify every single candle persisted in SQLite across all pairs.
                 </p>
               </div>
@@ -890,14 +890,14 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               {/* Filters */}
               <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
                 <div>
-                  <label className="text-slate-400 mr-1.5 font-sans">Symbol:</label>
+                  <label className="text-text-muted mr-1.5 font-sans">Symbol:</label>
                   <select
                     value={vaultSymbol}
                     onChange={(e) => {
                       setVaultSymbol(e.target.value);
                       loadVaultData(1, e.target.value, vaultTimeframe, vaultPageSize);
                     }}
-                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-white"
+                    className="px-2.5 py-1 rounded bg-bg border border-border text-white"
                   >
                     <option value="ALL">ALL SYMBOLS</option>
                     <option value="EURUSD">EURUSD</option>
@@ -908,14 +908,14 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-400 mr-1.5 font-sans">Timeframe:</label>
+                  <label className="text-text-muted mr-1.5 font-sans">Timeframe:</label>
                   <select
                     value={vaultTimeframe}
                     onChange={(e) => {
                       setVaultTimeframe(e.target.value);
                       loadVaultData(1, vaultSymbol, e.target.value, vaultPageSize);
                     }}
-                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-white"
+                    className="px-2.5 py-1 rounded bg-bg border border-border text-white"
                   >
                     <option value="ALL">ALL TIMEFRAMES</option>
                     <option value="M1">M1</option>
@@ -930,7 +930,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-slate-400 mr-1.5 font-sans">Per Page:</label>
+                  <label className="text-text-muted mr-1.5 font-sans">Per Page:</label>
                   <select
                     value={vaultPageSize}
                     onChange={(e) => {
@@ -938,7 +938,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                       setVaultPageSize(sz);
                       loadVaultData(1, vaultSymbol, vaultTimeframe, sz);
                     }}
-                    className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-white"
+                    className="px-2.5 py-1 rounded bg-bg border border-border text-white"
                   >
                     <option value={50}>50 bars</option>
                     <option value={100}>100 bars</option>
@@ -951,7 +951,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
             {/* Pagination Controls */}
             <div className="flex items-center justify-between text-xs font-mono pt-1">
-              <span className="text-slate-400">
+              <span className="text-text-muted">
                 Found <strong className="text-emerald-400">{vaultTotal.toLocaleString()}</strong> historical bars in SQLite
               </span>
               <div className="flex items-center gap-1.5">
@@ -959,18 +959,18 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   type="button"
                   disabled={vaultPage <= 1 || isLoadingVault}
                   onClick={() => loadVaultData(vaultPage - 1, vaultSymbol, vaultTimeframe, vaultPageSize)}
-                  className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 rounded bg-bg border border-border text-text-muted hover:text-text disabled:opacity-40 cursor-pointer"
                 >
                   Previous
                 </button>
-                <span className="px-2 text-slate-300">
+                <span className="px-2 text-text-muted">
                   Page {vaultPage} of {vaultTotalPages}
                 </span>
                 <button
                   type="button"
                   disabled={vaultPage >= vaultTotalPages || isLoadingVault}
                   onClick={() => loadVaultData(vaultPage + 1, vaultSymbol, vaultTimeframe, vaultPageSize)}
-                  className="px-2.5 py-1 rounded bg-slate-900 border border-slate-800 text-slate-300 hover:text-white disabled:opacity-40 cursor-pointer"
+                  className="px-2.5 py-1 rounded bg-bg border border-border text-text-muted hover:text-text disabled:opacity-40 cursor-pointer"
                 >
                   Next
                 </button>
@@ -979,17 +979,17 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
             {/* Bars Table */}
             {isLoadingVault ? (
-              <div className="py-20 text-center text-slate-500 text-xs font-mono">
+              <div className="py-20 text-center text-text-muted text-xs font-mono">
                 Querying SQLite candle repository...
               </div>
             ) : vaultCandles.length === 0 ? (
-              <div className="py-20 text-center text-slate-500 text-xs font-mono">
+              <div className="py-20 text-center text-text-muted text-xs font-mono">
                 No matching historical candles found in SQLite for current filter.
               </div>
             ) : (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="sticky top-0 bg-slate-900 border-b border-slate-800 text-slate-400 text-[11px]">
+                  <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-[11px]">
                     <tr>
                       <th className="py-2.5 px-3">Time (UTC)</th>
                       <th className="py-2.5 px-3">Epoch</th>
@@ -1001,18 +1001,18 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                       <th className="py-2.5 px-3">Spread (pts)</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-border">
                     {vaultCandles.map((c, i) => (
-                      <tr key={c.time + '-' + i} className="hover:bg-slate-800/20">
-                        <td className="py-1.5 px-3 text-slate-300">
+                      <tr key={c.time + '-' + i} className="hover:bg-surface">
+                        <td className="py-1.5 px-3 text-text-muted">
                           {new Date(c.time * 1000).toISOString().replace('T', ' ').substring(0, 19)}
                         </td>
-                        <td className="py-1.5 px-3 text-slate-500">{c.time}</td>
+                        <td className="py-1.5 px-3 text-text-muted">{c.time}</td>
                         <td className="py-1.5 px-3 text-white">{c.open}</td>
                         <td className="py-1.5 px-3 text-emerald-400">{c.high}</td>
                         <td className="py-1.5 px-3 text-rose-400">{c.low}</td>
                         <td className="py-1.5 px-3 text-white font-bold">{c.close}</td>
-                        <td className="py-1.5 px-3 text-slate-400">{c.tickVolume}</td>
+                        <td className="py-1.5 px-3 text-text-muted">{c.tickVolume}</td>
                         <td className="py-1.5 px-3 text-blue-400">{c.spread}</td>
                       </tr>
                     ))}
@@ -1027,8 +1027,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
       {/* Fetch from MT5 Bridge Modal */}
       {isFetchModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <Server className="w-4 h-4 text-emerald-400" />
                 Fetch Data from Local MT5 Bridge
@@ -1036,23 +1036,23 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIsFetchModalOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-text-muted hover:text-text"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Connects to the local Python FastAPI bridge on <code className="text-slate-100">127.0.0.1:8001</code>. Automatically appends broker suffix (<code className="text-emerald-400">EURUSDm</code>, <code className="text-emerald-400">XAUUSDm</code>) for Exness demo terminals, excludes the forming bar, and stores canonical data in SQLite.
+            <p className="text-xs text-text-muted leading-relaxed">
+              Connects to the local Python FastAPI bridge on <code className="text-text">127.0.0.1:8001</code>. Automatically appends broker suffix (<code className="text-emerald-400">EURUSDm</code>, <code className="text-emerald-400">XAUUSDm</code>) for Exness demo terminals, excludes the forming bar, and stores canonical data in SQLite.
             </p>
 
             <div className="grid grid-cols-2 gap-3 text-xs font-mono">
               <div>
-                <label className="block text-slate-400 mb-1 font-sans">Symbol</label>
+                <label className="block text-text-muted mb-1 font-sans">Symbol</label>
                 <select
                   value={fetchSymbol}
                   onChange={(e) => setFetchSymbol(e.target.value as ForexSymbol)}
-                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-white"
                 >
                   <option value="EURUSD">EURUSD</option>
                   <option value="GBPUSD">GBPUSD</option>
@@ -1062,11 +1062,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-sans">Timeframe</label>
+                <label className="block text-text-muted mb-1 font-sans">Timeframe</label>
                 <select
                   value={fetchTimeframe}
                   onChange={(e) => setFetchTimeframe(e.target.value as Timeframe)}
-                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-white"
                 >
                   <option value="M1">M1 (1 Minute)</option>
                   <option value="M5">M5 (5 Minutes)</option>
@@ -1081,13 +1081,13 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-slate-400 text-xs mb-1 font-sans">
+              <label className="block text-text-muted text-xs mb-1 font-sans">
                 Bar Count Depth
               </label>
               <select
                 value={fetchCount}
                 onChange={(e) => setFetchCount(parseInt(e.target.value))}
-                className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white font-mono text-xs"
+                className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-white font-mono text-xs"
               >
                 <option value={100}>100 Bars</option>
                 <option value={300}>300 Bars</option>
@@ -1110,11 +1110,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setIsFetchModalOpen(false)}
-                className="px-4 py-2 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="px-4 py-2 rounded text-xs font-semibold bg-surface hover:bg-surface text-text-muted"
               >
                 Close
               </button>
@@ -1135,7 +1135,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
       {/* CSV Import Modal */}
       {isImportOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-lg rounded-lg border border-slate-800 bg-[#0E1524] p-5 shadow-2xl space-y-4">
+          <div className="w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-2xl space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
               <Upload className="w-4 h-4 text-blue-400" />
               Import Custom Forex Candle CSV
@@ -1143,11 +1143,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
             <div className="grid grid-cols-3 gap-3 text-xs font-mono">
               <div>
-                <label className="block text-slate-400 mb-1 font-sans">Symbol</label>
+                <label className="block text-text-muted mb-1 font-sans">Symbol</label>
                 <select
                   value={importSymbol}
                   onChange={(e) => setImportSymbol(e.target.value as ForexSymbol)}
-                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-white"
                 >
                   <option value="EURUSD">EURUSD</option>
                   <option value="GBPUSD">GBPUSD</option>
@@ -1157,11 +1157,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-sans">Timeframe</label>
+                <label className="block text-text-muted mb-1 font-sans">Timeframe</label>
                 <select
                   value={importTimeframe}
                   onChange={(e) => setImportTimeframe(e.target.value as Timeframe)}
-                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-white"
                 >
                   <option value="M1">M1</option>
                   <option value="M5">M5</option>
@@ -1175,18 +1175,18 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-slate-400 mb-1 font-sans">UTC Offset</label>
+                <label className="block text-text-muted mb-1 font-sans">UTC Offset</label>
                 <input
                   type="number"
                   value={importUtcOffset}
                   onChange={(e) => setImportUtcOffset(parseInt(e.target.value) || 0)}
-                  className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-white"
+                  className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-white"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-slate-400 text-xs mb-1 font-sans">
+              <label className="block text-text-muted text-xs mb-1 font-sans">
                 Paste CSV Lines (Format: Time,Open,High,Low,Close,Volume,Spread)
               </label>
               <textarea
@@ -1194,7 +1194,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 onChange={(e) => setImportCsvText(e.target.value)}
                 placeholder="Time,Open,High,Low,Close,Volume,Spread&#10;2026-10-20 10:00:00,1.0850,1.0865,1.0840,1.0855,300,1.0&#10;2026-10-20 11:00:00,1.0855,1.0870,1.0850,1.0862,420,1.0"
                 rows={7}
-                className="w-full rounded bg-slate-950 p-2.5 font-mono text-xs text-white border border-slate-800 focus:outline-none focus:border-blue-500"
+                className="w-full rounded bg-bg p-2.5 font-mono text-xs text-white border border-border focus:outline-none focus:border-blue-500"
               />
             </div>
 
@@ -1204,11 +1204,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </div>
             )}
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => setIsImportOpen(false)}
-                className="px-4 py-2 rounded text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300"
+                className="px-4 py-2 rounded text-xs font-semibold bg-surface hover:bg-surface text-text-muted"
               >
                 Cancel
               </button>

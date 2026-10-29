@@ -271,23 +271,23 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
   return (
     <div className="space-y-6">
       {/* 1. TOP HEADER & INSTRUMENT TOGGLE */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
+      <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
             <Footprints className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-[#E6ECF5] tracking-tight">
+            <h1 className="text-2xl font-bold text-text tracking-tight">
               Smart Money Footprint & Institutional COT
             </h1>
-            <p className="text-xs text-slate-500 dark:text-[#9FB0C8] mt-0.5">
+            <p className="text-xs text-text-muted mt-0.5">
               Multi-evidence quantitative synthesis: Weekly CFTC COT Futures, H1 Volume Displacement, and H4 Trend Context.
             </p>
           </div>
         </div>
 
         {/* Universal Indigo Instrument Selector */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-bg border border-border">
           {SUPPORTED_SYMBOLS.map((sym) => (
             <button
               key={sym}
@@ -296,7 +296,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedSymbol === sym
                   ? 'bg-indigo-600 text-white shadow-sm'
-                  : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+                  : 'text-text-muted hover:text-text'
               }`}
             >
               {sym === 'XAUUSD' ? 'Gold (XAUUSD)' : 'Euro (EURUSD)'}
@@ -312,7 +312,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
             <Info className="w-4 h-4 shrink-0 text-indigo-500" />
             <span>{feedbackMessage}</span>
           </div>
-          <button type="button" onClick={() => setFeedbackMessage(null)} className="text-slate-400 hover:text-white cursor-pointer">
+          <button type="button" onClick={() => setFeedbackMessage(null)} className="text-text-muted hover:text-text cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -320,25 +320,25 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
       {/* 2. THREE-STEP GUIDED SETUP PIPELINE (When data needs ingest or signals) */}
       {(!hasCotData || !hasH1Bars || !hasSignals) && (
-        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-slate-800 dark:text-amber-100 space-y-4">
+        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-text space-y-4">
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
-            <h2 className="text-sm font-bold text-slate-900 dark:text-amber-200">
+            <h2 className="text-sm font-bold text-warning">
               Institutional Signal Setup Checklist
             </h2>
           </div>
-          <p className="text-xs text-slate-600 dark:text-amber-200/80">
+          <p className="text-xs text-text-muted">
             Smart Money Footprint requires 3 authoritative data layers to synthesize hedge fund positioning with price action:
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             {/* Step 1 */}
-            <div className={`p-3.5 rounded-xl border ${hasCotData ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-[#223049]'}`}>
+            <div className={`p-3.5 rounded-xl border ${hasCotData ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface border-border'}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-slate-800 dark:text-white">1. Weekly CFTC COT</span>
+                <span className="font-semibold text-text">1. Weekly CFTC COT</span>
                 {hasCotData ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
               </div>
-              <p className="text-slate-500 dark:text-[#9FB0C8] text-[11px] mb-3">
+              <p className="text-text-muted text-[11px] mb-3">
                 {hasCotData ? `${totalCotWeeks} weekly reports indexed` : '0 weeks indexed. Fetch official CFTC commitment records.'}
               </p>
               {!hasCotData && (
@@ -354,26 +354,26 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
             </div>
 
             {/* Step 2 */}
-            <div className={`p-3.5 rounded-xl border ${hasH1Bars ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-[#223049]'}`}>
+            <div className={`p-3.5 rounded-xl border ${hasH1Bars ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface border-border'}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-slate-800 dark:text-white">2. Closed H1 Bars</span>
+                <span className="font-semibold text-text">2. Closed H1 Bars</span>
                 {hasH1Bars ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
               </div>
-              <p className="text-slate-500 dark:text-[#9FB0C8] text-[11px] mb-3">
+              <p className="text-text-muted text-[11px] mb-3">
                 {hasH1Bars ? `${totalH1Bars} closed H1 candles available` : '0 bars found. Minimum 30 closed H1 bars required.'}
               </p>
               {!hasH1Bars && (
-                <span className="text-slate-400 text-[11px]">Seeded automatically on startup</span>
+                <span className="text-text-muted text-[11px]">Seeded automatically on startup</span>
               )}
             </div>
 
             {/* Step 3 */}
-            <div className={`p-3.5 rounded-xl border ${hasSignals ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white dark:bg-[#111A2E] border-slate-200 dark:border-[#223049]'}`}>
+            <div className={`p-3.5 rounded-xl border ${hasSignals ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface border-border'}`}>
               <div className="flex items-center justify-between mb-1.5">
-                <span className="font-semibold text-slate-800 dark:text-white">3. Synthesize Signals</span>
+                <span className="font-semibold text-text">3. Synthesize Signals</span>
                 {hasSignals ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
               </div>
-              <p className="text-slate-500 dark:text-[#9FB0C8] text-[11px] mb-3">
+              <p className="text-text-muted text-[11px] mb-3">
                 {hasSignals ? `${signalsList.length} candidate signals evaluated` : 'Compute multi-layer confidence score across all closed bars.'}
               </p>
               <button
@@ -390,13 +390,13 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       )}
 
       {/* 3. DIVERGING -100 TO +100 SCORE CARD */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-5">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+      <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm transition-colors space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div className="space-y-1">
-            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+            <h2 className="text-base font-bold text-text">
               Active Institutional Signal ({selectedSymbol})
             </h2>
-            <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+            <span className="text-xs text-text-muted">
               Composite footprint score combining CFTC positioning, volume displacement, and trend direction.
             </span>
           </div>
@@ -414,7 +414,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               type="button"
               onClick={handleRefreshCot}
               disabled={isRefreshingCot}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#223049] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer"
+              className="px-3 py-1.5 rounded-xl border border-border text-text-muted hover:bg-bg text-xs font-semibold cursor-pointer"
             >
               {isRefreshingCot ? 'Fetching...' : 'Refresh COT'}
             </button>
@@ -422,7 +422,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               type="button"
               onClick={() => handleExplainSignal()}
               disabled={isExplainingAi || !currentSignal}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-[#223049] hover:bg-slate-200 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bg text-text border border-border hover:bg-surface text-xs font-semibold disabled:opacity-40 cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
               <span>{isExplainingAi ? 'Analyzing...' : 'Explain signal'}</span>
@@ -435,12 +435,12 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
             {/* Score Number & Signal Badge */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">Synthesis Score:</span>
+                <span className="text-xs text-text-muted">Synthesis Score:</span>
                 <div className="flex items-baseline gap-2 mt-0.5">
-                  <span className="text-4xl font-extrabold font-mono text-slate-900 dark:text-white tabular-nums tracking-tight">
+                  <span className="text-4xl font-extrabold font-mono text-text tabular-nums tracking-tight">
                     {scoreVal > 0 ? `+${scoreVal}` : scoreVal}
                   </span>
-                  <span className="text-slate-400 font-mono text-xs">/ ±100</span>
+                  <span className="text-text-muted font-mono text-xs">/ ±100</span>
                 </div>
               </div>
 
@@ -451,7 +451,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                     ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
                     : currentSignal.direction === 'SELL'
                     ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
-                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                    : 'bg-bg text-text-muted border border-border'
                 }`}
               >
                 {currentSignal.direction === 'BUY' ? (
@@ -459,7 +459,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                 ) : currentSignal.direction === 'SELL' ? (
                   <ArrowDownRight className="w-4 h-4 text-rose-500" />
                 ) : (
-                  <Minus className="w-4 h-4 text-slate-400" />
+                  <Minus className="w-4 h-4 text-text-muted" />
                 )}
                 <span>{currentSignal.direction} CONFIRMED</span>
               </div>
@@ -467,25 +467,25 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
             {/* DIVERGING HORIZONTAL GAUGE: -100 to +100 with ±50 thresholds */}
             <div className="space-y-2">
-              <div className="flex justify-between text-xs text-slate-500 dark:text-[#9FB0C8] font-mono">
+              <div className="flex justify-between text-xs text-text-muted font-mono">
                 <span className="text-rose-500 font-bold">-100 (Strong Short)</span>
                 <span className="text-rose-400 font-medium">-50 (Short Gate)</span>
-                <span className="text-slate-400 font-medium">0 (Neutral)</span>
+                <span className="text-text-muted font-medium">0 (Neutral)</span>
                 <span className="text-emerald-400 font-medium">+50 (Long Gate)</span>
                 <span className="text-emerald-500 font-bold">+100 (Strong Long)</span>
               </div>
 
               {/* Gauge Track */}
-              <div className="h-4 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden relative border border-slate-300 dark:border-slate-700">
+              <div className="h-4 rounded-full bg-bg overflow-hidden relative border border-border">
                 {/* Visual Segments */}
-                <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-slate-400 to-emerald-500 opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-border to-emerald-500 opacity-80" />
                 {/* 50 Threshold Markers */}
                 <div className="absolute top-0 bottom-0 left-[25%] w-0.5 bg-white/70" title="-50 Threshold" />
                 <div className="absolute top-0 bottom-0 left-[50%] w-0.5 bg-white/90" title="Neutral 0" />
                 <div className="absolute top-0 bottom-0 left-[75%] w-0.5 bg-white/70" title="+50 Threshold" />
                 {/* Active Needle Pin */}
                 <div
-                  className="absolute top-0 bottom-0 w-2.5 bg-slate-900 dark:bg-white rounded-full shadow-lg ring-2 ring-indigo-500 transition-all duration-300 -translate-x-1/2"
+                  className="absolute top-0 bottom-0 w-2.5 bg-text rounded-full shadow-lg ring-2 ring-indigo-500 transition-all duration-300 -translate-x-1/2"
                   style={{ left: `${scorePositionPct}%` }}
                 />
               </div>
@@ -493,47 +493,47 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
             {/* Sub-Components Breakdown with Plain-English Tooltips */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-1">
+              <div className="p-3.5 rounded-xl bg-bg border border-border space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium" title="CFTC Commercial Hedger Net Flow">
+                  <span className="text-xs text-text-muted font-medium" title="CFTC Commercial Hedger Net Flow">
                     COT Hedger Flow (cCot)
                   </span>
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                  <HelpCircle className="w-3.5 h-3.5 text-text-muted" />
                 </div>
-                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+                <div className="text-lg font-bold font-mono text-text tabular-nums">
                   {currentSignal.c_cot > 0 ? `+${currentSignal.c_cot}` : currentSignal.c_cot} / ±40
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
+                <div className="text-[11px] text-text-muted">
                   Weekly institutional shift
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-1">
+              <div className="p-3.5 rounded-xl bg-bg border border-border space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium" title="H1 Tick Volume Expansion Event">
+                  <span className="text-xs text-text-muted font-medium" title="H1 Tick Volume Expansion Event">
                     Volume Spike (cAct)
                   </span>
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                  <HelpCircle className="w-3.5 h-3.5 text-text-muted" />
                 </div>
-                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+                <div className="text-lg font-bold font-mono text-text tabular-nums">
                   {currentSignal.c_act > 0 ? `+${currentSignal.c_act}` : currentSignal.c_act} / ±35
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
+                <div className="text-[11px] text-text-muted">
                   H1 institutional displacement
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-1">
+              <div className="p-3.5 rounded-xl bg-bg border border-border space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500 dark:text-[#9FB0C8] font-medium" title="H4 Multi-Timeframe Trend Alignment">
+                  <span className="text-xs text-text-muted font-medium" title="H4 Multi-Timeframe Trend Alignment">
                     Trend Context (cTrend)
                   </span>
-                  <HelpCircle className="w-3.5 h-3.5 text-slate-400" />
+                  <HelpCircle className="w-3.5 h-3.5 text-text-muted" />
                 </div>
-                <div className="text-lg font-bold font-mono text-slate-900 dark:text-white tabular-nums">
+                <div className="text-lg font-bold font-mono text-text tabular-nums">
                   {currentSignal.c_trend > 0 ? `+${currentSignal.c_trend}` : currentSignal.c_trend} / ±25
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
+                <div className="text-[11px] text-text-muted">
                   H4 swing & EMA structure
                 </div>
               </div>
@@ -541,9 +541,9 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
           </div>
         ) : (
           <div className="py-12 text-center space-y-3">
-            <Footprints className="w-8 h-8 text-slate-400 mx-auto" />
-            <div className="text-sm font-semibold text-slate-800 dark:text-slate-200">No signal calculated yet</div>
-            <p className="text-xs text-slate-500 dark:text-[#9FB0C8] max-w-sm mx-auto">
+            <Footprints className="w-8 h-8 text-text-muted mx-auto" />
+            <div className="text-sm font-semibold text-text">No signal calculated yet</div>
+            <p className="text-xs text-text-muted max-w-sm mx-auto">
               Click "Compute signals" above to scan the latest closed H1 bars and synthesize the institutional footprint score.
             </p>
           </div>
@@ -551,13 +551,13 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       </div>
 
       {/* 4. SIGNAL HISTORY TABLE WITH OUTCOMES */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm transition-colors space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+      <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm transition-colors space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+            <h2 className="text-base font-bold text-text">
               Historical Signal Log ({signalsList.length})
             </h2>
-            <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+            <span className="text-xs text-text-muted">
               Point-in-time signals generated from closed H1 bars with multi-horizon outcomes
             </span>
           </div>
@@ -567,7 +567,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               type="button"
               onClick={handleUpdateOutcomes}
               disabled={isUpdatingOutcomes || signalsList.length === 0}
-              className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#223049] text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl border border-border text-xs font-semibold text-text-muted hover:bg-bg disabled:opacity-50 cursor-pointer"
             >
               {isUpdatingOutcomes ? 'Updating...' : 'Update outcomes'}
             </button>
@@ -583,14 +583,14 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
         </div>
 
         {signalsList.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 text-xs">
+          <div className="py-8 text-center text-text-muted text-xs">
             No historical signals computed for {selectedSymbol}. Click "Compute signals" above.
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                <tr className="border-b border-border text-text-muted">
                   <th className="text-left py-2 font-medium">Bar Time</th>
                   <th className="text-center py-2 font-medium">Direction</th>
                   <th className="text-right py-2 font-medium">Score</th>
@@ -600,12 +600,12 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                   <th className="text-right py-2 font-medium">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+              <tbody className="divide-y divide-border font-mono">
                 {signalsList.slice(0, 10).map((s) => {
                   const out24 = (s.outcomes || []).find((o: any) => o.horizon_hours === 24);
                   return (
-                    <tr key={s.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-2.5 text-slate-500 tabular-nums">
+                    <tr key={s.id} className="hover:bg-bg/50 transition-colors">
+                      <td className="py-2.5 text-text-muted tabular-nums">
                         {new Date(s.bar_time * 1000).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </td>
                       <td className="py-2.5 text-center font-sans">
@@ -619,13 +619,13 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                           {s.direction}
                         </span>
                       </td>
-                      <td className="py-2.5 text-right font-bold tabular-nums text-slate-800 dark:text-white">
+                      <td className="py-2.5 text-right font-bold tabular-nums text-text">
                         {s.score > 0 ? `+${s.score}` : s.score}
                       </td>
                       <td className="py-2.5 text-right tabular-nums text-indigo-500 font-semibold">
                         {s.confidence}%
                       </td>
-                      <td className="py-2.5 text-slate-600 dark:text-[#9FB0C8] font-sans">
+                      <td className="py-2.5 text-text-muted font-sans">
                         {s.event_type}
                       </td>
                       <td className="py-2.5 text-right tabular-nums">
@@ -634,7 +634,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                             {out24.return_pips_or_points >= 0 ? '+' : ''}{out24.return_pips_or_points.toFixed(1)} pips
                           </span>
                         ) : (
-                          <span className="text-slate-400">Pending</span>
+                          <span className="text-text-muted">Pending</span>
                         )}
                       </td>
                       <td className="py-2.5 text-right font-sans">
@@ -657,12 +657,12 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
       {/* AI Explanation Dialog */}
       {(explanationText || explainError) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
-          <div className="max-w-lg w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="max-w-lg w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-[#E6ECF5]">
+                <h3 className="text-base font-bold text-text">
                   AI Quant Advisor: Signal Breakdown
                 </h3>
               </div>
@@ -672,14 +672,14 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                   setExplanationText(null);
                   setExplainError(null);
                 }}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                className="text-text-muted hover:text-text cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {explanationText ? (
-              <div className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
+              <div className="text-xs text-text-muted leading-relaxed whitespace-pre-wrap max-h-96 overflow-y-auto">
                 {explanationText}
               </div>
             ) : (

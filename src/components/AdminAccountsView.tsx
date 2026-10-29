@@ -537,25 +537,25 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
   return (
     <div className="space-y-6">
       {/* 1. TOP HEADER & SUB-TAB NAVIGATION */}
-      <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
+      <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-[#E6ECF5] tracking-tight">
+          <h1 className="text-2xl font-bold text-text tracking-tight">
             Admin & Data Administration
           </h1>
-          <p className="text-xs text-slate-500 dark:text-[#9FB0C8] mt-1">
+          <p className="text-xs text-text-muted mt-1">
             Institutional Risk Firewall, user role management, account assignments, and immutable audit logs.
           </p>
         </div>
 
         {/* Sub-tab Switcher */}
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-bg border border-border">
           <button
             type="button"
             onClick={() => setSubTab('firewall')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'firewall'
                 ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             <ShieldAlert className="w-3.5 h-3.5" />
@@ -567,7 +567,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'users'
                 ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             <Users className="w-3.5 h-3.5" />
@@ -579,7 +579,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'accounts'
                 ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             <Server className="w-3.5 h-3.5" />
@@ -591,7 +591,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'audit'
                 ? 'bg-indigo-600 text-white shadow-sm'
-                : 'text-slate-600 dark:text-[#9FB0C8] hover:text-slate-900 dark:hover:text-white'
+                : 'text-text-muted hover:text-text'
             }`}
           >
             <History className="w-3.5 h-3.5" />
@@ -620,7 +620,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
           <button
             type="button"
             onClick={() => setFeedback(null)}
-            className="text-slate-400 hover:text-slate-800 dark:hover:text-white font-bold cursor-pointer"
+            className="text-text-muted hover:text-text font-bold cursor-pointer"
           >
             ✕
           </button>
@@ -633,27 +633,27 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {subTab === 'firewall' && (
         <div className="space-y-6">
           {/* Firewall Scope & Master Switch Banner */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-[#223049]">
+          <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-5 h-5 text-indigo-500" />
-                  <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                  <h2 className="text-base font-bold text-text">
                     Institutional Risk Firewall Control
                   </h2>
                 </div>
-                <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                <p className="text-xs text-text-muted">
                   Hard-enforced risk limits evaluated on every manual order, automated bot, and API call.
                 </p>
               </div>
 
               {/* Scope Selector */}
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Scope:</span>
+                <span className="text-xs text-text-muted font-medium">Scope:</span>
                 <select
                   value={firewallScope}
                   onChange={(e) => setFirewallScope(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="px-3 py-1.5 rounded-xl bg-bg border border-border text-xs font-semibold text-text focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   <option value="global:demo">Global Demo (Default)</option>
                   <option value="global:live">Global Live (Locked Protection)</option>
@@ -703,7 +703,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 disabled={isLive}
                 className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer ${
                   isLive
-                    ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                    ? 'bg-bg text-text-muted cursor-not-allowed opacity-60'
                     : firewallState.enabled
                     ? 'bg-rose-600 hover:bg-rose-500 text-white'
                     : 'bg-emerald-600 hover:bg-emerald-500 text-white'
@@ -715,13 +715,13 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
           </div>
 
           {/* Firewall Limits Form */}
-          <form onSubmit={handleOpenDiffModal} className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <form onSubmit={handleOpenDiffModal} className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-6">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                <h3 className="text-sm font-bold text-text">
                   Risk Ceilings & Parameters ({firewallScope})
                 </h3>
-                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                <span className="text-xs text-text-muted">
                   Values cannot exceed immutable server ceilings defined in code.
                 </span>
               </div>
@@ -734,10 +734,10 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
               {/* Max Risk Per Trade % */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="flex justify-between font-semibold text-text-muted">
                   <span>Max Risk Per Trade (%)</span>
-                  <span className="text-slate-400 font-normal">Ceiling ≤ 5.0%</span>
+                  <span className="text-text-muted font-normal">Ceiling ≤ 5.0%</span>
                 </div>
                 <input
                   type="number"
@@ -751,18 +751,18 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       maxRiskPerTradePct: parseFloat(e.target.value) || 0.1,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-text-muted">
                   Maximum percent of balance risked on a single trade's Stop-Loss distance.
                 </p>
               </div>
 
               {/* Max Lots */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="flex justify-between font-semibold text-text-muted">
                   <span>Max Lots Per Order</span>
-                  <span className="text-slate-400 font-normal">Ceiling ≤ 10.0</span>
+                  <span className="text-text-muted font-normal">Ceiling ≤ 10.0</span>
                 </div>
                 <input
                   type="number"
@@ -776,18 +776,18 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       maxLots: parseFloat(e.target.value) || 0.01,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-text-muted">
                   Hard upper lot ceiling allowed for any manual ticket or automated bot order.
                 </p>
               </div>
 
               {/* Max Open Positions */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="flex justify-between font-semibold text-text-muted">
                   <span>Max Open Positions</span>
-                  <span className="text-slate-400 font-normal">Ceiling ≤ 20</span>
+                  <span className="text-text-muted font-normal">Ceiling ≤ 20</span>
                 </div>
                 <input
                   type="number"
@@ -801,18 +801,18 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       maxOpenPositions: parseInt(e.target.value, 10) || 1,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-text-muted">
                   Maximum concurrent open positions allowed across all pairs.
                 </p>
               </div>
 
               {/* Daily Loss Limit % */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="flex justify-between font-semibold text-text-muted">
                   <span>Daily Loss Limit (%)</span>
-                  <span className="text-slate-400 font-normal">Ceiling ≤ 10.0%</span>
+                  <span className="text-text-muted font-normal">Ceiling ≤ 10.0%</span>
                 </div>
                 <input
                   type="number"
@@ -826,18 +826,18 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       dailyLossLimitPct: parseFloat(e.target.value) || 0.5,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-text-muted">
                   Trading auto-halts for the remainder of UTC day if realized losses cross this threshold.
                 </p>
               </div>
 
               {/* Max Drawdown % */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="flex justify-between font-semibold text-text-muted">
                   <span>Max Peak Drawdown (%)</span>
-                  <span className="text-slate-400 font-normal">Ceiling ≤ 20.0%</span>
+                  <span className="text-text-muted font-normal">Ceiling ≤ 20.0%</span>
                 </div>
                 <input
                   type="number"
@@ -851,16 +851,16 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       maxDrawdownPct: parseFloat(e.target.value) || 1.0,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-text-muted">
                   Account peak-to-trough trailing equity drawdown threshold.
                 </p>
               </div>
 
               {/* Mandatory Stop Loss Toggle */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="flex justify-between font-semibold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="flex justify-between font-semibold text-text-muted">
                   <span>Mandatory Stop Loss</span>
                   {isLive && <span className="text-amber-500 font-bold">Locked ON (Live)</span>}
                 </div>
@@ -877,20 +877,20 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
                       formSettings.mandatoryStopLoss
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-300 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                        : 'bg-bg text-text-muted'
                     }`}
                   >
                     {formSettings.mandatoryStopLoss ? 'ACTIVE (Required)' : 'OFF (Allowed on Demo)'}
                   </button>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-text-muted">
                     Rejects any order submitted without a valid SL.
                   </span>
                 </div>
               </div>
 
               {/* Spread Pips EURUSD */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="font-semibold text-slate-700 dark:text-slate-300">Max Spread (EURUSD)</div>
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="font-semibold text-text-muted">Max Spread (EURUSD)</div>
                 <input
                   type="number"
                   step="0.1"
@@ -903,14 +903,14 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       maxSpreadPipsEURUSD: parseFloat(e.target.value) || 0.5,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">Rejects orders if EURUSD spread exceeds this in pips.</p>
+                <p className="text-[11px] text-text-muted">Rejects orders if EURUSD spread exceeds this in pips.</p>
               </div>
 
               {/* Spread Points XAUUSD */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="font-semibold text-slate-700 dark:text-slate-300">Max Spread (XAUUSD Points)</div>
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="font-semibold text-text-muted">Max Spread (XAUUSD Points)</div>
                 <input
                   type="number"
                   step="1"
@@ -923,14 +923,14 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       maxSpreadPointsXAUUSD: parseFloat(e.target.value) || 5,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">Rejects Gold orders during high volatility spread spikes.</p>
+                <p className="text-[11px] text-text-muted">Rejects Gold orders during high volatility spread spikes.</p>
               </div>
 
               {/* News Blackout Minutes */}
-              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
-                <div className="font-semibold text-slate-700 dark:text-slate-300">News Blackout Window (Minutes)</div>
+              <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
+                <div className="font-semibold text-text-muted">News Blackout Window (Minutes)</div>
                 <input
                   type="number"
                   step="5"
@@ -943,18 +943,18 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       newsBlackoutMinutes: parseInt(e.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full px-3 py-1.5 rounded-lg bg-white dark:bg-[#111A2E] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white text-sm"
+                  className="w-full px-3 py-1.5 rounded-lg bg-surface border border-border font-mono text-text text-sm"
                 />
-                <p className="text-[11px] text-slate-400">Halts orders before and after tier-1 economic events (NFP, FOMC).</p>
+                <p className="text-[11px] text-text-muted">Halts orders before and after tier-1 economic events (NFP, FOMC).</p>
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-[#223049]">
+            <div className="flex justify-end gap-3 pt-3 border-t border-border">
               <button
                 type="button"
                 onClick={() => setFormSettings(serverSettings)}
                 disabled={changedSettings.length === 0}
-                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold disabled:opacity-40 cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-border text-text-muted text-xs font-semibold disabled:opacity-40 cursor-pointer"
               >
                 Reset changes
               </button>
@@ -969,32 +969,32 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
           </form>
 
           {/* Append-Only Firewall Audit Log */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-bold text-text">
                   Firewall Parameter Audit Trail
                 </h3>
-                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                <span className="text-xs text-text-muted">
                   Append-only SQLite audit log protected by database triggers (modifications and deletions blocked).
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => loadFirewallData(firewallScope)}
-                className="p-1.5 rounded-lg border border-slate-200 dark:border-[#223049] hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="p-1.5 rounded-lg border border-border hover:bg-bg"
               >
-                <RefreshCw className={`w-3.5 h-3.5 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`w-3.5 h-3.5 text-text-muted ${isLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
 
             {firewallAudits.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">No firewall changes recorded yet.</div>
+              <div className="py-8 text-center text-text-muted text-xs">No firewall changes recorded yet.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                    <tr className="border-b border-border text-text-muted">
                       <th className="text-left py-2 font-medium">Timestamp</th>
                       <th className="text-left py-2 font-medium">Actor</th>
                       <th className="text-left py-2 font-medium">Scope</th>
@@ -1004,25 +1004,25 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       <th className="text-right py-2 font-medium">Hash</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  <tbody className="divide-y divide-border font-mono">
                     {firewallAudits.map((entry) => (
-                      <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="py-2.5 text-slate-500 tabular-nums">
+                      <tr key={entry.id} className="hover:bg-bg/50">
+                        <td className="py-2.5 text-text-muted tabular-nums">
                           {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
-                        <td className="py-2.5 font-sans font-semibold text-slate-800 dark:text-slate-200">
-                          {entry.actor} <span className="text-slate-400 font-normal">({entry.role})</span>
+                        <td className="py-2.5 font-sans font-semibold text-text">
+                          {entry.actor} <span className="text-text-muted font-normal">({entry.role})</span>
                         </td>
                         <td className="py-2.5 text-indigo-600 dark:text-indigo-400 font-semibold">{entry.scope}</td>
-                        <td className="py-2.5 font-sans font-medium text-slate-700 dark:text-slate-300">{entry.key}</td>
+                        <td className="py-2.5 font-sans font-medium text-text-muted">{entry.key}</td>
                         <td className="py-2.5">
                           <span className="text-rose-500 line-through mr-1.5">{entry.old_value}</span>
                           <span className="text-emerald-500 font-bold">{entry.new_value}</span>
                         </td>
-                        <td className="py-2.5 font-sans text-slate-600 dark:text-slate-300 max-w-xs truncate">
+                        <td className="py-2.5 font-sans text-text-muted max-w-xs truncate">
                           {entry.reason}
                         </td>
-                        <td className="py-2.5 text-right text-[10px] text-slate-400 font-mono" title={entry.hash}>
+                        <td className="py-2.5 text-right text-[10px] text-text-muted font-mono" title={entry.hash}>
                           {entry.hash.substring(0, 10)}...
                         </td>
                       </tr>
@@ -1034,25 +1034,25 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
           </div>
 
           {/* Blocked Orders Log */}
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-bold text-text">
                   Firewall Blocked Orders Log
                 </h3>
-                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                <span className="text-xs text-text-muted">
                   Append-only record of all orders rejected by risk boundaries with suggested lot sizing.
                 </span>
               </div>
             </div>
 
             {blockedOrders.length === 0 ? (
-              <div className="py-8 text-center text-slate-400 text-xs">No blocked orders recorded. All submitted orders met risk parameters.</div>
+              <div className="py-8 text-center text-text-muted text-xs">No blocked orders recorded. All submitted orders met risk parameters.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                    <tr className="border-b border-border text-text-muted">
                       <th className="text-left py-2 font-medium">Timestamp</th>
                       <th className="text-left py-2 font-medium">Symbol</th>
                       <th className="text-right py-2 font-medium">Attempted Lots</th>
@@ -1062,20 +1062,20 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       <th className="text-left py-2 font-medium">Message</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  <tbody className="divide-y divide-border font-mono">
                     {blockedOrders.map((ord) => (
-                      <tr key={ord.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                        <td className="py-2.5 text-slate-500 tabular-nums">
+                      <tr key={ord.id} className="hover:bg-bg/50">
+                        <td className="py-2.5 text-text-muted tabular-nums">
                           {new Date(ord.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
-                        <td className="py-2.5 font-sans font-bold text-slate-900 dark:text-white">{ord.symbol}</td>
+                        <td className="py-2.5 font-sans font-bold text-text">{ord.symbol}</td>
                         <td className="py-2.5 text-right text-rose-500 font-bold">{ord.attempted_lots.toFixed(2)}</td>
                         <td className="py-2.5 text-right text-rose-500 font-bold">${ord.attempted_risk_usd.toFixed(2)}</td>
                         <td className="py-2.5 text-amber-500 font-semibold">{ord.rule_violated}</td>
                         <td className="py-2.5 text-right text-emerald-500 font-bold">
                           {ord.suggested_lots !== null ? `${ord.suggested_lots.toFixed(2)} lots` : 'None'}
                         </td>
-                        <td className="py-2.5 font-sans text-slate-600 dark:text-slate-300 max-w-sm truncate" title={ord.error_message}>
+                        <td className="py-2.5 font-sans text-text-muted max-w-sm truncate" title={ord.error_message}>
                           {ord.error_message}
                         </td>
                       </tr>
@@ -1093,13 +1093,13 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* ============================================================== */}
       {subTab === 'users' && (
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
               <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                <h2 className="text-base font-bold text-text">
                   Supabase User Identities & Role Assignments
                 </h2>
-                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                <span className="text-xs text-text-muted">
                   Roles stored in public.profiles with Row-Level Security. Privilege escalation is blocked on the server.
                 </span>
               </div>
@@ -1116,7 +1116,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                  <tr className="border-b border-border text-text-muted">
                     <th className="text-left py-2 font-medium">User Identity</th>
                     <th className="text-left py-2 font-medium">Assigned Role</th>
                     <th className="text-center py-2 font-medium">Account Access</th>
@@ -1124,14 +1124,14 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                     <th className="text-right py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-sans">
+                <tbody className="divide-y divide-border font-sans">
                   {managedUsers.map((u) => {
                     const isMasterAdmin = u.role === 'master_admin';
                     const isSelf = u.id === profile?.userId;
                     return (
-                      <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                      <tr key={u.id} className="hover:bg-bg/50">
                         <td className="py-3">
-                          <div className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                          <div className="font-semibold text-text flex items-center gap-2">
                             <span>{u.email}</span>
                             {isMasterAdmin && (
                               <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30">
@@ -1139,14 +1139,14 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono">ID: {u.id.substring(0, 16)}...</div>
+                          <div className="text-[11px] text-text-muted font-mono">ID: {u.id.substring(0, 16)}...</div>
                         </td>
                         <td className="py-3">
                           <select
                             value={u.role}
                             disabled={isMasterAdmin || effectiveRole !== 'master_admin'}
                             onChange={(e) => handleChangeUserRole(u.id, e.target.value)}
-                            className="px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs font-semibold text-slate-800 dark:text-slate-200 disabled:opacity-60 cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg bg-bg border border-border text-xs font-semibold text-text disabled:opacity-60 cursor-pointer"
                           >
                             <option value="admin">admin</option>
                             <option value="trader">trader</option>
@@ -1183,7 +1183,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                             onClick={() => handleToggleUserStatus(u.id, u.status)}
                             className={`px-2.5 py-1 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
                               isMasterAdmin || isSelf
-                                ? 'text-slate-400 cursor-not-allowed opacity-50'
+                                ? 'text-text-muted cursor-not-allowed opacity-50'
                                 : u.status === 'ACTIVE'
                                 ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10'
                                 : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
@@ -1207,11 +1207,11 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* ============================================================== */}
       {subTab === 'accounts' && (
         <div className="space-y-6">
-          <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-100 dark:border-[#223049]">
+          <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
               <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">Broker Accounts</h2>
-                <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+                <h2 className="text-base font-bold text-text">Broker Accounts</h2>
+                <span className="text-xs text-text-muted">
                   MetaTrader 5 demo and production instances registered with the local bridge.
                 </span>
               </div>
@@ -1228,7 +1228,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                  <tr className="border-b border-border text-text-muted">
                     <th className="text-left py-2 font-medium">Account Name</th>
                     <th className="text-left py-2 font-medium">Broker & Server</th>
                     <th className="text-left py-2 font-medium">Login</th>
@@ -1238,19 +1238,19 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                     <th className="text-right py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                <tbody className="divide-y divide-border font-mono">
                   {accounts.map((acc) => (
-                    <tr key={acc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                      <td className="py-3 font-sans font-semibold text-slate-900 dark:text-white">
+                    <tr key={acc.id} className="hover:bg-bg/50">
+                      <td className="py-3 font-sans font-semibold text-text">
                         {acc.account_name}
                       </td>
-                      <td className="py-3 text-slate-600 dark:text-[#9FB0C8]">
-                        <span className="font-sans font-medium text-slate-800 dark:text-slate-200 mr-1.5">
+                      <td className="py-3 text-text-muted">
+                        <span className="font-sans font-medium text-text mr-1.5">
                           {acc.broker}
                         </span>
                         <span>({acc.server})</span>
                       </td>
-                      <td className="py-3 text-slate-700 dark:text-slate-300">{acc.login}</td>
+                      <td className="py-3 text-text-muted">{acc.login}</td>
                       <td className="py-3 text-center font-sans">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
                           {acc.type}
@@ -1261,18 +1261,18 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
                             acc.status === 'CONNECTED'
                               ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                              : 'bg-bg text-text-muted'
                           }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              acc.status === 'CONNECTED' ? 'bg-emerald-500' : 'bg-slate-400'
+                              acc.status === 'CONNECTED' ? 'bg-emerald-500' : 'bg-text-muted'
                             }`}
                           />
                           {acc.status}
                         </span>
                       </td>
-                      <td className="py-3 text-right text-slate-700 dark:text-slate-300">{acc.max_lots} lots</td>
+                      <td className="py-3 text-right text-text-muted">{acc.max_lots} lots</td>
                       <td className="py-3 text-right font-sans space-x-2">
                         <button
                           type="button"
@@ -1295,48 +1295,48 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* SUB-TAB 4: SYSTEM AUDIT */}
       {/* ============================================================== */}
       {subTab === 'audit' && (
-        <div className="p-5 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-sm space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+        <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">System Audit Log</h2>
-              <span className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+              <h2 className="text-base font-bold text-text">System Audit Log</h2>
+              <span className="text-xs text-text-muted">
                 Authoritative local activity record (orders, parameter edits, emergency actions).
               </span>
             </div>
             <button
               type="button"
               onClick={loadUsersAndAccounts}
-              className="p-1.5 rounded-lg border border-slate-200 dark:border-[#223049] hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="p-1.5 rounded-lg border border-border hover:bg-bg"
             >
-              <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+              <RefreshCw className="w-3.5 h-3.5 text-text-muted" />
             </button>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-[#9FB0C8]">
+                <tr className="border-b border-border text-text-muted">
                   <th className="text-left py-2 font-medium">Timestamp</th>
                   <th className="text-left py-2 font-medium">Operator</th>
                   <th className="text-left py-2 font-medium">Action</th>
                   <th className="text-left py-2 font-medium">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+              <tbody className="divide-y divide-border font-mono">
                 {auditLogs.slice(0, 25).map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40">
-                    <td className="py-2.5 text-slate-500 tabular-nums">
+                  <tr key={log.id} className="hover:bg-bg/50">
+                    <td className="py-2.5 text-text-muted tabular-nums">
                       {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </td>
-                    <td className="py-2.5 font-sans font-semibold text-slate-800 dark:text-slate-200">
-                      {log.username} <span className="text-slate-400 font-normal">({log.role})</span>
+                    <td className="py-2.5 font-sans font-semibold text-text">
+                      {log.username} <span className="text-text-muted font-normal">({log.role})</span>
                     </td>
                     <td className="py-2.5">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-bg text-text-muted">
                         {log.action}
                       </span>
                     </td>
-                    <td className="py-2.5 text-slate-600 dark:text-[#9FB0C8] font-sans">
+                    <td className="py-2.5 text-text-muted font-sans">
                       {log.details || '—'}
                     </td>
                   </tr>
@@ -1351,22 +1351,22 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* MODAL 1: DISABLE FIREWALL CONFIRMATION (DEMO ONLY) */}
       {/* ============================================================== */}
       {showDisableModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-rose-500/50 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-rose-500/50 shadow-2xl space-y-4">
             <div className="flex items-center gap-2 text-rose-600">
               <ShieldAlert className="w-5 h-5 shrink-0" />
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <h3 className="text-base font-bold text-text">
                 Disable Risk Firewall (24h Auto-Expiry)
               </h3>
             </div>
-            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+            <p className="text-xs text-text-muted leading-relaxed">
               Disabling the Risk Firewall bypasses all lot size ceilings, daily loss halts, and mandatory Stop-Loss checks on DEMO accounts.
               Protection will automatically re-enable after 24 hours. A red persistent banner will be displayed across the Trading Desk.
             </p>
 
             <div className="space-y-3 pt-2 text-xs">
               <div>
-                <label className="font-semibold text-slate-700 dark:text-slate-300">
+                <label className="font-semibold text-text-muted">
                   Reason for Suspension (Required for Audit Trail)
                 </label>
                 <input
@@ -1375,19 +1375,19 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                   placeholder="e.g. Backtesting custom high-lot grid execution"
                   value={disableReason}
                   onChange={(e) => setDisableReason(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border text-text"
                 />
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 dark:text-slate-300">
+                <label className="font-semibold text-text-muted">
                   Type <span className="font-mono font-bold text-rose-600">DISABLE</span> to confirm:
                 </label>
                 <input
                   type="text"
                   value={disableConfirmationInput}
                   onChange={(e) => setDisableConfirmationInput(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-slate-700 font-mono text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border font-mono text-text"
                 />
               </div>
             </div>
@@ -1396,7 +1396,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowDisableModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-border text-text-muted text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
@@ -1417,25 +1417,25 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* MODAL 2: DIFF PREVIEW & REASON */}
       {/* ============================================================== */}
       {showDiffModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-lg w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-lg w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
                 <Sliders className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                <h3 className="text-base font-bold text-text">
                   Confirm Firewall Parameter Changes
                 </h3>
               </div>
               <button
                 type="button"
                 onClick={() => setShowDiffModal(false)}
-                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                className="text-text-muted hover:text-text cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+            <p className="text-xs text-text-muted">
               The following modifications will be written to SQLite and logged in the append-only audit trail:
             </p>
 
@@ -1443,12 +1443,12 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               {changedSettings.map((c) => (
                 <div
                   key={c.key}
-                  className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs font-mono"
+                  className="flex items-center justify-between p-2.5 rounded-lg bg-bg border border-border text-xs font-mono"
                 >
-                  <span className="font-sans font-semibold text-slate-800 dark:text-slate-200">{c.key}</span>
+                  <span className="font-sans font-semibold text-text">{c.key}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-rose-500 line-through">{String(c.oldVal)}</span>
-                    <ArrowRight className="w-3 h-3 text-slate-400" />
+                    <ArrowRight className="w-3 h-3 text-text-muted" />
                     <span className="text-emerald-500 font-bold">{String(c.newVal)}</span>
                   </div>
                 </div>
@@ -1456,7 +1456,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             </div>
 
             <div className="space-y-1 pt-2">
-              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <label className="text-xs font-semibold text-text-muted">
                 Reason for Change (Audit Requirement)
               </label>
               <input
@@ -1465,15 +1465,15 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 placeholder="e.g. Adjusting risk limits for prop-firm demo challenge rules"
                 value={updateReason}
                 onChange={(e) => setUpdateReason(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-300 dark:border-slate-700 text-xs text-slate-900 dark:text-white"
+                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-xs text-text"
               />
             </div>
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#223049]">
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
               <button
                 type="button"
                 onClick={() => setShowDiffModal(false)}
-                className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 rounded-xl border border-border text-text-muted text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
@@ -1494,28 +1494,28 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* MODAL 3: INVITE USER */}
       {/* ============================================================== */}
       {showInviteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Invite Team User</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-text">Invite Team User</h3>
             <form onSubmit={handleInviteUser} className="space-y-3 text-xs">
               <div>
-                <label className="text-slate-600 dark:text-slate-400 font-medium">Email Address</label>
+                <label className="text-text-muted font-medium">Email Address</label>
                 <input
                   type="email"
                   required
                   placeholder="trader@firm.com"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border text-text"
                 />
               </div>
 
               <div>
-                <label className="text-slate-600 dark:text-slate-400 font-medium">Assigned Role</label>
+                <label className="text-text-muted font-medium">Assigned Role</label>
                 <select
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border text-text"
                 >
                   <option value="admin">Admin</option>
                   <option value="trader">Trader</option>
@@ -1527,7 +1527,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowInviteModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-border text-text-muted cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1547,22 +1547,22 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* MODAL 4: ASSIGN ACCOUNTS */}
       {/* ============================================================== */}
       {assignUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-[#223049]">
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <h3 className="text-base font-bold text-text">
                 Account Assignments: {assignUser.email}
               </h3>
               <button
                 type="button"
                 onClick={() => setAssignUser(null)}
-                className="text-slate-400 hover:text-white cursor-pointer"
+                className="text-text-muted hover:text-text cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
-            <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+            <p className="text-xs text-text-muted">
               Select which broker accounts this user is authorized to trade or view:
             </p>
 
@@ -1572,11 +1572,11 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 return (
                   <div
                     key={acc.login}
-                    className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-xs"
+                    className="flex items-center justify-between p-3 rounded-xl bg-bg border border-border text-xs"
                   >
                     <div>
-                      <div className="font-bold text-slate-900 dark:text-white">{acc.account_name}</div>
-                      <div className="text-[11px] text-slate-400 font-mono">
+                      <div className="font-bold text-text">{acc.account_name}</div>
+                      <div className="text-[11px] text-text-muted font-mono">
                         #{acc.login} · {acc.server}
                       </div>
                     </div>
@@ -1586,7 +1586,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
                         isAssigned
                           ? 'bg-emerald-600 text-white'
-                          : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          : 'bg-bg text-text-muted'
                       }`}
                     >
                       {isAssigned ? 'Assigned ✓' : 'Assign'}
@@ -1613,9 +1613,9 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* MODAL 5: ADD BROKER ACCOUNT */}
       {/* ============================================================== */}
       {showAddAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-2xl space-y-4">
-            <h3 className="text-base font-bold text-slate-900 dark:text-white">Register MT5 Broker Account</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
+            <h3 className="text-base font-bold text-text">Register MT5 Broker Account</h3>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1638,37 +1638,37 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               className="space-y-3 text-xs"
             >
               <div>
-                <label className="text-slate-600 dark:text-slate-400 font-medium">Account Name</label>
+                <label className="text-text-muted font-medium">Account Name</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. Exness Demo Primary"
                   value={newAccName}
                   onChange={(e) => setNewAccName(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border text-text"
                 />
               </div>
 
               <div>
-                <label className="text-slate-600 dark:text-slate-400 font-medium">MT5 Server</label>
+                <label className="text-text-muted font-medium">MT5 Server</label>
                 <input
                   type="text"
                   required
                   value={newAccServer}
                   onChange={(e) => setNewAccServer(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white font-mono"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border text-text font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-slate-600 dark:text-slate-400 font-medium">MT5 Login</label>
+                <label className="text-text-muted font-medium">MT5 Login</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. 50192834"
                   value={newAccLogin}
                   onChange={(e) => setNewAccLogin(e.target.value)}
-                  className="w-full px-3 py-2 mt-1 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white font-mono"
+                  className="w-full px-3 py-2 mt-1 rounded-xl bg-bg border border-border text-text font-mono"
                 />
               </div>
 
@@ -1676,7 +1676,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddAccountModal(false)}
-                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-300 cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-border text-text-muted cursor-pointer"
                 >
                   Cancel
                 </button>

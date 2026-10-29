@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getSupabaseClient } from '../services/supabaseClient';
 import { ShieldCheck, QrCode, Key, Copy, Check, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Button, Input, Card } from './ui';
 
 interface MfaEnrollmentViewProps {
   onEnrolled?: () => void;
@@ -117,23 +118,23 @@ export const MfaEnrollmentView: React.FC<MfaEnrollmentViewProps> = ({ onEnrolled
   };
 
   return (
-    <div className="p-6 rounded-2xl bg-white dark:bg-[#111A2E] border border-slate-200 dark:border-[#223049] shadow-md max-w-lg mx-auto space-y-6">
-      <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
-        <div className="p-2.5 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+    <Card padding="lg" className="max-w-lg mx-auto space-y-6">
+      <div className="flex items-center gap-3 border-b border-border pb-4">
+        <div className="p-2.5 rounded-xl bg-primary/10 text-primary">
           <ShieldCheck className="w-5 h-5" />
         </div>
         <div>
-          <h2 className="text-base font-bold text-slate-900 dark:text-white">
+          <h2 className="text-base font-bold text-text font-sans">
             Two-Factor Authentication (TOTP MFA)
           </h2>
-          <p className="text-xs text-slate-500 dark:text-[#9FB0C8]">
+          <p className="text-xs text-text-muted font-sans">
             Enhance administrative account security with Google Authenticator or 1Password
           </p>
         </div>
       </div>
 
       {error && (
-        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-2">
+        <div className="p-3 rounded-xl bg-danger/10 border border-danger/20 text-danger text-xs flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -141,27 +142,27 @@ export const MfaEnrollmentView: React.FC<MfaEnrollmentViewProps> = ({ onEnrolled
 
       {step === 'scan' && (
         <div className="space-y-4">
-          <p className="text-xs text-slate-600 dark:text-[#9FB0C8]">
+          <p className="text-xs text-text-muted font-sans">
             1. Scan this QR code in your Authenticator app (e.g. Google Authenticator, Authy):
           </p>
 
-          <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049]">
+          <div className="flex flex-col items-center justify-center p-4 rounded-xl bg-bg border border-border">
             {qrCodeUri ? (
               <img
                 src={qrCodeUri}
                 alt="TOTP MFA QR Code"
-                className="w-48 h-48 rounded-lg shadow-sm"
+                className="w-48 h-48 rounded-lg shadow-xs"
               />
             ) : loading ? (
-              <div className="h-48 flex items-center justify-center text-xs text-slate-400">
+              <div className="h-48 flex items-center justify-center text-xs text-text-muted">
                 Generating TOTP QR code...
               </div>
             ) : null}
 
             {secret && (
               <div className="mt-3 text-center">
-                <span className="text-[11px] text-slate-400 block mb-1">Manual entry key:</span>
-                <code className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 select-all">
+                <span className="text-[11px] text-text-muted block mb-1 font-sans">Manual entry key:</span>
+                <code className="text-xs font-mono font-bold text-primary px-2 py-1 rounded bg-surface border border-border select-all">
                   {secret}
                 </code>
               </div>
@@ -169,37 +170,33 @@ export const MfaEnrollmentView: React.FC<MfaEnrollmentViewProps> = ({ onEnrolled
           </div>
 
           <form onSubmit={handleVerify} className="space-y-3 pt-2">
-            <label className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              2. Enter the 6-digit confirmation code from your app:
-            </label>
-            <input
+            <Input
+              label="2. Enter the 6-digit confirmation code from your app:"
               type="text"
               required
               maxLength={6}
               value={verifyCode}
               onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
               placeholder="000000"
-              className="w-full text-center tracking-widest text-lg font-mono py-2 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="text-center tracking-widest text-lg font-mono"
             />
 
             <div className="flex items-center justify-end gap-3 pt-3">
               {onCancel && (
-                <button
-                  type="button"
-                  onClick={onCancel}
-                  className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                >
+                <Button variant="secondary" size="sm" type="button" onClick={onCancel}>
                   Cancel
-                </button>
+                </Button>
               )}
-              <button
+              <Button
+                variant="primary"
+                size="sm"
                 type="submit"
+                loading={loading}
                 disabled={loading || verifyCode.length !== 6}
-                className="flex items-center gap-2 px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-semibold shadow transition cursor-pointer"
               >
                 <span>Verify & Activate MFA</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+                {!loading && <ArrowRight className="w-4 h-4 ml-1.5" />}
+              </Button>
             </div>
           </form>
         </div>
@@ -207,21 +204,21 @@ export const MfaEnrollmentView: React.FC<MfaEnrollmentViewProps> = ({ onEnrolled
 
       {step === 'recovery_codes' && (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs">
+          <div className="p-4 rounded-xl bg-success/10 border border-success/20 text-success text-xs font-sans">
             <strong>MFA is now successfully activated!</strong> Save these one-time recovery codes in a secure place. If you ever lose your authenticator, each code can be used once to access your account.
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#0B1020] border border-slate-200 dark:border-[#223049] space-y-2">
+          <div className="p-4 rounded-xl bg-bg border border-border space-y-2">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              <span className="text-xs font-semibold text-text font-sans">
                 One-Time Emergency Recovery Codes
               </span>
               <button
                 type="button"
                 onClick={copyAllRecoveryCodes}
-                className="flex items-center gap-1.5 text-xs text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                className="flex items-center gap-1.5 text-xs text-primary hover:underline cursor-pointer"
               >
-                {copiedCodes ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                {copiedCodes ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{copiedCodes ? 'Copied!' : 'Copy All'}</span>
               </button>
             </div>
@@ -230,7 +227,7 @@ export const MfaEnrollmentView: React.FC<MfaEnrollmentViewProps> = ({ onEnrolled
               {recoveryCodes.map((code, idx) => (
                 <div
                   key={idx}
-                  className="p-2 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono text-center font-bold select-all"
+                  className="p-2 rounded bg-surface border border-border text-xs font-mono text-center font-bold select-all"
                 >
                   {code}
                 </div>
@@ -238,19 +235,20 @@ export const MfaEnrollmentView: React.FC<MfaEnrollmentViewProps> = ({ onEnrolled
             </div>
           </div>
 
-          <div className="text-[11px] text-slate-500 dark:text-[#9FB0C8]">
-            Note: If you lose both your authenticator and recovery codes, contact a Master Admin to run <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">npm run admin:reset-mfa</code>.
+          <div className="text-[11px] text-text-muted font-sans">
+            Note: If you lose both your authenticator and recovery codes, contact a Master Admin to run <code className="font-mono bg-surface px-1 py-0.5 rounded border border-border">npm run admin:reset-mfa</code>.
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
+            className="w-full"
             onClick={() => onEnrolled && onEnrolled()}
-            className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold transition cursor-pointer"
           >
             I Have Saved My Recovery Codes — Continue
-          </button>
+          </Button>
         </div>
       )}
-    </div>
+    </Card>
   );
 };

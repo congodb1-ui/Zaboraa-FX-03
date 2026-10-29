@@ -107,14 +107,14 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
   return (
     <div className="space-y-6">
       {/* Control Panel */}
-      <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               <Sliders className="w-4 h-4 text-blue-400" />
               2D Parameter Sweep & Heuristic Overfitting Auditor
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-text-muted mt-0.5">
               Identifies stable parameter plateaus and calculates 5-term quantitative overfitting penalties.
             </p>
           </div>
@@ -132,13 +132,13 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 text-xs font-mono">
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-[11px] mb-1 font-sans">
               Target Strategy
             </label>
             <select
               value={selectedStrategyId}
               onChange={(e) => setSelectedStrategyId(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text"
             >
               {BUILT_IN_STRATEGIES.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -149,13 +149,13 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
           </div>
 
           <div>
-            <label className="block text-slate-400 text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-[11px] mb-1 font-sans">
               Research Dataset
             </label>
             <select
               value={selectedDatasetId}
               onChange={(e) => setSelectedDatasetId(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded bg-slate-950 border border-slate-800 text-slate-200"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text"
             >
               {datasets.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -170,12 +170,12 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
       {/* 2D Heatmap Grid */}
       {heatmapResult && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2 flex items-center gap-2">
+          <div className="lg:col-span-2 rounded-lg border border-border bg-surface p-4 shadow-xl">
+            <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2 flex items-center gap-2">
               <Flame className="w-4 h-4 text-amber-400" />
               2D Parameter Robustness Heatmap (Sharpe Ratio)
             </h3>
-            <p className="text-[11px] text-slate-400 mb-4">
+            <p className="text-[11px] text-text-muted mb-4">
               X-axis: Channel Period · Y-axis: Exit Period. Solid green indicates a stable plateau; sharp isolated peaks indicate fragile curve-fitting.
             </p>
 
@@ -183,9 +183,9 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
               <table className="w-full text-center text-xs font-mono border-collapse">
                 <thead>
                   <tr>
-                    <th className="p-2 text-slate-500 text-[10px]">Exit \ Channel</th>
+                    <th className="p-2 text-text-muted text-[10px]">Exit \ Channel</th>
                     {heatmapResult.param1Values.map((p1) => (
-                      <th key={p1} className="p-2 text-slate-300 border-b border-slate-800">
+                      <th key={p1} className="p-2 text-text-muted border-b border-border">
                         {p1}
                       </th>
                     ))}
@@ -194,7 +194,7 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
                 <tbody>
                   {heatmapResult.param2Values.map((p2) => (
                     <tr key={p2}>
-                      <td className="p-2 text-slate-400 font-bold border-r border-slate-800">
+                      <td className="p-2 text-text-muted font-bold border-r border-border">
                         {p2}
                       </td>
                       {heatmapResult.param1Values.map((p1) => {
@@ -212,7 +212,7 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
                             ? 'bg-emerald-700/50 text-emerald-100'
                             : sharpe >= 0.8
                             ? 'bg-blue-900/40 text-blue-200'
-                            : 'bg-slate-900 text-slate-500';
+                            : 'bg-bg text-text-muted';
 
                         return (
                           <td key={p1} className="p-1">
@@ -236,8 +236,8 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
           {/* Overfitting Score & Monte Carlo */}
           <div className="space-y-4">
             {overfittingResult && (
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
-                <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
+              <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
+                <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
                   Heuristic Overfitting Score
                 </h3>
                 <div className="flex items-baseline gap-2">
@@ -252,43 +252,43 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
                   >
                     {overfittingResult.score} / 100
                   </span>
-                  <span className="text-xs text-slate-400 font-semibold">
+                  <span className="text-xs text-text-muted font-semibold">
                     {overfittingResult.label}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-2">
+                <p className="text-[11px] text-text-muted mt-2">
                   {overfittingResult.plainExplanation}
                 </p>
 
                 {/* 5 Weighted Penalty Terms */}
                 <div className="mt-4 space-y-1.5 text-[11px] font-mono">
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-text-muted">
                     <span>OOS Degradation (w1=0.35):</span>
-                    <strong className="text-slate-200">
+                    <strong className="text-text">
                       {overfittingResult.terms.oosDegradation}
                     </strong>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-text-muted">
                     <span>Param Sensitivity (w2=0.25):</span>
-                    <strong className="text-slate-200">
+                    <strong className="text-text">
                       {overfittingResult.terms.paramSensitivity}
                     </strong>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-text-muted">
                     <span>Trades / Param (w3=0.20):</span>
-                    <strong className="text-slate-200">
+                    <strong className="text-text">
                       {overfittingResult.terms.tradesPerParam}
                     </strong>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-text-muted">
                     <span>Trial Count (w4=0.10):</span>
-                    <strong className="text-slate-200">
+                    <strong className="text-text">
                       {overfittingResult.terms.trialCount}
                     </strong>
                   </div>
-                  <div className="flex justify-between text-slate-400">
+                  <div className="flex justify-between text-text-muted">
                     <span>Sample Size (w5=0.10):</span>
-                    <strong className="text-slate-200">
+                    <strong className="text-text">
                       {overfittingResult.terms.sampleSize}
                     </strong>
                   </div>
@@ -297,31 +297,31 @@ export const OptimizationView: React.FC<OptimizationViewProps> = ({ datasets }) 
             )}
 
             {monteCarloResult && (
-              <div className="rounded-lg border border-slate-800 bg-[#0E1524] p-4 shadow-xl">
+              <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+                  <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider flex items-center gap-2">
                     <Shuffle className="w-3.5 h-3.5 text-blue-400" />
                     Seeded Monte Carlo (Mulberry32)
                   </h3>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${(monteCarloResult as any).isRealTrades ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${(monteCarloResult as any).isRealTrades ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-surface text-text-muted border-border'}`}>
                     {(monteCarloResult as any).isRealTrades ? `From ${(monteCarloResult as any).tradeCount} Real Trades` : 'Simulated Sample'}
                   </span>
                 </div>
                 <div className="space-y-2 text-xs font-mono">
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Reshuffled Worst DD:</span>
+                    <span className="text-text-muted">Reshuffled Worst DD:</span>
                     <strong className="text-rose-400">
                       {monteCarloResult.reshuffledWorstDrawdown}%
                     </strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Bootstrap Drawdown 95% CI:</span>
-                    <strong className="text-slate-200">
+                    <span className="text-text-muted">Bootstrap Drawdown 95% CI:</span>
+                    <strong className="text-text">
                       [{monteCarloResult.bootstrapDrawdown95CI[0]}%, {monteCarloResult.bootstrapDrawdown95CI[1]}%]
                     </strong>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-400">Bootstrap Sharpe 95% CI:</span>
+                    <span className="text-text-muted">Bootstrap Sharpe 95% CI:</span>
                     <strong className="text-emerald-400">
                       [{monteCarloResult.bootstrapSharpe95CI[0]}, {monteCarloResult.bootstrapSharpe95CI[1]}]
                     </strong>
