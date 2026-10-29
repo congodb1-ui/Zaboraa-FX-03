@@ -734,15 +734,15 @@ export function executeStrategyBar(
     log,
   };
 
-  const security = validateStrategySecurity(code);
-  if (!security.valid) {
+  const securityResult = validateStrategySecurity(code);
+  if (!securityResult.valid) {
     return {
       signals: [],
       logs,
       visualBlocks: [],
       visualLines: [],
       visualMarkers: [],
-      error: security.error,
+      error: securityResult.error,
     };
   }
 
