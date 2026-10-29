@@ -24,11 +24,15 @@ import {
   UserPlus,
   Users,
   X,
+  Building,
+  TrendingUp,
 } from 'lucide-react';
 import { BrokerState } from '../types/forex';
 import { useAuth } from '../context/AuthContext';
+import { Button } from './ui/Button';
+import { Card } from './ui/Card';
 
-export type AdminSubTab = 'firewall' | 'users' | 'accounts' | 'audit';
+export type AdminSubTab = 'firewall' | 'users' | 'accounts' | 'audit' | 'branding';
 
 interface BrokerAccountDef {
   id: string;
@@ -218,6 +222,53 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
 
   // Token mask state
   const [maskedTokens, setMaskedTokens] = useState<Record<string, boolean>>({});
+
+  // Company Branding State
+  const [brandingName, setBrandingName] = useState<string>('Zaboraa FX');
+  const [brandingLogo, setBrandingLogo] = useState<string>('');
+  const [brandingSaving, setBrandingSaving] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/company/branding')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          if (data.companyName) setBrandingName(data.companyName);
+          if (data.logoUrl) setBrandingLogo(data.logoUrl);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveBranding = async () => {
+    try {
+      setBrandingSaving(true);
+      const token = getAccessToken();
+      const res = await fetch('/api/admin/company/branding', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ companyName: brandingName, logoUrl: brandingLogo }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFeedback({ success: true, message: 'Company name and logo updated successfully.' });
+        try {
+          localStorage.setItem('zaboraa_company_name', brandingName);
+          localStorage.setItem('zaboraa_company_logo', brandingLogo);
+        } catch {}
+        window.dispatchEvent(new Event('zaboraa_branding_updated'));
+      } else {
+        setFeedback({ success: false, message: data.message || 'Failed to update company branding.' });
+      }
+    } catch (e: any) {
+      setFeedback({ success: false, message: e.message || 'Network error updating branding.' });
+    } finally {
+      setBrandingSaving(false);
+    }
+  };
 
   // 1. Fetch Firewall data on scope change
   const loadFirewallData = async (scopeToLoad: string) => {
@@ -554,7 +605,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             onClick={() => setSubTab('firewall')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'firewall'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-text-muted hover:text-text'
             }`}
           >
@@ -566,7 +617,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             onClick={() => setSubTab('users')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'users'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-text-muted hover:text-text'
             }`}
           >
@@ -578,7 +629,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             onClick={() => setSubTab('accounts')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'accounts'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-text-muted hover:text-text'
             }`}
           >
@@ -590,12 +641,24 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             onClick={() => setSubTab('audit')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
               subTab === 'audit'
-                ? 'bg-indigo-600 text-white shadow-sm'
+                ? 'bg-primary text-white shadow-sm'
                 : 'text-text-muted hover:text-text'
             }`}
           >
             <History className="w-3.5 h-3.5" />
             <span>System Audit</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSubTab('branding')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              subTab === 'branding'
+                ? 'bg-primary text-white shadow-sm'
+                : 'text-text-muted hover:text-text'
+            }`}
+          >
+            <Building className="w-3.5 h-3.5" />
+            <span>Branding</span>
           </button>
         </div>
       </div>
@@ -605,15 +668,15 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
         <div
           className={`p-4 rounded-xl text-xs flex items-center justify-between gap-3 border shadow-sm ${
             feedback.success
-              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
-              : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/30'
+              ? 'bg-success/10 text-success border-success/30'
+              : 'bg-danger/10 text-danger border-danger/30'
           }`}
         >
           <div className="flex items-center gap-2">
             {feedback.success ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+              <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
             ) : (
-              <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0" />
+              <AlertTriangle className="w-4 h-4 text-danger shrink-0" />
             )}
             <span>{feedback.message}</span>
           </div>
@@ -637,7 +700,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
-                  <ShieldCheck className="w-5 h-5 text-indigo-500" />
+                  <ShieldCheck className="w-5 h-5 text-primary" />
                   <h2 className="text-base font-bold text-text">
                     Institutional Risk Firewall Control
                   </h2>
@@ -653,7 +716,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 <select
                   value={firewallScope}
                   onChange={(e) => setFirewallScope(e.target.value)}
-                  className="px-3 py-1.5 rounded-xl bg-bg border border-border text-xs font-semibold text-text focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="px-3 py-1.5 rounded-xl bg-bg border border-border text-xs font-semibold text-text focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="global:demo">Global Demo (Default)</option>
                   <option value="global:live">Global Live (Locked Protection)</option>
@@ -670,21 +733,21 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             <div
               className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 transition-colors ${
                 firewallState.enabled
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200'
-                  : 'bg-rose-500/15 border-rose-500/40 text-rose-900 dark:text-rose-200 animate-pulse'
+                  ? 'bg-success/10 border-success/30 text-success dark:text-success'
+                  : 'bg-danger/15 border-danger/40 text-danger dark:text-danger animate-pulse'
               }`}
             >
               <div className="flex items-center gap-3">
                 <div
                   className={`w-3 h-3 rounded-full ${
-                    firewallState.enabled ? 'bg-emerald-500' : 'bg-rose-500'
+                    firewallState.enabled ? 'bg-success' : 'bg-danger'
                   }`}
                 />
                 <div>
                   <div className="font-bold text-sm flex items-center gap-2">
                     <span>Risk Firewall Status: {firewallState.enabled ? 'ACTIVE (Protection Engaged)' : 'OFF (Protection Disabled)'}</span>
                     {isLive && (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-warning/20 text-warning dark:text-warning border border-warning/30">
                         LIVE: LOCKED ON
                       </span>
                     )}
@@ -705,8 +768,8 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                   isLive
                     ? 'bg-bg text-text-muted cursor-not-allowed opacity-60'
                     : firewallState.enabled
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                    ? 'bg-danger hover:bg-danger text-white'
+                    : 'bg-success hover:bg-success text-white'
                 }`}
               >
                 {isLive ? 'Locked ON for Live' : firewallState.enabled ? 'Turn OFF (Demo Only)' : 'Re-Enable Firewall'}
@@ -726,7 +789,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 </span>
               </div>
               {changedSettings.length > 0 && (
-                <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-warning/15 text-warning dark:text-warning border border-warning/30">
                   {changedSettings.length} unsaved changes
                 </span>
               )}
@@ -862,7 +925,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               <div className="space-y-1.5 p-3 rounded-xl bg-bg border border-border">
                 <div className="flex justify-between font-semibold text-text-muted">
                   <span>Mandatory Stop Loss</span>
-                  {isLive && <span className="text-amber-500 font-bold">Locked ON (Live)</span>}
+                  {isLive && <span className="text-warning font-bold">Locked ON (Live)</span>}
                 </div>
                 <div className="flex items-center gap-3 pt-1">
                   <button
@@ -876,7 +939,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                     }
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer ${
                       formSettings.mandatoryStopLoss
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-success text-white'
                         : 'bg-bg text-text-muted'
                     }`}
                   >
@@ -961,7 +1024,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               <button
                 type="submit"
                 disabled={changedSettings.length === 0 || isLoading}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-40 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 disabled:opacity-40 cursor-pointer"
               >
                 Review changes & Save ({changedSettings.length})
               </button>
@@ -1013,11 +1076,11 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                         <td className="py-2.5 font-sans font-semibold text-text">
                           {entry.actor} <span className="text-text-muted font-normal">({entry.role})</span>
                         </td>
-                        <td className="py-2.5 text-indigo-600 dark:text-indigo-400 font-semibold">{entry.scope}</td>
+                        <td className="py-2.5 text-primary font-semibold">{entry.scope}</td>
                         <td className="py-2.5 font-sans font-medium text-text-muted">{entry.key}</td>
                         <td className="py-2.5">
-                          <span className="text-rose-500 line-through mr-1.5">{entry.old_value}</span>
-                          <span className="text-emerald-500 font-bold">{entry.new_value}</span>
+                          <span className="text-danger line-through mr-1.5">{entry.old_value}</span>
+                          <span className="text-success font-bold">{entry.new_value}</span>
                         </td>
                         <td className="py-2.5 font-sans text-text-muted max-w-xs truncate">
                           {entry.reason}
@@ -1069,10 +1132,10 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                           {new Date(ord.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                         <td className="py-2.5 font-sans font-bold text-text">{ord.symbol}</td>
-                        <td className="py-2.5 text-right text-rose-500 font-bold">{ord.attempted_lots.toFixed(2)}</td>
-                        <td className="py-2.5 text-right text-rose-500 font-bold">${ord.attempted_risk_usd.toFixed(2)}</td>
-                        <td className="py-2.5 text-amber-500 font-semibold">{ord.rule_violated}</td>
-                        <td className="py-2.5 text-right text-emerald-500 font-bold">
+                        <td className="py-2.5 text-right text-danger font-bold">{ord.attempted_lots.toFixed(2)}</td>
+                        <td className="py-2.5 text-right text-danger font-bold">${ord.attempted_risk_usd.toFixed(2)}</td>
+                        <td className="py-2.5 text-warning font-semibold">{ord.rule_violated}</td>
+                        <td className="py-2.5 text-right text-success font-bold">
                           {ord.suggested_lots !== null ? `${ord.suggested_lots.toFixed(2)} lots` : 'None'}
                         </td>
                         <td className="py-2.5 font-sans text-text-muted max-w-sm truncate" title={ord.error_message}>
@@ -1106,7 +1169,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowInviteModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary text-white font-semibold text-xs shadow-sm cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5" />
                 <span>Invite User</span>
@@ -1134,7 +1197,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                           <div className="font-semibold text-text flex items-center gap-2">
                             <span>{u.email}</span>
                             {isMasterAdmin && (
-                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30">
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-warning/15 text-warning border border-warning/30">
                                 MASTER
                               </span>
                             )}
@@ -1158,7 +1221,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                           <button
                             type="button"
                             onClick={() => setAssignUser(u)}
-                            className="px-2.5 py-1 rounded-lg text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 hover:bg-indigo-100 transition-colors cursor-pointer"
+                            className="px-2.5 py-1 rounded-lg text-xs font-medium text-primary bg-primary/10 dark:bg-primary/10 hover:bg-primary/20 transition-colors cursor-pointer"
                           >
                             {u.assignedAccounts && u.assignedAccounts.length > 0
                               ? `${u.assignedAccounts.length} accounts`
@@ -1169,8 +1232,8 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                           <span
                             className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
                               u.status === 'ACTIVE'
-                                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                                : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                                ? 'bg-success/15 text-success'
+                                : 'bg-danger/15 text-danger'
                             }`}
                           >
                             {u.status}
@@ -1185,8 +1248,8 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                               isMasterAdmin || isSelf
                                 ? 'text-text-muted cursor-not-allowed opacity-50'
                                 : u.status === 'ACTIVE'
-                                ? 'text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10'
-                                : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10'
+                                ? 'text-danger hover:bg-danger/10 dark:hover:bg-danger/10'
+                                : 'text-success hover:bg-success/10 dark:hover:bg-success/10'
                             }`}
                           >
                             {u.status === 'ACTIVE' ? 'Disable' : 'Enable'}
@@ -1218,7 +1281,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddAccountModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm cursor-pointer"
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary text-white font-semibold text-xs shadow-sm cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add Account</span>
@@ -1252,7 +1315,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       </td>
                       <td className="py-3 text-text-muted">{acc.login}</td>
                       <td className="py-3 text-center font-sans">
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-warning/10 text-warning dark:text-warning border border-warning/20">
                           {acc.type}
                         </span>
                       </td>
@@ -1260,13 +1323,13 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                         <span
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold ${
                             acc.status === 'CONNECTED'
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                              ? 'bg-success/15 text-success'
                               : 'bg-bg text-text-muted'
                           }`}
                         >
                           <span
                             className={`w-1.5 h-1.5 rounded-full ${
-                              acc.status === 'CONNECTED' ? 'bg-emerald-500' : 'bg-text-muted'
+                              acc.status === 'CONNECTED' ? 'bg-success' : 'bg-text-muted'
                             }`}
                           />
                           {acc.status}
@@ -1277,7 +1340,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                         <button
                           type="button"
                           onClick={() => setAccounts((prev) => prev.filter((a) => a.id !== acc.id))}
-                          className="px-2 py-1 rounded-md text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 cursor-pointer"
+                          className="px-2 py-1 rounded-md text-xs font-medium text-danger hover:bg-danger/10 dark:hover:bg-danger/10 cursor-pointer"
                         >
                           Remove
                         </button>
@@ -1332,7 +1395,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       {log.username} <span className="text-text-muted font-normal">({log.role})</span>
                     </td>
                     <td className="py-2.5">
-                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-bg text-text-muted">
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-bg text-text-muted">
                         {log.action}
                       </span>
                     </td>
@@ -1348,12 +1411,101 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       )}
 
       {/* ============================================================== */}
+      {/* SUB-TAB 5: COMPANY BRANDING & LOGO */}
+      {/* ============================================================== */}
+      {subTab === 'branding' && (
+        <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-5 animate-in fade-in">
+          <div className="pb-3 border-b border-border">
+            <h2 className="text-base font-bold text-text font-sans">Company Branding & Portal Identity</h2>
+            <p className="text-xs text-text-muted mt-0.5 font-sans">
+              Change the portal brand wordmark, displayed company name, and header icon or logo image.
+            </p>
+          </div>
+
+          <div className="max-w-xl space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                Company Name
+              </label>
+              <input
+                type="text"
+                value={brandingName}
+                onChange={(e) => setBrandingName(e.target.value)}
+                placeholder="e.g. Zaboraa FX or Custom Capital Desk"
+                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                Company Logo URL
+              </label>
+              <input
+                type="text"
+                value={brandingLogo}
+                onChange={(e) => setBrandingLogo(e.target.value)}
+                placeholder="https://... or data:image/... (leave empty for default icon)"
+                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-mono"
+              />
+              <span className="text-xs text-text-muted mt-1 block">
+                Enter an image URL or leave empty to use the default platform icon.
+              </span>
+            </div>
+
+            {/* Live Preview Card */}
+            <div className="p-4 rounded-xl bg-bg border border-border space-y-2">
+              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider font-sans">
+                Header Live Preview
+              </div>
+              <div className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border shadow-xs w-fit">
+                {brandingLogo ? (
+                  <img
+                    src={brandingLogo}
+                    alt={brandingName}
+                    className="w-8 h-8 rounded-lg object-contain bg-surface border border-border"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                ) : (
+                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white shadow-xs">
+                    <TrendingUp className="w-4 h-4" />
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-base text-text tracking-tight font-sans">
+                      {brandingName || 'Zaboraa FX'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                      Sample Data
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                variant="primary"
+                size="md"
+                loading={brandingSaving}
+                onClick={handleSaveBranding}
+              >
+                Save Branding Settings
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
       {/* MODAL 1: DISABLE FIREWALL CONFIRMATION (DEMO ONLY) */}
       {/* ============================================================== */}
       {showDisableModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-rose-500/50 shadow-2xl space-y-4">
-            <div className="flex items-center gap-2 text-rose-600">
+          <div className="max-w-md w-full p-6 rounded-2xl bg-surface border border-danger/50 shadow-2xl space-y-4">
+            <div className="flex items-center gap-2 text-danger">
               <ShieldAlert className="w-5 h-5 shrink-0" />
               <h3 className="text-base font-bold text-text">
                 Disable Risk Firewall (24h Auto-Expiry)
@@ -1381,7 +1533,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
 
               <div>
                 <label className="font-semibold text-text-muted">
-                  Type <span className="font-mono font-bold text-rose-600">DISABLE</span> to confirm:
+                  Type <span className="font-mono font-bold text-danger">DISABLE</span> to confirm:
                 </label>
                 <input
                   type="text"
@@ -1404,7 +1556,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 type="button"
                 disabled={disableConfirmationInput !== 'DISABLE' || !disableReason}
                 onClick={confirmDisableFirewall}
-                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shadow-md shadow-rose-600/30 disabled:opacity-40 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-danger hover:bg-danger text-white font-bold text-xs shadow-md shadow-danger/30 disabled:opacity-40 cursor-pointer"
               >
                 Confirm & Disable
               </button>
@@ -1421,7 +1573,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
           <div className="max-w-lg w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <Sliders className="w-5 h-5 text-indigo-500" />
+                <Sliders className="w-5 h-5 text-primary" />
                 <h3 className="text-base font-bold text-text">
                   Confirm Firewall Parameter Changes
                 </h3>
@@ -1447,9 +1599,9 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 >
                   <span className="font-sans font-semibold text-text">{c.key}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-rose-500 line-through">{String(c.oldVal)}</span>
+                    <span className="text-danger line-through">{String(c.oldVal)}</span>
                     <ArrowRight className="w-3 h-3 text-text-muted" />
-                    <span className="text-emerald-500 font-bold">{String(c.newVal)}</span>
+                    <span className="text-success font-bold">{String(c.newVal)}</span>
                   </div>
                 </div>
               ))}
@@ -1481,7 +1633,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 type="button"
                 disabled={!updateReason || isLoading}
                 onClick={handleConfirmDiffSubmit}
-                className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/20 disabled:opacity-40 cursor-pointer"
+                className="px-5 py-2 rounded-xl bg-primary hover:bg-primary text-white font-bold text-xs shadow-md shadow-primary/20 disabled:opacity-40 cursor-pointer"
               >
                 {isLoading ? 'Saving...' : 'Confirm & Save'}
               </button>
@@ -1533,7 +1685,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-primary text-white font-bold cursor-pointer"
                 >
                   Send Invitation
                 </button>
@@ -1585,7 +1737,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                       onClick={() => handleToggleAccountAssignment(assignUser.id, acc.login, isAssigned)}
                       className={`px-3 py-1 rounded-lg font-semibold text-xs transition-colors cursor-pointer ${
                         isAssigned
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-success text-white'
                           : 'bg-bg text-text-muted'
                       }`}
                     >
@@ -1600,7 +1752,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setAssignUser(null)}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold cursor-pointer"
               >
                 Done
               </button>
@@ -1682,7 +1834,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-xl bg-indigo-600 text-white font-bold cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-primary text-white font-bold cursor-pointer"
                 >
                   Save Account
                 </button>

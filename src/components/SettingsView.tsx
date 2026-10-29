@@ -85,15 +85,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-emerald-400" />
-              <h2 className="text-sm font-bold text-white">
+              <Cpu className="w-4 h-4 text-success" />
+              <h2 className="text-sm font-bold text-text">
                 Engine Mathematical Self-Test Suite
               </h2>
               <span
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider uppercase ${
+                className={`px-2 py-0.5 rounded text-xs font-mono font-bold tracking-wider uppercase ${
                   allPassed
-                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                    ? 'bg-success/15 text-success border border-success/30'
+                    : 'bg-danger/15 text-danger border border-danger/30'
                 }`}
               >
                 {allPassed ? 'ALL 9 TESTS PASSING' : 'TESTS FAILING'}
@@ -107,7 +107,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={handleRunTests}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-blue-400 border border-border transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-primary border border-border transition-colors"
           >
             <RefreshCw className="w-3.5 h-3.5" />
             Re-run Self-Tests
@@ -118,7 +118,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="overflow-x-auto mt-3">
           <table className="w-full text-left text-xs font-mono">
             <thead>
-              <tr className="border-b border-border text-text-muted text-[11px]">
+              <tr className="border-b border-border text-text-muted text-xs">
                 <th className="py-2">Test Case</th>
                 <th>Category</th>
                 <th>Expected Value</th>
@@ -132,20 +132,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 const isPass = t.status === 'PASS';
                 return (
                   <tr key={t.id} className="hover:bg-surface">
-                    <td className="py-2.5 font-bold text-white font-sans">{t.name}</td>
+                    <td className="py-2.5 font-bold text-text font-sans">{t.name}</td>
                     <td>
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-surface text-text-muted">
+                      <span className="px-1.5 py-0.5 rounded text-xs bg-surface text-text-muted">
                         {t.category}
                       </span>
                     </td>
-                    <td className="text-emerald-400 font-semibold">{t.expected}</td>
-                    <td className="text-white font-semibold">{t.actual}</td>
+                    <td className="text-success font-semibold">{t.expected}</td>
+                    <td className="text-text font-semibold">{t.actual}</td>
                     <td>
                       <span
-                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold w-fit ${
+                        className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold w-fit ${
                           isPass
-                            ? 'bg-emerald-500/20 text-emerald-400'
-                            : 'bg-rose-500/20 text-rose-400'
+                            ? 'bg-success/20 text-success'
+                            : 'bg-danger/20 text-danger'
                         }`}
                       >
                         {isPass ? (
@@ -156,7 +156,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                         {t.status}
                       </span>
                     </td>
-                    <td className="text-[11px] text-text-muted font-sans">{t.note}</td>
+                    <td className="text-xs text-text-muted font-sans">{t.note}</td>
                   </tr>
                 );
               })}
@@ -170,7 +170,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <h3 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
-              <Server className="w-4 h-4 text-blue-400" />
+              <Server className="w-4 h-4 text-info" />
               Exness MT5 Python Bridge Diagnostics
             </h3>
             <span className="text-xs font-mono text-text-muted">127.0.0.1:8001</span>
@@ -183,15 +183,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="p-3 rounded bg-bg border border-border text-xs font-mono space-y-2">
             <div className="flex justify-between">
               <span className="text-text-muted">Server Endpoint:</span>
-              <strong className="text-white">http://127.0.0.1:8001</strong>
+              <strong className="text-text">http://127.0.0.1:8001</strong>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Broker Server:</span>
-              <strong className="text-emerald-400">{brokerState.server}</strong>
+              <strong className="text-success">{brokerState.server}</strong>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Account Login:</span>
-              <strong className="text-white">{brokerState.accountLogin} (Demo)</strong>
+              <strong className="text-text">{brokerState.accountLogin} (Demo)</strong>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Dynamic UTC Offset:</span>
@@ -204,14 +204,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               type="button"
               disabled={isPinging}
               onClick={handleTestBridge}
-              className="px-4 py-2 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all disabled:opacity-50"
+              className="px-4 py-2 rounded text-xs font-bold bg-primary hover:brightness-110 text-white shadow-md transition-all disabled:opacity-50"
             >
               {isPinging ? 'Pinging 127.0.0.1:8001...' : 'Test Bridge Connection'}
             </button>
             {pingResult && (
               <span
                 className={`text-xs font-mono font-semibold ${
-                  pingResult.status === 'ONLINE' ? 'text-emerald-400' : 'text-amber-400'
+                  pingResult.status === 'ONLINE' ? 'text-success' : 'text-warning'
                 }`}
               >
                 ● {pingResult.message}
@@ -224,10 +224,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-3">
           <div className="flex items-center justify-between pb-3 border-b border-border">
             <h3 className="text-xs font-bold text-text uppercase tracking-wider flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-emerald-400" />
+              <Terminal className="w-4 h-4 text-success" />
               Windows Terminal Launch Guide
             </h3>
-            <span className="text-[10px] font-mono text-text-muted">PowerShell 7+</span>
+            <span className="text-xs font-mono text-text-muted">PowerShell 7+</span>
           </div>
 
           <p className="text-xs text-text-muted">
@@ -245,7 +245,7 @@ cd mt5-bridge
 uvicorn main:app --host 127.0.0.1 --port 8001`}
           </pre>
 
-          <div className="text-[11px] text-text-muted">
+          <div className="text-xs text-text-muted">
             Note: In Exness MT5, ensure <strong>"Allow algorithmic trading"</strong> is ticked under Tools → Options → Expert Advisors.
           </div>
         </div>

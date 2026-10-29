@@ -50,6 +50,8 @@ import {
   saveChartLayout,
   getChartLayouts,
   deleteChartLayout,
+  getSystemBranding,
+  setSystemBranding,
 } from './src/db/sqlite';
 import {
   isSupabaseConfigured,
@@ -150,6 +152,7 @@ export const PUBLIC_ALLOWLIST_ROUTES = new Set([
   '/api/fundamentals/sentiment',
   '/api/cot/summary',
   '/api/cot/report',
+  '/api/company/branding',
 ]);
 
 export function isPublicAllowlisted(p: string): boolean {
@@ -194,13 +197,22 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     });
   });
 
+  app.get('/api/company/branding', (req: Request, res: Response) => {
+    const branding = getSystemBranding();
+    return res.json(branding);
+  });
+
   // Global Auth Guard Middleware
   app.use(async (req: Request, res: Response, next: NextFunction) => {
     if (!req.path.startsWith('/api/')) {
       return next();
     }
 
-    if (req.path === '/api/health' || req.path === '/api/auth/config') {
+    if (
+      req.path === '/api/health' ||
+      req.path === '/api/auth/config' ||
+      req.path === '/api/company/branding'
+    ) {
       return next();
     }
 
@@ -1142,6 +1154,17 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     const actor = (req as any).user as UserSessionPayload | undefined;
     const success = deleteChartLayout(String(req.params.id), actor?.userId || 'global');
     return res.json({ success });
+  });
+
+  app.post('/api/admin/company/branding', requirePermission('users.manage'), (req: Request, res: Response) => {
+    const { companyName = 'Zaboraa FX', logoUrl = '' } = req.body || {};
+    setSystemBranding(companyName, logoUrl);
+    return res.json({
+      success: true,
+      companyName,
+      logoUrl,
+      message: 'Company branding updated successfully',
+    });
   });
 
   // Authoritative server-side multi-level kill switch execution

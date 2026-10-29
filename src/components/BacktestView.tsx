@@ -293,7 +293,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <BarChart2 className="w-4 h-4 text-blue-400" />
+              <BarChart2 className="w-4 h-4 text-primary" />
               Quantitative Backtest Lab
             </h2>
             <p className="text-xs text-text-muted mt-0.5">
@@ -309,7 +309,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   onClick={handleSaveReportClick}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                 >
-                  <Download className="w-3.5 h-3.5 text-blue-400" />
+                  <Download className="w-3.5 h-3.5 text-primary" />
                   Save Report
                 </button>
                 <button
@@ -318,7 +318,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                   title="Export completed trades to CSV"
                 >
-                  <Download className="w-3.5 h-3.5 text-emerald-400" />
+                  <Download className="w-3.5 h-3.5 text-success" />
                   Export CSV
                 </button>
                 <button
@@ -326,7 +326,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   onClick={handlePrintPdf}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                 >
-                  <Printer className="w-3.5 h-3.5 text-emerald-400" />
+                  <Printer className="w-3.5 h-3.5 text-success" />
                   Print / Save PDF
                 </button>
               </>
@@ -335,7 +335,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               type="button"
               disabled={isRunning}
               onClick={handleRunBacktest}
-              className="flex items-center gap-2 px-5 py-2 rounded text-xs font-bold uppercase tracking-wider bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2 rounded text-xs font-bold uppercase tracking-wider bg-primary hover:bg-primary text-white shadow-lg shadow-primary/30 transition-all disabled:opacity-50"
             >
               <Play className="w-4 h-4 fill-current" />
               {isRunning ? 'Simulating...' : 'Run Simulation'}
@@ -351,7 +351,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               onClick={() => setSubTab('single')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 subTab === 'single'
-                  ? 'bg-blue-600 text-white shadow-md'
+                  ? 'bg-primary text-white shadow-md'
                   : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
@@ -362,7 +362,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               onClick={() => setSubTab('batch')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subTab === 'batch'
-                  ? 'bg-violet-600 text-white shadow-md'
+                  ? 'bg-primary text-white shadow-md'
                   : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
@@ -378,7 +378,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subTab === 'comparison'
-                  ? 'bg-indigo-600 text-white shadow-md'
+                  ? 'bg-primary text-white shadow-md'
                   : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
@@ -390,7 +390,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               onClick={() => setSubTab('walkforward')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 subTab === 'walkforward'
-                  ? 'bg-emerald-600 text-white shadow-md'
+                  ? 'bg-success text-white shadow-md'
                   : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
@@ -399,21 +399,21 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </button>
           </div>
 
-          <span className="text-[11px] font-mono text-text-muted">
+          <span className="text-xs font-mono text-text-muted">
             Intrabar Tick & Bar Resolution
           </span>
         </div>
 
         {saveToast && (
-          <div className="mt-3 px-3 py-2 rounded bg-emerald-950/60 border border-emerald-700/60 text-emerald-300 text-xs flex items-center justify-between animate-in fade-in duration-200">
+          <div className="mt-3 px-3 py-2 rounded bg-success/20 border border-success/60 text-success text-xs flex items-center justify-between animate-in fade-in duration-200">
             <span className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <CheckCircle className="w-4 h-4 text-success shrink-0" />
               {saveToast}
             </span>
             <button
               type="button"
               onClick={() => setSaveToast(null)}
-              className="text-emerald-400 hover:text-emerald-200 text-xs font-bold ml-3"
+              className="text-success hover:text-success text-xs font-bold ml-3"
             >
               ✕
             </button>
@@ -426,13 +426,13 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             {/* Parameter Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4 text-xs font-mono">
           <div>
-            <label className="block text-text-muted text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-xs mb-1 font-sans">
               Historical Dataset
             </label>
             <select
               value={selectedDatasetId}
               onChange={(e) => setSelectedDatasetId(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
             >
               {datasets.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -444,14 +444,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="block text-text-muted text-[11px] font-sans">
+              <label className="block text-text-muted text-xs font-sans">
                 Strategy Algorithm
               </label>
               {onNavigateToStrategyStudio && (
                 <button
                   type="button"
                   onClick={() => onNavigateToStrategyStudio(selectedStrategyId)}
-                  className="text-[10px] text-blue-400 hover:text-blue-300 flex items-center gap-1 font-sans cursor-pointer hover:underline"
+                  className="text-xs text-primary hover:text-primary flex items-center gap-1 font-sans cursor-pointer hover:underline"
                   title="Edit strategy code and parameters in Strategy Studio"
                 >
                   <Code2 className="w-3 h-3" />
@@ -462,7 +462,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             <select
               value={selectedStrategyId}
               onChange={(e) => setSelectedStrategyId(e.target.value)}
-              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
             >
               {strategies.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -473,7 +473,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           </div>
 
           <div>
-            <label className="block text-text-muted text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-xs mb-1 font-sans">
               Broker Spread (pips)
             </label>
             <input
@@ -481,12 +481,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               step="0.1"
               value={spreadPips}
               onChange={(e) => setSpreadPips(parseFloat(e.target.value) || 0)}
-              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-text-muted text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-xs mb-1 font-sans">
               Commission ($/lot)
             </label>
             <input
@@ -494,12 +494,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               step="0.5"
               value={commission}
               onChange={(e) => setCommission(parseFloat(e.target.value) || 0)}
-              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
             />
           </div>
 
           <div>
-            <label className="block text-text-muted text-[11px] mb-1 font-sans">
+            <label className="block text-text-muted text-xs mb-1 font-sans">
               Slippage (pips)
             </label>
             <input
@@ -507,7 +507,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               step="0.1"
               value={slippagePips}
               onChange={(e) => setSlippagePips(parseFloat(e.target.value) || 0)}
-              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+              className="w-full px-2.5 py-1.5 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
             />
           </div>
         </div>
@@ -518,12 +518,12 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             <div className="flex items-center gap-3">
               <span className="text-text-muted font-sans">Provenance:</span>
               <span
-                className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider font-mono uppercase ${
+                className={`px-2 py-0.5 rounded text-xs font-bold tracking-wider font-mono uppercase ${
                   selectedDataset.provenance === 'MT5 BRIDGE'
-                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    ? 'bg-success/10 text-success border border-success/20'
                     : selectedDataset.provenance === 'USER CSV'
-                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    ? 'bg-primary/10 text-primary border border-primary/20'
+                    : 'bg-warning/10 text-warning border border-warning/20'
                 }`}
               >
                 {selectedDataset.provenance}
@@ -537,15 +537,15 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-text-muted">Quality Score:</span>
-              <span className="font-mono font-bold text-emerald-400">
+              <span className="text-xs text-text-muted">Quality Score:</span>
+              <span className="font-mono font-bold text-success">
                 {selectedDataset.qualityScore}%
               </span>
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-bold ${
+                className={`text-xs px-1.5 py-0.5 rounded font-mono font-bold ${
                   selectedDataset.isResearchEligible
-                    ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-rose-500/15 text-rose-400'
+                    ? 'bg-success/15 text-success'
+                    : 'bg-danger/15 text-danger'
                 }`}
               >
                 {selectedDataset.isResearchEligible ? 'RESEARCH READY' : 'INELIGIBLE'}
@@ -555,8 +555,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
         )}
 
         {runError && (
-          <div className="mt-3 p-2.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          <div className="mt-3 p-2.5 rounded bg-danger/10 border border-danger/30 text-danger text-xs flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-danger" />
             <span>{runError}</span>
           </div>
         )}
@@ -570,7 +570,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
       {selectedDataset && (
         <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-bg border border-border">
           <div className="flex items-center gap-1.5 text-xs text-text-muted">
-            <Layers className="w-4 h-4 text-blue-400" />
+            <Layers className="w-4 h-4 text-primary" />
             <span className="font-semibold text-text-muted">Simulation Visualizer Engines:</span>
           </div>
 
@@ -580,7 +580,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               onClick={() => setChartViewMode('both')}
               className={`px-3 py-1 rounded transition-colors ${
                 chartViewMode === 'both'
-                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  ? 'bg-primary text-white font-bold shadow-sm'
                   : 'text-text-muted hover:text-text'
               }`}
             >
@@ -591,7 +591,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               onClick={() => setChartViewMode('candles')}
               className={`px-3 py-1 rounded transition-colors ${
                 chartViewMode === 'candles'
-                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  ? 'bg-primary text-white font-bold shadow-sm'
                   : 'text-text-muted hover:text-text'
               }`}
             >
@@ -602,7 +602,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               onClick={() => setChartViewMode('timeline')}
               className={`px-3 py-1 rounded transition-colors ${
                 chartViewMode === 'timeline'
-                  ? 'bg-blue-600 text-white font-bold shadow-sm'
+                  ? 'bg-primary text-white font-bold shadow-sm'
                   : 'text-text-muted hover:text-text'
               }`}
             >
@@ -660,7 +660,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 type="button"
                 onClick={handleConsultAiDoctor}
                 disabled={isAdvising}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md shadow-primary/20 transition-all cursor-pointer disabled:opacity-50"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isAdvising ? 'animate-spin' : ''}`} />
                 {isAdvising ? 'Diagnosing with Gemini...' : 'AI Strategy Doctor & Suggestions'}
@@ -671,7 +671,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 via-surface to-surface p-5 shadow-xl space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                    <Sparkles className="w-4 h-4 text-primary" />
                     <h4 className="text-xs font-bold text-white uppercase tracking-wider">
                       AI Quantitative Strategy Diagnosis
                     </h4>
@@ -680,7 +680,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <span className="text-xs font-mono font-bold text-text-muted">
                       Score: {aiAdvice.overallScore}/100
                     </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                    <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-primary/20 text-primary border border-primary/30">
                       {aiAdvice.performanceVerdict.replace(/_/g, ' ')}
                     </span>
                     <button
@@ -698,19 +698,19 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                   {/* Parameter Tuning Suggestions */}
                   <div className="p-3.5 rounded bg-bg border border-border space-y-2 text-xs">
-                    <span className="font-semibold text-blue-400 uppercase text-[11px] block">
+                    <span className="font-semibold text-primary uppercase text-xs block">
                       Parameter Tuning Suggestions
                     </span>
                     <div className="space-y-2">
                       {aiAdvice.parameterSuggestions?.map((p: any, i: number) => (
                         <div key={i} className="p-2 rounded bg-bg border border-border space-y-1">
-                          <div className="flex justify-between font-mono text-[11px]">
-                            <span className="text-indigo-400">{p.parameter}</span>
+                          <div className="flex justify-between font-mono text-xs">
+                            <span className="text-primary">{p.parameter}</span>
                             <span className="text-text-muted">
-                              {p.currentValue} → <strong className="text-emerald-400">{p.suggestedValue}</strong>
+                              {p.currentValue} → <strong className="text-success">{p.suggestedValue}</strong>
                             </span>
                           </div>
-                          <p className="text-[10px] text-text-muted">{p.rationale}</p>
+                          <p className="text-xs text-text-muted">{p.rationale}</p>
                         </div>
                       ))}
                     </div>
@@ -718,23 +718,23 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
                   {/* Bottlenecks & Regime Filters */}
                   <div className="p-3.5 rounded bg-bg border border-border space-y-2 text-xs">
-                    <span className="font-semibold text-amber-400 uppercase text-[11px] block">
+                    <span className="font-semibold text-warning uppercase text-xs block">
                       Bottlenecks & Regime Gates
                     </span>
-                    <ul className="space-y-1 text-text-muted text-[11px]">
+                    <ul className="space-y-1 text-text-muted text-xs">
                       {aiAdvice.bottlenecks?.map((b: string, i: number) => (
                         <li key={i} className="flex items-start gap-1.5">
-                          <span className="text-amber-400">•</span>
+                          <span className="text-warning">•</span>
                           <span>{b}</span>
                         </li>
                       ))}
                     </ul>
                     {aiAdvice.regimeFilters?.length > 0 && (
                       <div className="pt-2 border-t border-border space-y-1">
-                        <span className="font-semibold text-emerald-400 text-[11px] block">
+                        <span className="font-semibold text-success text-xs block">
                           Suggested Filter: {aiAdvice.regimeFilters[0].filterName}
                         </span>
-                        <p className="text-[10px] text-text-muted">{aiAdvice.regimeFilters[0].description}</p>
+                        <p className="text-xs text-text-muted">{aiAdvice.regimeFilters[0].description}</p>
                       </div>
                     )}
                   </div>
@@ -744,62 +744,62 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
               <div className="rounded-lg border border-border bg-bg p-3">
-                <span className="text-[11px] font-sans text-text-muted">Net Profit</span>
+                <span className="text-xs font-sans text-text-muted">Net Profit</span>
                 <div
                   className={`mt-1 text-base font-bold tabular-nums ${
-                    activeReport.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                    activeReport.netProfit >= 0 ? 'text-success' : 'text-danger'
                   }`}
                 >
                   {activeReport.netProfit >= 0 ? '+' : ''}${activeReport.netProfit.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-text-muted font-mono">
+                <div className="text-xs text-text-muted font-mono">
                   {activeReport.netProfitPct >= 0 ? '+' : ''}
                   {activeReport.netProfitPct}%
                 </div>
               </div>
 
               <div className="rounded-lg border border-border bg-bg p-3">
-                <span className="text-[11px] font-sans text-text-muted">Profit Factor</span>
+                <span className="text-xs font-sans text-text-muted">Profit Factor</span>
                 <div className="mt-1 text-base font-bold text-white tabular-nums">
                   {activeReport.profitFactor.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-text-muted">Gross Win / Gross Loss</div>
+                <div className="text-xs text-text-muted">Gross Win / Gross Loss</div>
               </div>
 
               <div className="rounded-lg border border-border bg-bg p-3">
-                <span className="text-[11px] font-sans text-text-muted">Max Drawdown</span>
-                <div className="mt-1 text-base font-bold text-rose-400 tabular-nums">
+                <span className="text-xs font-sans text-text-muted">Max Drawdown</span>
+                <div className="mt-1 text-base font-bold text-danger tabular-nums">
                   ${activeReport.maxDrawdown.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-rose-500 font-mono">
+                <div className="text-xs text-danger font-mono">
                   {activeReport.maxDrawdownPct.toFixed(2)}% peak-to-trough
                 </div>
               </div>
 
               <div className="rounded-lg border border-border bg-bg p-3">
-                <span className="text-[11px] font-sans text-text-muted">Win Rate</span>
-                <div className="mt-1 text-base font-bold text-blue-400 tabular-nums">
+                <span className="text-xs font-sans text-text-muted">Win Rate</span>
+                <div className="mt-1 text-base font-bold text-primary tabular-nums">
                   {activeReport.winRate.toFixed(1)}%
                 </div>
-                <div className="text-[10px] text-text-muted">
+                <div className="text-xs text-text-muted">
                   {activeReport.winningTrades}W / {activeReport.losingTrades}L ({activeReport.totalTrades})
                 </div>
               </div>
 
               <div className="rounded-lg border border-border bg-bg p-3">
-                <span className="text-[11px] font-sans text-text-muted">Sharpe Ratio</span>
-                <div className="mt-1 text-base font-bold text-emerald-400 tabular-nums">
+                <span className="text-xs font-sans text-text-muted">Sharpe Ratio</span>
+                <div className="mt-1 text-base font-bold text-success tabular-nums">
                   {activeReport.sharpeRatio.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-text-muted">Sortino: {activeReport.sortinoRatio.toFixed(2)}</div>
+                <div className="text-xs text-text-muted">Sortino: {activeReport.sortinoRatio.toFixed(2)}</div>
               </div>
 
               <div className="rounded-lg border border-border bg-bg p-3">
-                <span className="text-[11px] font-sans text-text-muted">Expectancy</span>
-                <div className="mt-1 text-base font-bold text-indigo-400 tabular-nums">
+                <span className="text-xs font-sans text-text-muted">Expectancy</span>
+                <div className="mt-1 text-base font-bold text-primary tabular-nums">
                   ${activeReport.expectancy.toFixed(2)}
                 </div>
-                <div className="text-[10px] text-text-muted">Avg Trade: ${activeReport.avgTrade.toFixed(2)}</div>
+                <div className="text-xs text-text-muted">Avg Trade: ${activeReport.avgTrade.toFixed(2)}</div>
               </div>
             </div>
           </div>
@@ -813,11 +813,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                 <div className="p-2 rounded bg-bg border border-border">
                   <span className="text-text-muted">Spread Deductions:</span>
-                  <div className="text-rose-400 font-bold">${activeReport.totalSpreadCost.toFixed(2)}</div>
+                  <div className="text-danger font-bold">${activeReport.totalSpreadCost.toFixed(2)}</div>
                 </div>
                 <div className="p-2 rounded bg-bg border border-border">
                   <span className="text-text-muted">Commission ($7/lot):</span>
-                  <div className="text-rose-400 font-bold">${activeReport.totalCommission.toFixed(2)}</div>
+                  <div className="text-danger font-bold">${activeReport.totalCommission.toFixed(2)}</div>
                 </div>
                 <div className="p-2 rounded bg-bg border border-border">
                   <span className="text-text-muted">Swap Financing:</span>
@@ -825,7 +825,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 </div>
                 <div className="p-2 rounded bg-bg border border-border">
                   <span className="text-text-muted">Modeled Slippage:</span>
-                  <div className="text-rose-400 font-bold">${activeReport.totalSlippageCost.toFixed(2)}</div>
+                  <div className="text-danger font-bold">${activeReport.totalSlippageCost.toFixed(2)}</div>
                 </div>
               </div>
             </div>
@@ -842,11 +842,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   </div>
                   <div className="flex justify-between font-mono">
                     <span className="text-text-muted">In-Sample Sharpe:</span>
-                    <strong className="text-emerald-400">{activeReport.holdoutInfo.inSampleSharpe}</strong>
+                    <strong className="text-success">{activeReport.holdoutInfo.inSampleSharpe}</strong>
                   </div>
                   <div className="flex justify-between font-mono">
                     <span className="text-text-muted">Out-of-Sample Sharpe:</span>
-                    <strong className="text-blue-400">{activeReport.holdoutInfo.outOfSampleSharpe}</strong>
+                    <strong className="text-primary">{activeReport.holdoutInfo.outOfSampleSharpe}</strong>
                   </div>
                   <div className="p-2 rounded bg-bg border border-border mt-2">
                     <div className="flex items-center justify-between text-xs font-bold">
@@ -854,16 +854,16 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                       <span
                         className={`font-mono ${
                           activeReport.overfitting.score < 25
-                            ? 'text-emerald-400'
+                            ? 'text-success'
                             : activeReport.overfitting.score <= 50
-                            ? 'text-amber-400'
-                            : 'text-rose-400'
+                            ? 'text-warning'
+                            : 'text-danger'
                         }`}
                       >
                         {activeReport.overfitting.score} / 100 ({activeReport.overfitting.label})
                       </span>
                     </div>
-                    <p className="text-[11px] text-text-muted mt-1">
+                    <p className="text-xs text-text-muted mt-1">
                       {activeReport.overfitting.plainExplanation}
                     </p>
                   </div>
@@ -876,7 +876,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
           <div className="rounded-lg border border-border bg-surface p-4 shadow-xl space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-400" />
+                  <Shield className="w-4 h-4 text-success" />
                   Strategy Promotion Gate Checklist (Live & Demo Criteria)
                 </h4>
                 {(() => {
@@ -890,8 +890,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <span
                       className={`text-xs font-mono font-bold px-2.5 py-0.5 rounded border ${
                         allPass
-                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
-                          : 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                          ? 'bg-success/20 text-success border-success/40'
+                          : 'bg-warning/20 text-warning border-warning/40'
                       }`}
                     >
                       {allPass ? 'GATE PASSED: ELIGIBLE FOR PAPER / DEMO' : 'UNVERIFIED: DOES NOT MEET GATES'}
@@ -902,60 +902,60 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
 
               <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-xs font-mono">
                 <div className="p-2.5 rounded bg-bg border border-border">
-                  <span className="text-text-muted block text-[10px] font-sans">Min Trades (&ge;30)</span>
+                  <span className="text-text-muted block text-xs font-sans">Min Trades (&ge;30)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.totalTrades >= 30 ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-success" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      <AlertTriangle className="w-4 h-4 text-warning" />
                     )}
                     <span className="text-white font-bold">{activeReport.totalTrades} Trades</span>
                   </div>
                 </div>
 
                 <div className="p-2.5 rounded bg-bg border border-border">
-                  <span className="text-text-muted block text-[10px] font-sans">Profit Factor (&ge;1.25)</span>
+                  <span className="text-text-muted block text-xs font-sans">Profit Factor (&ge;1.25)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.profitFactor >= 1.25 ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-success" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      <AlertTriangle className="w-4 h-4 text-warning" />
                     )}
                     <span className="text-white font-bold">{activeReport.profitFactor.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div className="p-2.5 rounded bg-bg border border-border">
-                  <span className="text-text-muted block text-[10px] font-sans">Max DD (&le;15%)</span>
+                  <span className="text-text-muted block text-xs font-sans">Max DD (&le;15%)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.maxDrawdownPct <= 15 ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-success" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      <AlertTriangle className="w-4 h-4 text-danger" />
                     )}
                     <span className="text-white font-bold">{activeReport.maxDrawdownPct.toFixed(1)}%</span>
                   </div>
                 </div>
 
                 <div className="p-2.5 rounded bg-bg border border-border">
-                  <span className="text-text-muted block text-[10px] font-sans">Sharpe Ratio (&ge;1.0)</span>
+                  <span className="text-text-muted block text-xs font-sans">Sharpe Ratio (&ge;1.0)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {activeReport.sharpeRatio >= 1.0 ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-success" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      <AlertTriangle className="w-4 h-4 text-warning" />
                     )}
                     <span className="text-white font-bold">{activeReport.sharpeRatio.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div className="p-2.5 rounded bg-bg border border-border">
-                  <span className="text-text-muted block text-[10px] font-sans">OOS Sharpe (&gt;0)</span>
+                  <span className="text-text-muted block text-xs font-sans">OOS Sharpe (&gt;0)</span>
                   <div className="flex items-center gap-1.5 mt-1">
                     {(activeReport.holdoutInfo?.outOfSampleSharpe ?? 1) > 0 ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      <CheckCircle2 className="w-4 h-4 text-success" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      <AlertTriangle className="w-4 h-4 text-danger" />
                     )}
                     <span className="text-white font-bold">
                       {activeReport.holdoutInfo?.outOfSampleSharpe ?? 'N/A'}
@@ -972,7 +972,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <h4 className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans">
                     Underwater Drawdown Profile (% Depth from Highest Equity Highwater Mark)
                   </h4>
-                  <span className="text-xs font-mono text-rose-400 font-bold">
+                  <span className="text-xs font-mono text-danger font-bold">
                     Max Depth: -{activeReport.maxDrawdownPct.toFixed(2)}%
                   </span>
                 </div>
@@ -1021,7 +1021,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             </h4>
             <div className="overflow-x-auto max-h-72 overflow-y-auto">
               <table className="w-full text-left text-xs font-mono">
-                <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-[11px]">
+                <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-xs">
                   <tr>
                     <th className="py-2">Ticket</th>
                     <th>Side</th>
@@ -1043,10 +1043,10 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         <td className="py-2 text-text-muted font-semibold">#{t.ticket}</td>
                         <td>
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                               t.side === 'BUY'
-                                ? 'bg-emerald-500/20 text-emerald-400'
-                                : 'bg-rose-500/20 text-rose-400'
+                                ? 'bg-success/20 text-success'
+                                : 'bg-danger/20 text-danger'
                             }`}
                           >
                             {t.side}
@@ -1056,25 +1056,25 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         <td>{t.openPrice}</td>
                         <td>{t.closePrice}</td>
                         <td>
-                          <span className="text-rose-400">SL: {t.sl}</span> |{' '}
-                          <span className="text-emerald-400">TP1: {t.tp || '-'}</span>
-                          {t.tp2 && <span className="text-emerald-300"> | TP2: {t.tp2}</span>}
-                          {t.tp3 && <span className="text-emerald-200"> | TP3: {t.tp3}</span>}
+                          <span className="text-danger">SL: {t.sl}</span> |{' '}
+                          <span className="text-success">TP1: {t.tp || '-'}</span>
+                          {t.tp2 && <span className="text-success"> | TP2: {t.tp2}</span>}
+                          {t.tp3 && <span className="text-success"> | TP3: {t.tp3}</span>}
                         </td>
-                        <td className="text-blue-400 font-bold">
+                        <td className="text-primary font-bold">
                           {t.riskRewardRatio ? `1:${t.riskRewardRatio}` : '1:2.0'}
                         </td>
                         <td>
-                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-surface text-text-muted font-sans">
+                          <span className="px-1.5 py-0.5 rounded text-xs bg-surface text-text-muted font-sans">
                             {t.exitReason}
                           </span>
                         </td>
-                        <td className={`font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <td className={`font-bold ${isWin ? 'text-success' : 'text-danger'}`}>
                           {t.pnlPips ? `${t.pnlPips >= 0 ? '+' : ''}${t.pnlPips} p` : `${isWin ? '+' : ''}${(t.pnl / 10).toFixed(1)} p`}
                         </td>
                         <td
                           className={`font-bold tabular-nums ${
-                            isWin ? 'text-emerald-400' : 'text-rose-400'
+                            isWin ? 'text-success' : 'text-danger'
                           }`}
                         >
                           {isWin ? '+' : ''}
@@ -1103,7 +1103,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Table className="w-4 h-4 text-indigo-400" />
+                  <Table className="w-4 h-4 text-primary" />
                   Cross-Asset & Strategy Matrix Runner (N × M)
                 </h3>
                 <p className="text-xs text-text-muted mt-1">
@@ -1114,7 +1114,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 type="button"
                 onClick={handleRunBatch}
                 disabled={isBatchRunning || batchStrategies.length === 0 || batchDatasets.length === 0}
-                className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-primary/20 disabled:opacity-50 cursor-pointer"
               >
                 <Play className={`w-4 h-4 fill-white ${isBatchRunning ? 'animate-spin' : ''}`} />
                 {isBatchRunning ? `Running Matrix (${batchProgress}%)...` : `Run Matrix (${batchStrategies.length * batchDatasets.length} Tests)`}
@@ -1131,14 +1131,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setBatchStrategies(strategies.map((s) => s.id))}
-                      className="text-[10px] text-blue-400 hover:underline cursor-pointer"
+                      className="text-xs text-primary hover:underline cursor-pointer"
                     >
                       All
                     </button>
                     <button
                       type="button"
                       onClick={() => setBatchStrategies([])}
-                      className="text-[10px] text-text-muted hover:underline cursor-pointer"
+                      className="text-xs text-text-muted hover:underline cursor-pointer"
                     >
                       None
                     </button>
@@ -1154,9 +1154,9 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                           if (e.target.checked) setBatchStrategies((prev) => [...prev, s.id]);
                           else setBatchStrategies((prev) => prev.filter((id) => id !== s.id));
                         }}
-                        className="rounded border-border bg-bg text-indigo-600"
+                        className="rounded border-border bg-bg text-primary"
                       />
-                      <span className="font-mono text-[11px] truncate">{s.name}</span>
+                      <span className="font-mono text-xs truncate">{s.name}</span>
                     </label>
                   ))}
                 </div>
@@ -1170,14 +1170,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => setBatchDatasets(datasets.map((d) => d.id))}
-                      className="text-[10px] text-blue-400 hover:underline cursor-pointer"
+                      className="text-xs text-primary hover:underline cursor-pointer"
                     >
                       All
                     </button>
                     <button
                       type="button"
                       onClick={() => setBatchDatasets([])}
-                      className="text-[10px] text-text-muted hover:underline cursor-pointer"
+                      className="text-xs text-text-muted hover:underline cursor-pointer"
                     >
                       None
                     </button>
@@ -1193,9 +1193,9 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                           if (e.target.checked) setBatchDatasets((prev) => [...prev, d.id]);
                           else setBatchDatasets((prev) => prev.filter((id) => id !== d.id));
                         }}
-                        className="rounded border-border bg-bg text-indigo-600"
+                        className="rounded border-border bg-bg text-primary"
                       />
-                      <span className="font-mono text-[11px] truncate">
+                      <span className="font-mono text-xs truncate">
                         {d.symbol} {d.timeframe} ({d.candles.length} bars)
                       </span>
                     </label>
@@ -1213,7 +1213,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 </div>
                 <div className="w-full bg-surface h-2 rounded-full overflow-hidden">
                   <div
-                    className="bg-indigo-500 h-full transition-all duration-200"
+                    className="bg-primary h-full transition-all duration-200"
                     style={{ width: `${batchProgress}%` }}
                   />
                 </div>
@@ -1231,7 +1231,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="bg-bg border-b border-border text-text-muted text-[11px]">
+                  <thead className="bg-bg border-b border-border text-text-muted text-xs">
                     <tr>
                       <th className="py-2.5 px-3">Rank</th>
                       <th className="px-3">Strategy</th>
@@ -1251,18 +1251,18 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                       const isWin = r.netProfit >= 0;
                       return (
                         <tr key={idx} className="hover:bg-surface">
-                          <td className="py-2.5 px-3 font-bold text-indigo-400">#{idx + 1}</td>
+                          <td className="py-2.5 px-3 font-bold text-primary">#{idx + 1}</td>
                           <td className="px-3 text-white font-sans font-semibold">{r.strategyName}</td>
                           <td className="px-3 text-text-muted">{r.symbol}</td>
                           <td className="px-3 text-text-muted">{r.timeframe}</td>
                           <td className="px-3">{r.totalTrades}</td>
                           <td className="px-3">{r.winRate.toFixed(1)}%</td>
                           <td className="px-3 font-bold">{r.profitFactor.toFixed(2)}</td>
-                          <td className={`px-3 font-bold ${isWin ? 'text-emerald-400' : 'text-rose-400'}`}>
+                          <td className={`px-3 font-bold ${isWin ? 'text-success' : 'text-danger'}`}>
                             {isWin ? '+' : ''}${r.netProfit.toFixed(2)}
                           </td>
-                          <td className="px-3 text-rose-400">{r.maxDrawdownPct.toFixed(1)}%</td>
-                          <td className="px-3 font-bold text-blue-400">{r.sharpeRatio.toFixed(2)}</td>
+                          <td className="px-3 text-danger">{r.maxDrawdownPct.toFixed(1)}%</td>
+                          <td className="px-3 font-bold text-primary">{r.sharpeRatio.toFixed(2)}</td>
                           <td className="px-3 text-right">
                             <button
                               type="button"
@@ -1270,7 +1270,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                                 setActiveReport(r);
                                 setSubTab('single');
                               }}
-                              className="px-2.5 py-1 rounded bg-indigo-600/30 hover:bg-indigo-600 text-indigo-200 hover:text-text font-sans text-[11px] font-semibold transition-colors cursor-pointer"
+                              className="px-2.5 py-1 rounded bg-primary/30 hover:bg-primary text-primary hover:text-text font-sans text-xs font-semibold transition-colors cursor-pointer"
                             >
                               Load in Lab
                             </button>
@@ -1291,7 +1291,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
         <div className="space-y-6">
           <div className="rounded-lg border border-border bg-surface p-5 shadow-xl space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <GitCompare className="w-4 h-4 text-indigo-400" />
+              <GitCompare className="w-4 h-4 text-primary" />
               Side-by-Side Strategy Run Comparison
             </h3>
             <p className="text-xs text-text-muted">
@@ -1301,7 +1301,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             {/* Run Selection Dropdowns */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="p-4 rounded-lg bg-bg border border-border space-y-2">
-                <label className="text-xs font-semibold text-indigo-400 block uppercase tracking-wider">
+                <label className="text-xs font-semibold text-primary block uppercase tracking-wider">
                   Run A (Benchmark Candidate)
                 </label>
                 <select
@@ -1325,7 +1325,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               </div>
 
               <div className="p-4 rounded-lg bg-bg border border-border space-y-2">
-                <label className="text-xs font-semibold text-emerald-400 block uppercase tracking-wider">
+                <label className="text-xs font-semibold text-success block uppercase tracking-wider">
                   Run B (Challenger Candidate)
                 </label>
                 <select
@@ -1389,8 +1389,8 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <thead className="bg-bg border-b border-border text-text-muted">
                       <tr>
                         <th className="py-3 px-4 font-sans font-semibold">Evaluation Metric</th>
-                        <th className="px-4 text-indigo-400 font-bold">Run A: {reportA.strategyName}</th>
-                        <th className="px-4 text-emerald-400 font-bold">Run B: {reportB.strategyName}</th>
+                        <th className="px-4 text-primary font-bold">Run A: {reportA.strategyName}</th>
+                        <th className="px-4 text-success font-bold">Run B: {reportB.strategyName}</th>
                         <th className="px-4 text-right font-sans">Attribution Advantage</th>
                       </tr>
                     </thead>
@@ -1415,21 +1415,21 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                         return (
                           <tr key={i} className="hover:bg-surface">
                             <td className="py-2.5 px-4 font-sans font-semibold text-text-muted">{m.label}</td>
-                            <td className={`px-4 ${winA ? 'text-emerald-400 font-bold' : 'text-text-muted'}`}>
+                            <td className={`px-4 ${winA ? 'text-success font-bold' : 'text-text-muted'}`}>
                               {m.format ? m.format(m.a as number) : m.a}
-                              {winA && <span className="ml-1.5 text-[10px] text-emerald-400">★</span>}
+                              {winA && <span className="ml-1.5 text-xs text-success">★</span>}
                             </td>
-                            <td className={`px-4 ${winB ? 'text-emerald-400 font-bold' : 'text-text-muted'}`}>
+                            <td className={`px-4 ${winB ? 'text-success font-bold' : 'text-text-muted'}`}>
                               {m.format ? m.format(m.b as number) : m.b}
-                              {winB && <span className="ml-1.5 text-[10px] text-emerald-400">★</span>}
+                              {winB && <span className="ml-1.5 text-xs text-success">★</span>}
                             </td>
                             <td className="px-4 text-right">
                               <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold ${
+                                className={`px-2 py-0.5 rounded text-xs font-sans font-bold ${
                                   winA
-                                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                                    ? 'bg-primary/20 text-primary border border-primary/30'
                                     : winB
-                                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                    ? 'bg-success/20 text-success border border-success/30'
                                     : 'text-text-muted'
                                 }`}
                               >
@@ -1455,7 +1455,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-emerald-400" />
+                  <Clock className="w-4 h-4 text-success" />
                   Walk-Forward Out-of-Sample (OOS) Generalization Tester
                 </h3>
                 <p className="text-xs text-text-muted mt-1">
@@ -1466,7 +1466,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 type="button"
                 onClick={handleRunWalkForward}
                 disabled={isWfRunning || !selectedDataset}
-                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/20 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 rounded-lg bg-success hover:bg-success text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-success/20 disabled:opacity-50 cursor-pointer"
               >
                 <Play className={`w-4 h-4 fill-white ${isWfRunning ? 'animate-spin' : ''}`} />
                 {isWfRunning ? 'Running Walk-Forward...' : 'Execute Walk-Forward Isolation'}
@@ -1476,11 +1476,11 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
               <div className="p-3.5 rounded bg-bg border border-border text-xs space-y-1">
                 <span className="text-text-muted font-semibold block">Target Strategy:</span>
-                <span className="text-white font-mono">{selectedStrategy?.name || 'None'}</span>
+                <span className="text-text font-mono">{selectedStrategy?.name || 'None'}</span>
               </div>
               <div className="p-3.5 rounded bg-bg border border-border text-xs space-y-1">
                 <span className="text-text-muted font-semibold block">Target Dataset:</span>
-                <span className="text-white font-mono">
+                <span className="text-text font-mono">
                   {selectedDataset ? `${selectedDataset.symbol} ${selectedDataset.timeframe} (${selectedDataset.candles.length} bars)` : 'None'}
                 </span>
               </div>
@@ -1493,23 +1493,23 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
               <div
                 className={`rounded-lg border p-5 shadow-xl flex items-center justify-between ${
                   wfResult.verdict === 'ROBUST GENERALIZATION'
-                    ? 'border-emerald-500/40 bg-emerald-950/20'
+                    ? 'border-success/40 bg-success/20'
                     : wfResult.verdict === 'MODERATE DECAY'
-                    ? 'border-amber-500/40 bg-amber-950/20'
-                    : 'border-rose-500/40 bg-rose-950/20'
+                    ? 'border-warning/40 bg-warning/20'
+                    : 'border-danger/40 bg-danger/20'
                 }`}
               >
                 <div>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted block mb-1">
+                  <span className="text-xs font-mono uppercase tracking-wider text-text-muted block mb-1">
                     Walk-Forward Robustness Verdict
                   </span>
                   <h4
                     className={`text-lg font-black tracking-wide ${
                       wfResult.verdict === 'ROBUST GENERALIZATION'
-                        ? 'text-emerald-400'
+                        ? 'text-success'
                         : wfResult.verdict === 'MODERATE DECAY'
-                        ? 'text-amber-400'
-                        : 'text-rose-400'
+                        ? 'text-warning'
+                        : 'text-danger'
                     }`}
                   >
                     {wfResult.verdict}
@@ -1549,28 +1549,28 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     </thead>
                     <tbody className="divide-y divide-border">
                       <tr className="hover:bg-surface">
-                        <td className="py-2.5 px-3 font-bold text-blue-400">In-Sample (70%)</td>
+                        <td className="py-2.5 px-3 font-bold text-primary">In-Sample (70%)</td>
                         <td className="px-3">{wfResult.isCandleCount}</td>
                         <td className="px-3">{wfResult.isReport.totalTrades}</td>
                         <td className="px-3">{wfResult.isReport.winRate.toFixed(1)}%</td>
                         <td className="px-3 font-bold">{wfResult.isReport.profitFactor.toFixed(2)}</td>
-                        <td className={`px-3 font-bold ${wfResult.isReport.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <td className={`px-3 font-bold ${wfResult.isReport.netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
                           ${wfResult.isReport.netProfit.toFixed(2)}
                         </td>
-                        <td className="px-3 text-rose-400">{wfResult.isReport.maxDrawdownPct.toFixed(1)}%</td>
-                        <td className="px-3 font-bold text-blue-400">{wfResult.isReport.sharpeRatio.toFixed(2)}</td>
+                        <td className="px-3 text-danger">{wfResult.isReport.maxDrawdownPct.toFixed(1)}%</td>
+                        <td className="px-3 font-bold text-primary">{wfResult.isReport.sharpeRatio.toFixed(2)}</td>
                       </tr>
                       <tr className="hover:bg-surface">
-                        <td className="py-2.5 px-3 font-bold text-emerald-400">Out-of-Sample (30%)</td>
+                        <td className="py-2.5 px-3 font-bold text-success">Out-of-Sample (30%)</td>
                         <td className="px-3">{wfResult.oosCandleCount}</td>
                         <td className="px-3">{wfResult.oosReport.totalTrades}</td>
                         <td className="px-3">{wfResult.oosReport.winRate.toFixed(1)}%</td>
                         <td className="px-3 font-bold">{wfResult.oosReport.profitFactor.toFixed(2)}</td>
-                        <td className={`px-3 font-bold ${wfResult.oosReport.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        <td className={`px-3 font-bold ${wfResult.oosReport.netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
                           ${wfResult.oosReport.netProfit.toFixed(2)}
                         </td>
-                        <td className="px-3 text-rose-400">{wfResult.oosReport.maxDrawdownPct.toFixed(1)}%</td>
-                        <td className="px-3 font-bold text-blue-400">{wfResult.oosReport.sharpeRatio.toFixed(2)}</td>
+                        <td className="px-3 text-danger">{wfResult.oosReport.maxDrawdownPct.toFixed(1)}%</td>
+                        <td className="px-3 font-bold text-primary">{wfResult.oosReport.sharpeRatio.toFixed(2)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1596,14 +1596,14 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                 <div className="flex justify-between items-start">
                   <div>
                     <strong className="text-white font-sans block">{r.strategyName}</strong>
-                    <span className="text-[10px] text-text-muted">
+                    <span className="text-xs text-text-muted">
                       {r.symbol} {r.timeframe} · {r.provenance}
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => onDeleteReport(r.id)}
-                    className="text-text-muted hover:text-rose-400 p-1"
+                    className="text-text-muted hover:text-danger p-1"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -1613,7 +1613,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <span className="text-text-muted">Net Profit:</span>
                   <span
                     className={`font-bold ${
-                      r.netProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      r.netProfit >= 0 ? 'text-success' : 'text-danger'
                     }`}
                   >
                     {r.netProfit >= 0 ? '+' : ''}${r.netProfit.toFixed(2)}
@@ -1628,7 +1628,7 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveReport(r)}
-                    className="flex-1 py-1 rounded text-[11px] font-sans font-bold bg-surface hover:bg-surface text-blue-400 transition-colors"
+                    className="flex-1 py-1 rounded text-xs font-sans font-bold bg-surface hover:bg-surface text-primary transition-colors"
                   >
                     Load Report
                   </button>
@@ -1636,10 +1636,10 @@ export const BacktestView: React.FC<BacktestViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onNavigateToStrategyStudio(r.strategyId)}
-                      className="px-2.5 py-1 rounded text-[11px] font-sans font-medium bg-bg hover:bg-surface text-text-muted border border-border flex items-center gap-1 transition-colors"
+                      className="px-2.5 py-1 rounded text-xs font-sans font-medium bg-bg hover:bg-surface text-text-muted border border-border flex items-center gap-1 transition-colors"
                       title="Edit this strategy in Strategy Studio"
                     >
-                      <Code2 className="w-3 h-3 text-blue-400" />
+                      <Code2 className="w-3 h-3 text-primary" />
                       Edit Strategy
                     </button>
                   )}

@@ -51,7 +51,7 @@ export const Select: React.FC<SelectProps> = ({
           <ChevronDown className="w-4 h-4" />
         </div>
       </div>
-      {error && <p className="text-[11px] text-danger mt-1 font-sans">{error}</p>}
+      {error && <p className="text-xs text-danger mt-1 font-sans">{error}</p>}
     </div>
   );
 };

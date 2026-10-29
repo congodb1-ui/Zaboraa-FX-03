@@ -3,7 +3,7 @@
 # ==========================================
 
 # 1. Protect the Local Trading Database (CRITICAL)
-data/
+/data/
 *.sqlite
 *.sqlite-journal
 *.sqlite3

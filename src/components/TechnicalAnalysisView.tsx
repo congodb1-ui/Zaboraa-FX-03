@@ -136,11 +136,11 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
         <svg width={w} height={h} className="overflow-visible" role="img" aria-label={`${label} gauge: ${action}`}>
           <defs>
             <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#f43f5e" />
-              <stop offset="25%" stopColor="#fb923c" />
-              <stop offset="50%" stopColor="#94a3b8" />
-              <stop offset="75%" stopColor="#34d399" />
-              <stop offset="100%" stopColor="#10b981" />
+              <stop offset="0%" stopColor="var(--danger)" />
+              <stop offset="25%" stopColor="var(--warning)" />
+              <stop offset="50%" stopColor="var(--text-muted)" />
+              <stop offset="75%" stopColor="var(--info)" />
+              <stop offset="100%" stopColor="var(--success)" />
             </linearGradient>
           </defs>
 
@@ -164,31 +164,31 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
           />
 
           {/* Needle Pin */}
-          <circle cx={cx} cy={cy} r={5} fill="#475569" stroke="#ffffff" strokeWidth="1.5" />
+          <circle cx={cx} cy={cy} r={5} fill="var(--surface)" stroke="var(--text)" strokeWidth="1.5" />
 
           {/* Needle Line */}
-          <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" />
+          <line x1={cx} y1={cy} x2={nx} y2={ny} stroke="var(--text)" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
 
         {/* Labels below arc with no collisions */}
-        <div className="w-full flex justify-between px-3 text-[11px] text-text-muted -mt-3">
-          <span className="text-rose-500 font-medium">Sell</span>
+        <div className="w-full flex justify-between px-3 text-xs text-text-muted -mt-3">
+          <span className="text-danger font-medium">Sell</span>
           <span className="text-text-muted">Neutral</span>
-          <span className="text-emerald-500 font-medium">Buy</span>
+          <span className="text-success font-medium">Buy</span>
         </div>
 
         {/* Action Badge */}
         <div
           className={`mt-3 px-3.5 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm ${
             action === 'Strong Buy'
-              ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40'
+              ? 'bg-success/20 text-success dark:text-success border border-success/40'
               : action === 'Buy'
-              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+              ? 'bg-success/10 text-success dark:text-success border border-success/20'
               : action === 'Neutral'
               ? 'bg-bg text-text-muted border border-border'
               : action === 'Sell'
-              ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
-              : 'bg-rose-500/20 text-rose-600 dark:text-rose-400 border border-rose-500/40'
+              ? 'bg-danger/10 text-danger dark:text-danger border border-danger/20'
+              : 'bg-danger/20 text-danger dark:text-danger border border-danger/40'
           }`}
         >
           {action}
@@ -196,9 +196,9 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
 
         {/* Votes Count */}
         <div className="mt-2 text-xs font-mono text-text-muted flex items-center gap-2">
-          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{buyCount} Buy</span>
+          <span className="text-success dark:text-success font-semibold">{buyCount} Buy</span>
           {neutralCount !== undefined && <span>· {neutralCount} Neu</span>}
-          <span className="text-rose-600 dark:text-rose-400 font-semibold">· {sellCount} Sell</span>
+          <span className="text-danger dark:text-danger font-semibold">· {sellCount} Sell</span>
         </div>
       </div>
     );
@@ -227,7 +227,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
     if (ma20) {
       chartVisualLines.push({
         name: 'MA20',
-        color: '#38BDF8',
+        color: 'var(--info)',
         style: 'solid',
         points: [
           { time: firstTime, price: ma20.simple },
@@ -238,7 +238,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
     if (ma50) {
       chartVisualLines.push({
         name: 'MA50',
-        color: '#F59E0B',
+        color: 'var(--warning)',
         style: 'dashed',
         points: [
           { time: firstTime, price: ma50.simple },
@@ -249,7 +249,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
     if (ma200) {
       chartVisualLines.push({
         name: 'MA200',
-        color: '#6366F1',
+        color: 'var(--primary)',
         style: 'solid',
         points: [
           { time: firstTime, price: ma200.simple },
@@ -265,7 +265,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
       const lastTime = candles[candles.length - 1].time;
       chartVisualLines.push({
         name: 'Pivot PP',
-        color: '#10B981',
+        color: 'var(--success)',
         style: 'dashed',
         points: [
           { time: firstTime, price: classic.pivot },
@@ -285,20 +285,20 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
             <h1 className="text-2xl font-bold text-text tracking-tight">
               {data?.symbol || (isGold ? 'XAU/USD - Gold Spot' : `${symbol} - Spot FX`)}
             </h1>
-            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-warning/10 text-warning dark:text-warning border border-warning/20">
               {symbol}m (Exness MT5)
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs text-text-muted">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-success/10 text-success dark:text-success font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
               Market Active · Updated {lastUpdatedSecAgo}s ago
             </span>
             <span>·</span>
             <span>Canonical: <strong className="text-text font-mono">{symbol}</strong></span>
             <span>·</span>
-            <span>Exness Suffix: <strong className="text-amber-500 font-mono">m</strong></span>
+            <span>Exness Suffix: <strong className="text-warning font-mono">m</strong></span>
           </div>
         </div>
 
@@ -310,7 +310,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
             </div>
             <div
               className={`flex items-center gap-1 font-semibold text-sm font-mono mt-0.5 ${
-                (data?.change24hPct ?? 0) >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
+                (data?.change24hPct ?? 0) >= 0 ? 'text-success dark:text-success' : 'text-danger dark:text-danger'
               }`}
             >
               {(data?.change24hPct ?? 0) >= 0 ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
@@ -321,13 +321,13 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
           {/* Range Sliders Bar */}
           <div className="space-y-2.5 min-w-[200px]">
             <div>
-              <div className="flex justify-between text-[11px] text-text-muted font-mono">
+              <div className="flex justify-between text-xs text-text-muted font-mono">
                 <span>Day L: {dayLow.toFixed(decimals)}</span>
                 <span>Day H: {dayHigh.toFixed(decimals)}</span>
               </div>
               <div className="h-2 rounded-full bg-bg overflow-hidden mt-1 relative">
                 <div
-                  className="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-danger via-warning to-success rounded-full"
                   style={{ width: '100%' }}
                 />
                 <div
@@ -338,13 +338,13 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
             </div>
 
             <div>
-              <div className="flex justify-between text-[11px] text-text-muted font-mono">
+              <div className="flex justify-between text-xs text-text-muted font-mono">
                 <span>52W L: {yearLow.toFixed(decimals)}</span>
                 <span>52W H: {yearHigh.toFixed(decimals)}</span>
               </div>
               <div className="h-2 rounded-full bg-bg overflow-hidden mt-1 relative">
                 <div
-                  className="h-full bg-gradient-to-r from-rose-500 via-amber-400 to-emerald-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-danger via-warning to-success rounded-full"
                   style={{ width: '100%' }}
                 />
                 <div
@@ -364,7 +364,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                 onClick={() => setSymbol(sym)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   symbol === sym
-                    ? 'bg-indigo-600 text-white shadow-sm'
+                    ? 'bg-primary text-white shadow-sm'
                     : 'text-text-muted hover:text-text'
                 }`}
               >
@@ -378,7 +378,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
       {/* 2. DYNAMIC TIMEFRAME SELECTOR STRIP */}
       <div className="p-3.5 rounded-2xl bg-surface border border-border shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex items-center gap-2">
-          <Clock className="w-4 h-4 text-indigo-500" />
+          <Clock className="w-4 h-4 text-primary" />
           <span className="text-xs font-bold text-text">
             Select Timeframe (indicators recalculate dynamically):
           </span>
@@ -394,11 +394,11 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                 onClick={() => setTimeframe(item.id)}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25 ring-2 ring-indigo-400'
+                    ? 'bg-primary text-white shadow-md shadow-primary/25 ring-2 ring-primary'
                     : 'bg-bg border border-border text-text-muted hover:text-text'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
+                <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-white' : 'bg-success'}`} />
                 <span>{item.label}</span>
               </button>
             );
@@ -442,7 +442,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
           />
         ) : (
           <div className="h-64 flex flex-col items-center justify-center text-text-muted gap-2">
-            <Activity className="w-8 h-8 animate-pulse text-indigo-500" />
+            <Activity className="w-8 h-8 animate-pulse text-primary" />
             <span>Loading market candles for {symbol} ({timeframe})...</span>
           </div>
         )}
@@ -457,7 +457,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
               Technical Indicators ({timeframe})
             </h2>
             <span className="text-xs text-text-muted font-mono">
-              Buy: <strong className="text-emerald-500">{data?.indicatorsBuyCount ?? 6}</strong> · Sell: <strong className="text-rose-500">{data?.indicatorsSellCount ?? 1}</strong>
+              Buy: <strong className="text-success">{data?.indicatorsBuyCount ?? 6}</strong> · Sell: <strong className="text-danger">{data?.indicatorsSellCount ?? 1}</strong>
             </span>
           </div>
 
@@ -481,11 +481,11 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                     </td>
                     <td className="py-2.5 text-right font-sans">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded text-[11px] font-semibold ${
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
                           ind.action === 'Buy'
-                            ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                            ? 'bg-success/15 text-success dark:text-success border border-success/30'
                             : ind.action === 'Sell'
-                            ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                            ? 'bg-danger/15 text-danger dark:text-danger border border-danger/30'
                             : 'bg-bg text-text-muted border border-border'
                         }`}
                       >
@@ -508,7 +508,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                 Moving Averages ({timeframe})
               </h2>
               <span className="text-xs text-text-muted font-mono">
-                Buy: <strong className="text-emerald-500">{data?.maBuyCount ?? 10}</strong> · Sell: <strong className="text-rose-500">{data?.maSellCount ?? 2}</strong>
+                Buy: <strong className="text-success">{data?.maBuyCount ?? 10}</strong> · Sell: <strong className="text-danger">{data?.maSellCount ?? 2}</strong>
               </span>
             </div>
 
@@ -530,10 +530,10 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                       <td className="py-2.5 text-right tabular-nums">
                         <span className="mr-2 text-text-muted">{ma.simple.toFixed(decimals)}</span>
                         <span
-                          className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-sans font-semibold ${
+                          className={`inline-block px-1.5 py-0.2 rounded text-xs font-sans font-semibold ${
                             ma.simpleAction === 'Buy'
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              ? 'bg-success/15 text-success dark:text-success'
+                              : 'bg-danger/15 text-danger dark:text-danger'
                           }`}
                         >
                           {ma.simpleAction}
@@ -542,10 +542,10 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                       <td className="py-2.5 text-right tabular-nums">
                         <span className="mr-2 text-text-muted">{ma.exponential.toFixed(decimals)}</span>
                         <span
-                          className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-sans font-semibold ${
+                          className={`inline-block px-1.5 py-0.2 rounded text-xs font-sans font-semibold ${
                             ma.exponentialAction === 'Buy'
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              ? 'bg-success/15 text-success dark:text-success'
+                              : 'bg-danger/15 text-danger dark:text-danger'
                           }`}
                         >
                           {ma.exponentialAction}
@@ -571,7 +571,7 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                     <th className="text-left py-2 font-medium">Method</th>
                     <th className="text-right py-2 font-medium">S3</th>
                     <th className="text-right py-2 font-medium">S1</th>
-                    <th className="text-right py-2 font-medium font-bold text-indigo-500">Pivot</th>
+                    <th className="text-right py-2 font-medium font-bold text-primary">Pivot</th>
                     <th className="text-right py-2 font-medium">R1</th>
                     <th className="text-right py-2 font-medium">R3</th>
                   </tr>
@@ -580,11 +580,11 @@ export const TechnicalAnalysisView: React.FC<TechnicalAnalysisViewProps> = ({
                   {data?.pivotPoints.map((pp) => (
                     <tr key={pp.name} className="hover:bg-bg/50 transition-colors">
                       <td className="py-2 font-sans font-medium text-text">{pp.name}</td>
-                      <td className="py-2 text-right text-rose-500 tabular-nums">{pp.s3}</td>
-                      <td className="py-2 text-right text-rose-400 tabular-nums">{pp.s1}</td>
-                      <td className="py-2 text-right font-bold text-indigo-500 tabular-nums">{pp.pivot}</td>
-                      <td className="py-2 text-right text-emerald-400 tabular-nums">{pp.r1}</td>
-                      <td className="py-2 text-right text-emerald-500 tabular-nums">{pp.r3}</td>
+                      <td className="py-2 text-right text-danger tabular-nums">{pp.s3}</td>
+                      <td className="py-2 text-right text-danger tabular-nums">{pp.s1}</td>
+                      <td className="py-2 text-right font-bold text-primary tabular-nums">{pp.pivot}</td>
+                      <td className="py-2 text-right text-success tabular-nums">{pp.r1}</td>
+                      <td className="py-2 text-right text-success tabular-nums">{pp.r3}</td>
                     </tr>
                   ))}
                 </tbody>

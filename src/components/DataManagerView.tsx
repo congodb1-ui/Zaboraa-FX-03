@@ -357,11 +357,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <Database className="w-4 h-4 text-blue-400" />
+              <Database className="w-4 h-4 text-primary" />
               Historical Market Data Catalog (SQLite Local Source of Truth)
             </h2>
             <p className="text-xs text-text-muted mt-0.5">
-              Strict 3-tier provenance tracking (<code className="text-emerald-400">MT5 BRIDGE</code>, <code className="text-blue-400">USER CSV</code>, <code className="text-amber-400">SIMULATED</code>) across all 8 broker timeframes.
+              Strict 3-tier provenance tracking (<code className="text-success">MT5 BRIDGE</code>, <code className="text-primary">USER CSV</code>, <code className="text-warning">SIMULATED</code>) across all 8 broker timeframes.
             </p>
           </div>
 
@@ -369,7 +369,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             <button
               type="button"
               onClick={() => setIsFetchModalOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/20 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-success hover:bg-success text-white shadow-md shadow-success/20 transition-all"
             >
               <Server className="w-3.5 h-3.5" />
               Fetch from MT5 Bridge
@@ -378,7 +378,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               type="button"
               onClick={handleSeedHistorical}
               disabled={isSeedingData}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md shadow-primary/20 transition-all cursor-pointer disabled:opacity-50"
             >
               <Database className={`w-3.5 h-3.5 ${isSeedingData ? 'animate-spin' : ''}`} />
               {isSeedingData ? 'Seeding...' : 'Seed 6-Month Historical Data'}
@@ -386,7 +386,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md transition-all"
             >
               <Upload className="w-3.5 h-3.5" />
               Import Custom CSV
@@ -404,7 +404,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <button
                   type="button"
                   onClick={handleRunAutofix}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-amber-300 border border-border transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-warning border border-border transition-all cursor-pointer"
                 >
                   <Wrench className="w-3.5 h-3.5" />
                   Run Integrity Autofix
@@ -413,7 +413,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   type="button"
                   onClick={handleRunAiAudit}
                   disabled={isAiReviewing}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md shadow-primary/20 transition-all cursor-pointer disabled:opacity-50"
                 >
                   <Sparkles className={`w-3.5 h-3.5 ${isAiReviewing ? 'animate-spin' : ''}`} />
                   {isAiReviewing ? 'Auditing...' : 'AI Data Quality Review'}
@@ -431,7 +431,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               onClick={() => setActiveTabMode('catalog')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 activeTabMode === 'catalog'
-                  ? 'bg-blue-600 text-white shadow-md'
+                  ? 'bg-primary text-white shadow-md'
                   : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
@@ -446,7 +446,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               }}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
                 activeTabMode === 'vault'
-                  ? 'bg-emerald-600 text-white shadow-md'
+                  ? 'bg-success text-white shadow-md'
                   : 'bg-bg text-text-muted hover:text-text border border-border'
               }`}
             >
@@ -455,7 +455,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             </button>
           </div>
 
-          <div className="text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 bg-emerald-500/10 px-2.5 py-1 rounded border border-emerald-500/20">
+          <div className="text-xs font-mono text-success flex items-center gap-1.5 bg-success/10 px-2.5 py-1 rounded border border-success/20">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             SQLite Storage: 100% Permanent & Append-Only (Zero Deletions)
           </div>
@@ -479,28 +479,28 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 onClick={() => setSelectedDatasetId(d.id)}
                 className={`px-3 py-2 rounded-lg border text-xs font-mono whitespace-nowrap text-left transition-all ${
                   selectedDatasetId === d.id
-                    ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500'
+                    ? 'border-primary bg-primary/10 ring-1 ring-primary'
                     : 'border-border bg-bg hover:bg-bg'
                 }`}
               >
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-white">{d.symbol}</span>
-                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-surface text-text-muted">
+                  <span className="text-xs px-1.5 py-0.2 rounded bg-surface text-text-muted">
                     {d.timeframe}
                   </span>
                   <span
                     className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
                       d.provenance === 'MT5 BRIDGE'
-                        ? 'bg-emerald-500/20 text-emerald-400'
+                        ? 'bg-success/20 text-success'
                         : d.provenance === 'USER CSV'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-amber-500/20 text-amber-400'
+                        ? 'bg-primary/20 text-primary'
+                        : 'bg-warning/20 text-warning'
                     }`}
                   >
                     {d.provenance}
                   </span>
                 </div>
-                <div className="text-[10px] text-text-muted mt-1">
+                <div className="text-xs text-text-muted mt-1">
                   {d.candleCount} bars · Score: {d.qualityScore}%
                 </div>
               </button>
@@ -516,7 +516,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             <div className="rounded-lg border border-primary/30 bg-gradient-to-r from-primary/10 via-surface to-surface p-5 shadow-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-indigo-400" />
+                  <Sparkles className="w-4 h-4 text-primary" />
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                     AI Data Health Audit & Research Appraisal
                   </h3>
@@ -524,10 +524,10 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-text-muted">Score: {aiReview.healthScore}%</span>
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                    className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
                       aiReview.verdict === 'PRODUCTION_READY'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                        ? 'bg-success/20 text-success border border-success/30'
+                        : 'bg-warning/20 text-warning border border-warning/30'
                     }`}
                   >
                     {aiReview.verdict.replace(/_/g, ' ')}
@@ -546,12 +546,12 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 text-xs">
                 <div className="p-3 rounded bg-bg border border-border space-y-1">
-                  <span className="font-semibold text-indigo-400">Weekend & Gap Analysis:</span>
-                  <p className="text-text-muted text-[11px]">{aiReview.gapAnalysis}</p>
+                  <span className="font-semibold text-primary">Weekend & Gap Analysis:</span>
+                  <p className="text-text-muted text-xs">{aiReview.gapAnalysis}</p>
                 </div>
                 <div className="p-3 rounded bg-bg border border-border space-y-1">
-                  <span className="font-semibold text-emerald-400">Slippage & Spread Considerations:</span>
-                  <p className="text-text-muted text-[11px]">{aiReview.slippageSpreadRisks}</p>
+                  <span className="font-semibold text-success">Slippage & Spread Considerations:</span>
+                  <p className="text-text-muted text-xs">{aiReview.slippageSpreadRisks}</p>
                 </div>
               </div>
 
@@ -560,8 +560,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   <span className="font-semibold text-text-muted block mb-1">AI Cleaning Suggestions:</span>
                   <ul className="space-y-1">
                     {aiReview.cleaningRecommendations.map((r: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-1.5 text-text-muted text-[11px]">
-                        <span className="text-indigo-400">•</span>
+                      <li key={idx} className="flex items-start gap-1.5 text-text-muted text-xs">
+                        <span className="text-primary">•</span>
                         <span>{r}</span>
                       </li>
                     ))}
@@ -590,8 +590,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <strong
                   className={
                     activeDs.provenance === 'MT5 BRIDGE'
-                      ? 'text-emerald-400'
-                      : 'text-blue-400'
+                      ? 'text-success'
+                      : 'text-primary'
                   }
                 >
                   {activeDs.provenance}
@@ -601,7 +601,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <span className="text-text-muted">Research Eligibility:</span>
                 <strong
                   className={
-                    activeDs.isResearchEligible ? 'text-emerald-400' : 'text-rose-400'
+                    activeDs.isResearchEligible ? 'text-success' : 'text-danger'
                   }
                 >
                   {activeDs.isResearchEligible ? 'RESEARCH READY' : 'BLOCKED'}
@@ -619,21 +619,21 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               </div>
               <div className="flex justify-between">
                 <span className="text-text-muted">Quality Score:</span>
-                <strong className="text-emerald-400">{activeDs.qualityScore}%</strong>
+                <strong className="text-success">{activeDs.qualityScore}%</strong>
               </div>
               <div className="flex justify-between">
                 <span className="text-text-muted">Gaps Detected:</span>
                 <strong className="text-text-muted">{activeDs.gapCount}</strong>
               </div>
-              <div className="pt-2 border-t border-border text-[10px] text-text-muted break-all">
+              <div className="pt-2 border-t border-border text-xs text-text-muted break-all">
                 SHA-256: {activeDs.sha256}
               </div>
             </div>
 
             {/* Autofix Logs */}
             {autofixLogs.length > 0 && (
-              <div className="p-3 rounded bg-bg border border-border space-y-1 text-[11px]">
-                <strong className="text-amber-400 block font-sans">
+              <div className="p-3 rounded bg-bg border border-border space-y-1 text-xs">
+                <strong className="text-warning block font-sans">
                   Autofix Actions Executed:
                 </strong>
                 {autofixLogs.map((log, i) => (
@@ -650,7 +650,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider font-sans">
                   Stored OHLC Market Bars ({loadedCandles.length} Bars in Dataset)
                 </h3>
-                <span className="text-[10px] text-emerald-400 font-mono">
+                <span className="text-xs text-success font-mono">
                   Showing {loadedCandles.length > 0 ? (catalogPage - 1) * catalogPageSize + 1 : 0} – {Math.min(catalogPage * catalogPageSize, loadedCandles.length)} of {loadedCandles.length}
                 </span>
               </div>
@@ -677,7 +677,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                   >
                     Prev
                   </button>
-                  <span className="px-1.5 text-text-muted text-[11px]">
+                  <span className="px-1.5 text-text-muted text-xs">
                     {catalogPage} / {Math.max(1, Math.ceil(loadedCandles.length / catalogPageSize))}
                   </span>
                   <button
@@ -703,7 +703,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             ) : (
               <div className="overflow-x-auto max-h-96 overflow-y-auto mt-2">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-[11px]">
+                  <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-xs">
                     <tr>
                       <th className="py-2">Time (UTC)</th>
                       <th>Open</th>
@@ -726,11 +726,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                               .substring(0, 19)}
                           </td>
                           <td className="text-white">{c.open}</td>
-                          <td className="text-emerald-400">{c.high}</td>
-                          <td className="text-rose-400">{c.low}</td>
+                          <td className="text-success">{c.high}</td>
+                          <td className="text-danger">{c.low}</td>
                           <td className="text-white">{c.close}</td>
                           <td className="text-text-muted">{c.tickVolume}</td>
-                          <td className="text-blue-400">{c.spread}</td>
+                          <td className="text-primary">{c.spread}</td>
                         </tr>
                       ))}
                   </tbody>
@@ -748,50 +748,50 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           {/* Storage Summary Highlights */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
-              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
+              <span className="text-xs font-sans text-text-muted uppercase tracking-wider block">
                 Total Historical Bars in SQLite
               </span>
-              <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">
+              <span className="text-2xl font-bold font-mono text-success mt-1 block">
                 {storageSummary?.totalCandles?.toLocaleString() || '0'}
               </span>
-              <span className="text-[10px] text-text-muted mt-1 block">
+              <span className="text-xs text-text-muted mt-1 block">
                 Permanently persisted in data/zaboraa.sqlite
               </span>
             </div>
 
             <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
-              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
+              <span className="text-xs font-sans text-text-muted uppercase tracking-wider block">
                 Tracked Pair Series
               </span>
               <span className="text-2xl font-bold font-mono text-white mt-1 block">
                 {storageSummary?.datasets?.length || 0} Sets
               </span>
-              <span className="text-[10px] text-text-muted mt-1 block">
+              <span className="text-xs text-text-muted mt-1 block">
                 Unique symbol + timeframe combinations
               </span>
             </div>
 
             <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
-              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
+              <span className="text-xs font-sans text-text-muted uppercase tracking-wider block">
                 Persistence Policy
               </span>
-              <span className="text-base font-bold font-mono text-blue-400 mt-1 block">
+              <span className="text-base font-bold font-mono text-primary mt-1 block">
                 Append-Only
               </span>
-              <span className="text-[10px] text-emerald-400 mt-1 block">
+              <span className="text-xs text-success mt-1 block">
                 Zero Deletions / No Pruning
               </span>
             </div>
 
             <div className="p-4 rounded-lg border border-border bg-surface shadow-md">
-              <span className="text-[11px] font-sans text-text-muted uppercase tracking-wider block">
+              <span className="text-xs font-sans text-text-muted uppercase tracking-wider block">
                 Disk Integrity
               </span>
-              <span className="text-base font-bold font-mono text-emerald-400 mt-1 block flex items-center gap-1.5">
+              <span className="text-base font-bold font-mono text-success mt-1 block flex items-center gap-1.5">
                 <CheckCircle className="w-4 h-4" />
                 Synchronous WAL
               </span>
-              <span className="text-[10px] text-text-muted mt-1 block">
+              <span className="text-xs text-text-muted mt-1 block">
                 Index: (symbol, timeframe, time)
               </span>
             </div>
@@ -802,7 +802,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Database className="w-4 h-4 text-emerald-400" />
+                  <Database className="w-4 h-4 text-success" />
                   Stored Historical Series Overview
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5">
@@ -824,7 +824,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono border-collapse">
-                <thead className="bg-bg border-b border-border text-text-muted text-[11px]">
+                <thead className="bg-bg border-b border-border text-text-muted text-xs">
                   <tr>
                     <th className="p-3">Symbol</th>
                     <th className="p-3">Timeframe</th>
@@ -840,17 +840,17 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                     <tr key={ds.symbol + '-' + ds.timeframe} className="hover:bg-surface">
                       <td className="p-3 font-bold text-white font-sans">{ds.symbol}</td>
                       <td className="p-3 text-text-muted">{ds.timeframe}</td>
-                      <td className="p-3 font-bold text-emerald-400">
+                      <td className="p-3 font-bold text-success">
                         {ds.candleCount.toLocaleString()}
                       </td>
-                      <td className="p-3 text-text-muted text-[11px]">
+                      <td className="p-3 text-text-muted text-xs">
                         {ds.minDateIso ? ds.minDateIso.replace('T', ' ').substring(0, 19) : 'N/A'}
                       </td>
-                      <td className="p-3 text-text-muted text-[11px]">
+                      <td className="p-3 text-text-muted text-xs">
                         {ds.maxDateIso ? ds.maxDateIso.replace('T', ' ').substring(0, 19) : 'N/A'}
                       </td>
                       <td className="p-3">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-success/10 text-success border border-success/30">
                           PERMANENT SQLITE
                         </span>
                       </td>
@@ -862,7 +862,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                             setVaultTimeframe(ds.timeframe);
                             loadVaultData(1, ds.symbol, ds.timeframe, vaultPageSize);
                           }}
-                          className="px-2.5 py-1 rounded bg-surface hover:bg-surface text-text text-[11px] font-sans font-semibold cursor-pointer"
+                          className="px-2.5 py-1 rounded bg-surface hover:bg-surface text-text text-xs font-sans font-semibold cursor-pointer"
                         >
                           Inspect Bars
                         </button>
@@ -879,7 +879,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
               <div>
                 <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Search className="w-4 h-4 text-blue-400" />
+                  <Search className="w-4 h-4 text-primary" />
                   Universal Historical Candle Explorer
                 </h3>
                 <p className="text-xs text-text-muted mt-0.5">
@@ -952,7 +952,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             {/* Pagination Controls */}
             <div className="flex items-center justify-between text-xs font-mono pt-1">
               <span className="text-text-muted">
-                Found <strong className="text-emerald-400">{vaultTotal.toLocaleString()}</strong> historical bars in SQLite
+                Found <strong className="text-success">{vaultTotal.toLocaleString()}</strong> historical bars in SQLite
               </span>
               <div className="flex items-center gap-1.5">
                 <button
@@ -989,7 +989,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             ) : (
               <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-left text-xs font-mono">
-                  <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-[11px]">
+                  <thead className="sticky top-0 bg-bg border-b border-border text-text-muted text-xs">
                     <tr>
                       <th className="py-2.5 px-3">Time (UTC)</th>
                       <th className="py-2.5 px-3">Epoch</th>
@@ -1009,11 +1009,11 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                         </td>
                         <td className="py-1.5 px-3 text-text-muted">{c.time}</td>
                         <td className="py-1.5 px-3 text-white">{c.open}</td>
-                        <td className="py-1.5 px-3 text-emerald-400">{c.high}</td>
-                        <td className="py-1.5 px-3 text-rose-400">{c.low}</td>
+                        <td className="py-1.5 px-3 text-success">{c.high}</td>
+                        <td className="py-1.5 px-3 text-danger">{c.low}</td>
                         <td className="py-1.5 px-3 text-white font-bold">{c.close}</td>
                         <td className="py-1.5 px-3 text-text-muted">{c.tickVolume}</td>
-                        <td className="py-1.5 px-3 text-blue-400">{c.spread}</td>
+                        <td className="py-1.5 px-3 text-primary">{c.spread}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1030,7 +1030,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
           <div className="w-full max-w-md rounded-lg border border-border bg-surface p-5 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Server className="w-4 h-4 text-emerald-400" />
+                <Server className="w-4 h-4 text-success" />
                 Fetch Data from Local MT5 Bridge
               </h3>
               <button
@@ -1043,7 +1043,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             </div>
 
             <p className="text-xs text-text-muted leading-relaxed">
-              Connects to the local Python FastAPI bridge on <code className="text-text">127.0.0.1:8001</code>. Automatically appends broker suffix (<code className="text-emerald-400">EURUSDm</code>, <code className="text-emerald-400">XAUUSDm</code>) for Exness demo terminals, excludes the forming bar, and stores canonical data in SQLite.
+              Connects to the local Python FastAPI bridge on <code className="text-text">127.0.0.1:8001</code>. Automatically appends broker suffix (<code className="text-success">EURUSDm</code>, <code className="text-success">XAUUSDm</code>) for Exness demo terminals, excludes the forming bar, and stores canonical data in SQLite.
             </p>
 
             <div className="grid grid-cols-2 gap-3 text-xs font-mono">
@@ -1102,8 +1102,8 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               <div
                 className={`p-2.5 rounded text-xs border ${
                   fetchStatusMessage.success
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    ? 'bg-success/10 border-success/30 text-success'
+                    : 'bg-danger/10 border-danger/30 text-danger'
                 }`}
               >
                 {fetchStatusMessage.message}
@@ -1122,7 +1122,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 type="button"
                 disabled={isFetchingFromBridge}
                 onClick={handleExecuteBridgeFetch}
-                className="px-4 py-2 rounded text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                className="px-4 py-2 rounded text-xs font-bold bg-success hover:bg-success text-white shadow-md disabled:opacity-50 flex items-center gap-1.5"
               >
                 <Download className="w-3.5 h-3.5" />
                 {isFetchingFromBridge ? 'Fetching from MT5...' : 'Execute Download'}
@@ -1137,7 +1137,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg rounded-lg border border-border bg-surface p-5 shadow-2xl space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Upload className="w-4 h-4 text-blue-400" />
+              <Upload className="w-4 h-4 text-primary" />
               Import Custom Forex Candle CSV
             </h3>
 
@@ -1194,12 +1194,12 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
                 onChange={(e) => setImportCsvText(e.target.value)}
                 placeholder="Time,Open,High,Low,Close,Volume,Spread&#10;2026-10-20 10:00:00,1.0850,1.0865,1.0840,1.0855,300,1.0&#10;2026-10-20 11:00:00,1.0855,1.0870,1.0850,1.0862,420,1.0"
                 rows={7}
-                className="w-full rounded bg-bg p-2.5 font-mono text-xs text-white border border-border focus:outline-none focus:border-blue-500"
+                className="w-full rounded bg-bg p-2.5 font-mono text-xs text-white border border-border focus:outline-none focus:border-primary"
               />
             </div>
 
             {importFeedback && (
-              <div className="p-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-300 text-xs font-mono">
+              <div className="p-2 rounded bg-primary/10 border border-primary/30 text-primary text-xs font-mono">
                 {importFeedback}
               </div>
             )}
@@ -1215,7 +1215,7 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               <button
                 type="button"
                 onClick={handleCommitImport}
-                className="px-4 py-2 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white"
+                className="px-4 py-2 rounded text-xs font-bold bg-primary hover:bg-primary text-white"
               >
                 Audit & Commit to SQLite
               </button>

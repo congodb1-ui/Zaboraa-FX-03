@@ -1708,5 +1708,28 @@ export function deleteChartLayout(id: string, ownerId: string): boolean {
   return res.changes > 0;
 }
 
+export function getSystemBranding(): { companyName: string; logoUrl: string } {
+  const rowName = db.prepare('SELECT value FROM system_state WHERE key = ?').get('company_name') as { value: string } | undefined;
+  const rowLogo = db.prepare('SELECT value FROM system_state WHERE key = ?').get('company_logo') as { value: string } | undefined;
+  return {
+    companyName: rowName?.value || 'Zaboraa FX',
+    logoUrl: rowLogo?.value || '',
+  };
+}
+
+export function setSystemBranding(companyName: string, logoUrl: string): void {
+  const now = new Date().toISOString();
+  db.prepare(`
+    INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+  `).run('company_name', companyName.trim() || 'Zaboraa FX', now);
+
+  db.prepare(`
+    INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+  `).run('company_logo', logoUrl.trim(), now);
+}
+
+
 
 

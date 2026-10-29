@@ -38,13 +38,13 @@ export const App: React.FC = () => {
   const [studioSelectedStrategyId, setStudioSelectedStrategyId] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Dual Theme state (defaults to dark)
+  // Dual Theme state (defaults to light mode)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     try {
       const saved = localStorage.getItem('zaboraa_theme');
-      return saved === 'light' ? 'light' : 'dark';
+      return saved === 'dark' ? 'dark' : 'light';
     } catch {
-      return 'dark';
+      return 'light';
     }
   });
 

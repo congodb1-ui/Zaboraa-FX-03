@@ -81,7 +81,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-border">
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              <Bot className="w-4 h-4 text-blue-400" />
+              <Bot className="w-4 h-4 text-primary" />
               Automated Bot Fleet & Execution State Machine
             </h2>
             <p className="text-xs text-text-muted mt-0.5">
@@ -108,9 +108,9 @@ export const BotsView: React.FC<BotsViewProps> = ({
               key={b.id}
               className={`rounded-lg border p-4 shadow-lg transition-all ${
                 isRunning
-                  ? 'border-emerald-500/40 bg-bg ring-1 ring-emerald-500/20'
+                  ? 'border-success/40 bg-bg ring-1 ring-success/20'
                   : isPaused
-                  ? 'border-amber-500/40 bg-bg'
+                  ? 'border-warning/40 bg-bg'
                   : 'border-border bg-bg'
               }`}
             >
@@ -118,7 +118,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
               <div className="flex items-start justify-between">
                 <div>
                   <h3 className="font-bold text-sm text-white">{b.name}</h3>
-                  <div className="text-[11px] text-text-muted font-mono mt-0.5">
+                  <div className="text-xs text-text-muted font-mono mt-0.5">
                     Magic #{b.magicNumber} · {b.symbol} {b.timeframe}
                   </div>
                 </div>
@@ -126,22 +126,22 @@ export const BotsView: React.FC<BotsViewProps> = ({
                 {/* Mode Pill */}
                 <div className="flex flex-col items-end gap-1">
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase font-mono ${
+                    className={`px-2 py-0.5 rounded text-xs font-bold tracking-wider uppercase font-mono ${
                       b.mode === 'LIVE'
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        ? 'bg-danger/20 text-danger border border-danger/30'
                         : b.mode === 'DEMO'
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                        ? 'bg-success/20 text-success border border-success/30'
+                        : 'bg-primary/20 text-primary border border-primary/30'
                     }`}
                   >
                     {b.mode}
                   </span>
                   <span
-                    className={`text-[10px] font-mono font-semibold ${
+                    className={`text-xs font-mono font-semibold ${
                       isRunning
-                        ? 'text-emerald-400'
+                        ? 'text-success'
                         : isPaused
-                        ? 'text-amber-400'
+                        ? 'text-warning'
                         : 'text-text-muted'
                     }`}
                   >
@@ -166,7 +166,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                   <span>Today P&L:</span>
                   <strong
                     className={`tabular-nums font-bold ${
-                      b.todayPnl >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      b.todayPnl >= 0 ? 'text-success' : 'text-danger'
                     }`}
                   >
                     {b.todayPnl >= 0 ? '+' : ''}${b.todayPnl.toFixed(2)}
@@ -181,7 +181,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleBotStatus(b.id, 'PAUSED')}
-                      className="p-1.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 transition-colors"
+                      className="p-1.5 rounded bg-warning/20 hover:bg-warning/30 text-warning transition-colors"
                       title="Pause Bot"
                     >
                       <Pause className="w-4 h-4" />
@@ -190,7 +190,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     <button
                       type="button"
                       onClick={() => onToggleBotStatus(b.id, 'RUNNING')}
-                      className="p-1.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 transition-colors"
+                      className="p-1.5 rounded bg-success/20 hover:bg-success/30 text-success transition-colors"
                       title="Start Bot"
                     >
                       <Play className="w-4 h-4 fill-current" />
@@ -207,13 +207,13 @@ export const BotsView: React.FC<BotsViewProps> = ({
                 </div>
 
                 {/* Mode Switcher */}
-                <div className="flex items-center gap-1 text-[10px] font-mono">
+                <div className="flex items-center gap-1 text-xs font-mono">
                   <button
                     type="button"
                     onClick={() => onChangeBotMode(b.id, 'PAPER')}
                     className={`px-2 py-1 rounded font-bold ${
                       b.mode === 'PAPER'
-                        ? 'bg-blue-600 text-white'
+                        ? 'bg-primary text-white'
                         : 'bg-surface text-text-muted hover:text-text'
                     }`}
                   >
@@ -224,7 +224,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     onClick={() => onChangeBotMode(b.id, 'DEMO')}
                     className={`px-2 py-1 rounded font-bold ${
                       b.mode === 'DEMO'
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-success text-white'
                         : 'bg-surface text-text-muted hover:text-text'
                     }`}
                   >
@@ -235,8 +235,8 @@ export const BotsView: React.FC<BotsViewProps> = ({
                     onClick={() => handleOpenLiveModal(b)}
                     className={`px-2 py-1 rounded font-bold ${
                       b.mode === 'LIVE'
-                        ? 'bg-rose-600 text-white'
-                        : 'bg-surface text-rose-400 hover:bg-rose-950'
+                        ? 'bg-danger text-white'
+                        : 'bg-surface text-danger hover:bg-rose-950'
                     }`}
                   >
                     LIVE
@@ -251,7 +251,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
       {/* Risk Events & Firewall Audit Trail */}
       <div className="rounded-lg border border-border bg-surface p-4 shadow-xl">
         <h3 className="text-xs font-bold text-text uppercase tracking-wider mb-2 flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-amber-400" />
+          <ShieldAlert className="w-4 h-4 text-warning" />
           Authoritative Risk Firewall Audit Events ({riskEvents.length})
         </h3>
         <div className="overflow-x-auto max-h-56 overflow-y-auto">
@@ -266,20 +266,20 @@ export const BotsView: React.FC<BotsViewProps> = ({
                   key={e.id}
                   className={`p-2 rounded border flex items-start justify-between gap-3 ${
                     e.severity === 'CRITICAL' || e.severity === 'BLOCKED'
-                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                      ? 'bg-danger/10 border-danger/30 text-danger'
                       : e.severity === 'WARNING'
-                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+                      ? 'bg-warning/10 border-warning/30 text-warning'
                       : 'bg-bg border-border text-text-muted'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-[10px] uppercase px-1.5 py-0.2 rounded bg-bg">
+                    <span className="font-bold text-xs uppercase px-1.5 py-0.2 rounded bg-bg">
                       {e.severity}
                     </span>
                     <strong className="text-white">[{e.rule}]</strong>
                     <span>{e.message}</span>
                   </div>
-                  <span className="text-[10px] text-text-muted whitespace-nowrap">
+                  <span className="text-xs text-text-muted whitespace-nowrap">
                     {new Date(e.timestamp).toLocaleTimeString()}
                   </span>
                 </div>
@@ -292,12 +292,12 @@ export const BotsView: React.FC<BotsViewProps> = ({
       {/* Live Safety Gate Modal */}
       {selectedBotForLive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md rounded-lg border border-rose-500/50 bg-surface p-6 shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-rose-400 border-b border-rose-500/30 pb-3">
-              <AlertOctagon className="w-6 h-6 text-rose-500 animate-pulse" />
+          <div className="w-full max-w-md rounded-lg border border-danger/50 bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-danger border-b border-danger/30 pb-3">
+              <AlertOctagon className="w-6 h-6 text-danger animate-pulse" />
               <div>
                 <h3 className="font-bold text-sm text-white">Live Trading Safety Gate</h3>
-                <span className="text-xs text-rose-300">Cryptographic Single-Use Confirmation</span>
+                <span className="text-xs text-danger">Cryptographic Single-Use Confirmation</span>
               </div>
             </div>
 
@@ -312,7 +312,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
               </div>
               <div className="flex justify-between text-text-muted">
                 <span>Mandatory Stop-Loss:</span>
-                <strong className="text-emerald-400">HARD BROKER ENFORCED</strong>
+                <strong className="text-success">HARD BROKER ENFORCED</strong>
               </div>
               <div className="flex justify-between text-text-muted">
                 <span>Max Lot Ceiling:</span>
@@ -321,7 +321,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-rose-300 mb-1">
+              <label className="block text-xs font-semibold text-danger mb-1">
                 Type active account login <strong>{brokerState.accountLogin}</strong> to confirm:
               </label>
               <input
@@ -329,12 +329,12 @@ export const BotsView: React.FC<BotsViewProps> = ({
                 value={typedConfirmationLogin}
                 onChange={(e) => setTypedConfirmationLogin(e.target.value)}
                 placeholder={brokerState.accountLogin}
-                className="w-full px-3 py-2 rounded bg-bg border border-rose-500/40 font-mono text-xs text-white focus:outline-none focus:border-rose-500"
+                className="w-full px-3 py-2 rounded bg-bg border border-danger/40 font-mono text-xs text-white focus:outline-none focus:border-danger"
               />
             </div>
 
             {liveGateError && (
-              <div className="p-2.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
+              <div className="p-2.5 rounded bg-danger/10 border border-danger/30 text-danger text-xs">
                 {liveGateError}
               </div>
             )}
@@ -350,7 +350,7 @@ export const BotsView: React.FC<BotsViewProps> = ({
               <button
                 type="button"
                 onClick={handleConfirmLivePromotion}
-                className="px-4 py-2 rounded text-xs font-bold uppercase tracking-wider bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30 transition-all"
+                className="px-4 py-2 rounded text-xs font-bold uppercase tracking-wider bg-danger hover:bg-danger text-white shadow-lg shadow-danger/30 transition-all"
               >
                 Promote Bot to LIVE
               </button>

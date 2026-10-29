@@ -273,7 +273,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
       {/* 1. TOP HEADER & INSTRUMENT TOGGLE */}
       <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
             <Footprints className="w-5 h-5" />
           </div>
           <div>
@@ -295,7 +295,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               onClick={() => setSelectedSymbol(sym)}
               className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 selectedSymbol === sym
-                  ? 'bg-indigo-600 text-white shadow-sm'
+                  ? 'bg-primary text-white shadow-sm'
                   : 'text-text-muted hover:text-text'
               }`}
             >
@@ -307,9 +307,9 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
       {/* Global Feedback notification */}
       {feedbackMessage && (
-        <div className="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 text-xs flex items-center justify-between animate-in fade-in">
+        <div className="p-3.5 rounded-xl bg-primary/10 border border-primary/30 text-primary text-xs flex items-center justify-between animate-in fade-in">
           <div className="flex items-center gap-2">
-            <Info className="w-4 h-4 shrink-0 text-indigo-500" />
+            <Info className="w-4 h-4 shrink-0 text-primary" />
             <span>{feedbackMessage}</span>
           </div>
           <button type="button" onClick={() => setFeedbackMessage(null)} className="text-text-muted hover:text-text cursor-pointer">
@@ -320,9 +320,9 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
       {/* 2. THREE-STEP GUIDED SETUP PIPELINE (When data needs ingest or signals) */}
       {(!hasCotData || !hasH1Bars || !hasSignals) && (
-        <div className="p-5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-text space-y-4">
+        <div className="p-5 rounded-2xl bg-warning/10 border border-warning/30 text-text space-y-4">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+            <AlertTriangle className="w-5 h-5 text-warning shrink-0" />
             <h2 className="text-sm font-bold text-warning">
               Institutional Signal Setup Checklist
             </h2>
@@ -333,10 +333,10 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
             {/* Step 1 */}
-            <div className={`p-3.5 rounded-xl border ${hasCotData ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface border-border'}`}>
+            <div className={`p-3.5 rounded-xl border ${hasCotData ? 'bg-success/10 border-success/30' : 'bg-surface border-border'}`}>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-semibold text-text">1. Weekly CFTC COT</span>
-                {hasCotData ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
+                {hasCotData ? <CheckCircle2 className="w-4 h-4 text-success" /> : <span className="text-warning font-bold">Pending</span>}
               </div>
               <p className="text-text-muted text-[11px] mb-3">
                 {hasCotData ? `${totalCotWeeks} weekly reports indexed` : '0 weeks indexed. Fetch official CFTC commitment records.'}
@@ -346,7 +346,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                   type="button"
                   onClick={handleRefreshCot}
                   disabled={isRefreshingCot}
-                  className="w-full py-1.5 rounded-lg bg-indigo-600 text-white font-semibold text-xs cursor-pointer"
+                  className="w-full py-1.5 rounded-lg bg-primary text-white font-semibold text-xs cursor-pointer"
                 >
                   {isRefreshingCot ? 'Fetching...' : 'Ingest CFTC reports'}
                 </button>
@@ -354,10 +354,10 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
             </div>
 
             {/* Step 2 */}
-            <div className={`p-3.5 rounded-xl border ${hasH1Bars ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface border-border'}`}>
+            <div className={`p-3.5 rounded-xl border ${hasH1Bars ? 'bg-success/10 border-success/30' : 'bg-surface border-border'}`}>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-semibold text-text">2. Closed H1 Bars</span>
-                {hasH1Bars ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
+                {hasH1Bars ? <CheckCircle2 className="w-4 h-4 text-success" /> : <span className="text-warning font-bold">Pending</span>}
               </div>
               <p className="text-text-muted text-[11px] mb-3">
                 {hasH1Bars ? `${totalH1Bars} closed H1 candles available` : '0 bars found. Minimum 30 closed H1 bars required.'}
@@ -368,10 +368,10 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
             </div>
 
             {/* Step 3 */}
-            <div className={`p-3.5 rounded-xl border ${hasSignals ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-surface border-border'}`}>
+            <div className={`p-3.5 rounded-xl border ${hasSignals ? 'bg-success/10 border-success/30' : 'bg-surface border-border'}`}>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-semibold text-text">3. Synthesize Signals</span>
-                {hasSignals ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <span className="text-amber-500 font-bold">Pending</span>}
+                {hasSignals ? <CheckCircle2 className="w-4 h-4 text-success" /> : <span className="text-warning font-bold">Pending</span>}
               </div>
               <p className="text-text-muted text-[11px] mb-3">
                 {hasSignals ? `${signalsList.length} candidate signals evaluated` : 'Compute multi-layer confidence score across all closed bars.'}
@@ -380,7 +380,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                 type="button"
                 onClick={handleComputeSignals}
                 disabled={isComputingSignals || !hasCotData || !hasH1Bars}
-                className="w-full py-1.5 rounded-lg bg-indigo-600 text-white font-semibold text-xs disabled:opacity-50 cursor-pointer"
+                className="w-full py-1.5 rounded-lg bg-primary text-white font-semibold text-xs disabled:opacity-50 cursor-pointer"
               >
                 {isComputingSignals ? 'Computing...' : 'Compute signals'}
               </button>
@@ -406,7 +406,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               type="button"
               onClick={handleComputeSignals}
               disabled={isComputingSignals}
-              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-sm shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary text-white font-semibold text-xs shadow-sm shadow-primary/20 disabled:opacity-50 cursor-pointer"
             >
               {isComputingSignals ? 'Computing...' : 'Compute signals'}
             </button>
@@ -424,7 +424,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               disabled={isExplainingAi || !currentSignal}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-bg text-text border border-border hover:bg-surface text-xs font-semibold disabled:opacity-40 cursor-pointer"
             >
-              <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
               <span>{isExplainingAi ? 'Analyzing...' : 'Explain signal'}</span>
             </button>
           </div>
@@ -448,16 +448,16 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               <div
                 className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 ${
                   currentSignal.direction === 'BUY'
-                    ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30'
+                    ? 'bg-success/15 text-success border border-success/30'
                     : currentSignal.direction === 'SELL'
-                    ? 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'
+                    ? 'bg-danger/15 text-danger border border-danger/30'
                     : 'bg-bg text-text-muted border border-border'
                 }`}
               >
                 {currentSignal.direction === 'BUY' ? (
-                  <ArrowUpRight className="w-4 h-4 text-emerald-500" />
+                  <ArrowUpRight className="w-4 h-4 text-success" />
                 ) : currentSignal.direction === 'SELL' ? (
-                  <ArrowDownRight className="w-4 h-4 text-rose-500" />
+                  <ArrowDownRight className="w-4 h-4 text-danger" />
                 ) : (
                   <Minus className="w-4 h-4 text-text-muted" />
                 )}
@@ -468,24 +468,24 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
             {/* DIVERGING HORIZONTAL GAUGE: -100 to +100 with ±50 thresholds */}
             <div className="space-y-2">
               <div className="flex justify-between text-xs text-text-muted font-mono">
-                <span className="text-rose-500 font-bold">-100 (Strong Short)</span>
-                <span className="text-rose-400 font-medium">-50 (Short Gate)</span>
+                <span className="text-danger font-bold">-100 (Strong Short)</span>
+                <span className="text-danger font-medium">-50 (Short Gate)</span>
                 <span className="text-text-muted font-medium">0 (Neutral)</span>
-                <span className="text-emerald-400 font-medium">+50 (Long Gate)</span>
-                <span className="text-emerald-500 font-bold">+100 (Strong Long)</span>
+                <span className="text-success font-medium">+50 (Long Gate)</span>
+                <span className="text-success font-bold">+100 (Strong Long)</span>
               </div>
 
               {/* Gauge Track */}
               <div className="h-4 rounded-full bg-bg overflow-hidden relative border border-border">
                 {/* Visual Segments */}
-                <div className="absolute inset-0 bg-gradient-to-r from-rose-500 via-border to-emerald-500 opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-r from-danger via-border to-success opacity-80" />
                 {/* 50 Threshold Markers */}
                 <div className="absolute top-0 bottom-0 left-[25%] w-0.5 bg-white/70" title="-50 Threshold" />
                 <div className="absolute top-0 bottom-0 left-[50%] w-0.5 bg-white/90" title="Neutral 0" />
                 <div className="absolute top-0 bottom-0 left-[75%] w-0.5 bg-white/70" title="+50 Threshold" />
                 {/* Active Needle Pin */}
                 <div
-                  className="absolute top-0 bottom-0 w-2.5 bg-text rounded-full shadow-lg ring-2 ring-indigo-500 transition-all duration-300 -translate-x-1/2"
+                  className="absolute top-0 bottom-0 w-2.5 bg-text rounded-full shadow-lg ring-2 ring-primary transition-all duration-300 -tranborder/2"
                   style={{ left: `${scorePositionPct}%` }}
                 />
               </div>
@@ -575,7 +575,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
               type="button"
               onClick={handleRunEventStudy}
               disabled={isRunningEval || signalsList.length === 0}
-              className="px-3.5 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-semibold shadow-sm disabled:opacity-50 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-primary text-white text-xs font-semibold shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {isRunningEval ? 'Evaluating...' : 'Run event study'}
             </button>
@@ -612,8 +612,8 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                         <span
                           className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
                             s.direction === 'BUY'
-                              ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                              : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'
+                              ? 'bg-success/15 text-success'
+                              : 'bg-danger/15 text-danger'
                           }`}
                         >
                           {s.direction}
@@ -622,7 +622,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                       <td className="py-2.5 text-right font-bold tabular-nums text-text">
                         {s.score > 0 ? `+${s.score}` : s.score}
                       </td>
-                      <td className="py-2.5 text-right tabular-nums text-indigo-500 font-semibold">
+                      <td className="py-2.5 text-right tabular-nums text-primary font-semibold">
                         {s.confidence}%
                       </td>
                       <td className="py-2.5 text-text-muted font-sans">
@@ -630,7 +630,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                       </td>
                       <td className="py-2.5 text-right tabular-nums">
                         {out24 ? (
-                          <span className={out24.return_pips_or_points >= 0 ? 'text-emerald-500 font-semibold' : 'text-rose-500 font-semibold'}>
+                          <span className={out24.return_pips_or_points >= 0 ? 'text-success font-semibold' : 'text-danger font-semibold'}>
                             {out24.return_pips_or_points >= 0 ? '+' : ''}{out24.return_pips_or_points.toFixed(1)} pips
                           </span>
                         ) : (
@@ -641,7 +641,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                         <button
                           type="button"
                           onClick={() => handleExplainSignal(s)}
-                          className="px-2 py-1 rounded text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-500/10 cursor-pointer"
+                          className="px-2 py-1 rounded text-xs text-primary hover:bg-primary/10 cursor-pointer"
                         >
                           Explain
                         </button>
@@ -661,7 +661,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
           <div className="max-w-lg w-full p-6 rounded-2xl bg-surface border border-border shadow-2xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <Sparkles className="w-5 h-5 text-indigo-500" />
+                <Sparkles className="w-5 h-5 text-primary" />
                 <h3 className="text-base font-bold text-text">
                   AI Quant Advisor: Signal Breakdown
                 </h3>
@@ -683,7 +683,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                 {explanationText}
               </div>
             ) : (
-              <div className="p-3 rounded-lg bg-rose-500/10 text-rose-500 text-xs">
+              <div className="p-3 rounded-lg bg-danger/10 text-danger text-xs">
                 {explainError}
               </div>
             )}
@@ -695,7 +695,7 @@ export const SmartMoneyFootprintView: React.FC<SmartMoneyFootprintViewProps> = (
                   setExplanationText(null);
                   setExplainError(null);
                 }}
-                className="px-4 py-2 rounded-xl bg-indigo-600 text-white font-semibold text-xs cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-primary text-white font-semibold text-xs cursor-pointer"
               >
                 Done
               </button>

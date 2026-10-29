@@ -337,9 +337,9 @@ function onBar(ctx, bar) {
   return (
     <div className="space-y-6">
       {/* Top Banner Notice */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-blue-500/30 bg-blue-500/10 text-xs text-blue-300">
+      <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary">
         <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-blue-400 shrink-0" />
+          <Info className="w-4 h-4 text-primary shrink-0" />
           <span>
             <strong>Strategy Studio & Parameter Studio:</strong> You can edit logic, add custom parameters, clone presets, and create brand-new algorithmic strategies.
           </span>
@@ -347,7 +347,7 @@ function onBar(ctx, bar) {
         <button
           type="button"
           onClick={handleCreateNew}
-          className="flex items-center gap-1 px-3 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold font-mono shadow-sm"
+          className="flex items-center gap-1 px-3 py-1 rounded bg-primary hover:bg-primary text-white font-bold font-mono shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
           Create New Strategy
@@ -356,8 +356,8 @@ function onBar(ctx, bar) {
 
       {/* Save Success Banner */}
       {saveSuccessMsg && (
-        <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs flex items-center gap-2 font-mono">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <div className="p-3 rounded-lg border border-success/30 bg-success/10 text-success text-xs flex items-center gap-2 font-mono">
+          <CheckCircle2 className="w-4 h-4 text-success shrink-0" />
           <span>{saveSuccessMsg}</span>
         </div>
       )}
@@ -372,7 +372,7 @@ function onBar(ctx, bar) {
             <button
               type="button"
               onClick={handleCreateNew}
-              className="text-[11px] text-blue-400 hover:text-blue-300 font-bold flex items-center gap-0.5"
+              className="text-xs text-primary hover:text-primary font-bold flex items-center gap-0.5"
             >
               <Plus className="w-3 h-3" /> New
             </button>
@@ -386,24 +386,24 @@ function onBar(ctx, bar) {
                 onClick={() => handleSelectStrategy(s)}
                 className={`w-full text-left p-3 rounded-lg border transition-all ${
                   selectedStrategy.id === s.id
-                    ? 'border-blue-500 bg-blue-500/10 ring-1 ring-blue-500 shadow-sm'
+                    ? 'border-primary bg-primary/10 ring-1 ring-primary shadow-sm'
                     : 'border-border bg-bg hover:bg-surface'
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-white line-clamp-1">{s.name}</span>
                   {s.id.startsWith('custom') || s.id.startsWith('strat-copy') ? (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-indigo-500/20 text-indigo-300 font-mono">
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-primary/20 text-primary font-mono">
                       Custom
                     </span>
                   ) : null}
                 </div>
-                <div className="text-[11px] text-text-muted mt-1 line-clamp-2">
+                <div className="text-xs text-text-muted mt-1 line-clamp-2">
                   {s.description}
                 </div>
-                <div className="mt-2 flex items-center justify-between text-[10px] font-mono text-text-muted">
+                <div className="mt-2 flex items-center justify-between text-xs font-mono text-text-muted">
                   <span>v{s.version}</span>
-                  <span className="text-blue-400">
+                  <span className="text-primary">
                     {Object.keys(s.params || {}).length} params
                   </span>
                 </div>
@@ -419,7 +419,7 @@ function onBar(ctx, bar) {
             <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-border">
               <div>
                 <h2 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Code2 className="w-4 h-4 text-blue-400" />
+                  <Code2 className="w-4 h-4 text-primary" />
                   {editName}
                 </h2>
                 <span className="text-xs text-text-muted">
@@ -434,7 +434,7 @@ function onBar(ctx, bar) {
                   onClick={handleRunSmokeTest}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                 >
-                  <Play className="w-3.5 h-3.5 fill-current text-blue-400" />
+                  <Play className="w-3.5 h-3.5 fill-current text-primary" />
                   Smoke Test
                 </button>
 
@@ -443,7 +443,7 @@ function onBar(ctx, bar) {
                   onClick={handleDuplicate}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border"
                 >
-                  <Copy className="w-3.5 h-3.5 text-indigo-400" />
+                  <Copy className="w-3.5 h-3.5 text-primary" />
                   Duplicate
                 </button>
 
@@ -451,9 +451,9 @@ function onBar(ctx, bar) {
                   <button
                     type="button"
                     onClick={() => handleDelete(selectedStrategy.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold bg-danger/10 hover:bg-danger/20 text-danger border border-danger/30"
                   >
-                    <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                    <Trash2 className="w-3.5 h-3.5 text-danger" />
                     Delete
                   </button>
                 )}
@@ -461,7 +461,7 @@ function onBar(ctx, bar) {
                 <button
                   type="button"
                   onClick={handleSave}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-600/30 transition-all"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md shadow-primary/30 transition-all"
                 >
                   <Save className="w-3.5 h-3.5" />
                   Save Strategy
@@ -476,7 +476,7 @@ function onBar(ctx, bar) {
                 onClick={() => setActiveEditorTab('code')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
                   activeEditorTab === 'code'
-                    ? 'bg-blue-600 text-white font-bold'
+                    ? 'bg-primary text-white font-bold'
                     : 'text-text-muted hover:text-text hover:bg-surface'
                 }`}
               >
@@ -489,7 +489,7 @@ function onBar(ctx, bar) {
                 onClick={() => setActiveEditorTab('params')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
                   activeEditorTab === 'params'
-                    ? 'bg-blue-600 text-white font-bold'
+                    ? 'bg-primary text-white font-bold'
                     : 'text-text-muted hover:text-text hover:bg-surface'
                 }`}
               >
@@ -502,7 +502,7 @@ function onBar(ctx, bar) {
                 onClick={() => setActiveEditorTab('meta')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded transition-all ${
                   activeEditorTab === 'meta'
-                    ? 'bg-blue-600 text-white font-bold'
+                    ? 'bg-primary text-white font-bold'
                     : 'text-text-muted hover:text-text hover:bg-surface'
                 }`}
               >
@@ -519,7 +519,7 @@ function onBar(ctx, bar) {
                   onChange={(e) => setCode(e.target.value)}
                   rows={20}
                   spellCheck={false}
-                  className="w-full rounded bg-bg p-3 font-mono text-xs leading-relaxed text-text border border-border focus:outline-none focus:border-blue-500"
+                  className="w-full rounded bg-bg p-3 font-mono text-xs leading-relaxed text-text border border-border focus:outline-none focus:border-primary"
                 />
               </div>
             )}
@@ -528,7 +528,7 @@ function onBar(ctx, bar) {
             {activeEditorTab === 'params' && (
               <div className="mt-3 space-y-4">
                 <p className="text-xs text-text-muted">
-                  Parameters defined here can be accessed directly in your code via <code className="text-blue-400 font-mono">ctx.params</code> or tuned inside the Parameter Sweep Heatmap matrix.
+                  Parameters defined here can be accessed directly in your code via <code className="text-primary font-mono">ctx.params</code> or tuned inside the Parameter Sweep Heatmap matrix.
                 </p>
 
                 {/* Parameter List */}
@@ -540,7 +540,7 @@ function onBar(ctx, bar) {
                     >
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-text">{key}:</span>
-                        <span className="text-[10px] text-text-muted font-sans uppercase">
+                        <span className="text-xs text-text-muted font-sans uppercase">
                           ({typeof val})
                         </span>
                       </div>
@@ -551,7 +551,7 @@ function onBar(ctx, bar) {
                             type="button"
                             onClick={() => handleParamChange(key, !val)}
                             className={`px-3 py-1 rounded font-bold text-xs ${
-                              val ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'
+                              val ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'
                             }`}
                           >
                             {val ? 'TRUE' : 'FALSE'}
@@ -562,14 +562,14 @@ function onBar(ctx, bar) {
                             step="any"
                             value={val}
                             onChange={(e) => handleParamChange(key, parseFloat(e.target.value) || 0)}
-                            className="w-32 px-2 py-1 rounded bg-bg border border-border text-text text-right focus:outline-none focus:border-blue-500"
+                            className="w-32 px-2 py-1 rounded bg-bg border border-border text-text text-right focus:outline-none focus:border-primary"
                           />
                         ) : (
                           <input
                             type="text"
                             value={val}
                             onChange={(e) => handleParamChange(key, e.target.value)}
-                            className="w-48 px-2 py-1 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+                            className="w-48 px-2 py-1 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
                           />
                         )}
 
@@ -577,7 +577,7 @@ function onBar(ctx, bar) {
                           type="button"
                           onClick={() => handleDeleteParam(key)}
                           title="Remove Parameter"
-                          className="p-1 rounded text-text-muted hover:text-rose-400 hover:bg-bg"
+                          className="p-1 rounded text-text-muted hover:text-danger hover:bg-bg"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -597,14 +597,14 @@ function onBar(ctx, bar) {
                     placeholder="Key (e.g. stopLossPips)"
                     value={newParamKey}
                     onChange={(e) => setNewParamKey(e.target.value)}
-                    className="px-2.5 py-1.5 rounded bg-bg border border-border text-text font-mono text-xs focus:outline-none focus:border-blue-500"
+                    className="px-2.5 py-1.5 rounded bg-bg border border-border text-text font-mono text-xs focus:outline-none focus:border-primary"
                   />
                   <input
                     type="text"
                     placeholder="Initial Value (e.g. 25)"
                     value={newParamValue}
                     onChange={(e) => setNewParamValue(e.target.value)}
-                    className="px-2.5 py-1.5 rounded bg-bg border border-border text-text font-mono text-xs focus:outline-none focus:border-blue-500"
+                    className="px-2.5 py-1.5 rounded bg-bg border border-border text-text font-mono text-xs focus:outline-none focus:border-primary"
                   />
                   <select
                     value={newParamType}
@@ -617,7 +617,7 @@ function onBar(ctx, bar) {
                   </select>
                   <button
                     type="submit"
-                    className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs"
+                    className="px-3 py-1.5 rounded bg-primary hover:bg-primary text-white font-bold text-xs"
                   >
                     Add
                   </button>
@@ -629,43 +629,43 @@ function onBar(ctx, bar) {
             {activeEditorTab === 'meta' && (
               <div className="mt-3 space-y-3 text-xs font-sans">
                 <div>
-                  <label className="block text-text-muted text-[11px] mb-1">Strategy Name</label>
+                  <label className="block text-text-muted text-xs mb-1">Strategy Name</label>
                   <input
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="w-full px-3 py-2 rounded bg-bg border border-border text-text font-bold focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 rounded bg-bg border border-border text-text font-bold focus:outline-none focus:border-primary"
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-text-muted text-[11px] mb-1">Author / Source</label>
+                    <label className="block text-text-muted text-xs mb-1">Author / Source</label>
                     <input
                       type="text"
                       value={editAuthor}
                       onChange={(e) => setEditAuthor(e.target.value)}
-                      className="w-full px-3 py-2 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
                     />
                   </div>
                   <div>
-                    <label className="block text-text-muted text-[11px] mb-1">Version</label>
+                    <label className="block text-text-muted text-xs mb-1">Version</label>
                     <input
                       type="text"
                       value={editVersion}
                       onChange={(e) => setEditVersion(e.target.value)}
-                      className="w-full px-3 py-2 rounded bg-bg border border-border text-text font-mono focus:outline-none focus:border-blue-500"
+                      className="w-full px-3 py-2 rounded bg-bg border border-border text-text font-mono focus:outline-none focus:border-primary"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-text-muted text-[11px] mb-1">Description</label>
+                  <label className="block text-text-muted text-xs mb-1">Description</label>
                   <textarea
                     rows={3}
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full px-3 py-2 rounded bg-bg border border-border text-text focus:outline-none focus:border-blue-500"
+                    className="w-full px-3 py-2 rounded bg-bg border border-border text-text focus:outline-none focus:border-primary"
                   />
                 </div>
               </div>
@@ -676,15 +676,15 @@ function onBar(ctx, bar) {
               <div
                 className={`mt-3 p-3 rounded-lg border text-xs font-mono ${
                   smokeOutput.success
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    ? 'bg-success/10 border-success/30 text-success'
+                    : 'bg-danger/10 border-danger/30 text-danger'
                 }`}
               >
                 <div className="flex items-center gap-2 font-bold mb-1">
                   {smokeOutput.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 text-success" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-rose-400" />
+                    <AlertCircle className="w-4 h-4 text-danger" />
                   )}
                   <span>
                     {smokeOutput.success
@@ -693,7 +693,7 @@ function onBar(ctx, bar) {
                   </span>
                 </div>
                 {smokeOutput.logs.length > 0 && (
-                  <div className="mt-2 space-y-0.5 text-[11px] text-text-muted bg-bg p-2 rounded border border-border">
+                  <div className="mt-2 space-y-0.5 text-xs text-text-muted bg-bg p-2 rounded border border-border">
                     {smokeOutput.logs.map((l, i) => (
                       <div key={i}>{l}</div>
                     ))}

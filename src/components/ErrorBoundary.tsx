@@ -32,15 +32,15 @@ export class ErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-950/20 p-6 text-center space-y-4 my-4">
-          <div className="w-12 h-12 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center mx-auto text-rose-400">
+        <div className="rounded-lg border border-danger/30 bg-danger/10 p-6 text-center space-y-4 my-4">
+          <div className="w-12 h-12 rounded-full bg-danger/10 border border-danger/20 flex items-center justify-center mx-auto text-danger">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white">
+            <h3 className="text-base font-bold text-text">
               {this.props.fallbackTitle || 'Component Error Encountered'}
             </h3>
-            <p className="text-xs text-rose-300/80 mt-1 max-w-md mx-auto">
+            <p className="text-xs text-danger/90 mt-1 max-w-md mx-auto">
               {this.state.error?.message || 'An unexpected error occurred while rendering this view.'}
             </p>
           </div>

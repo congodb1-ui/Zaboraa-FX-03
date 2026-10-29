@@ -56,49 +56,49 @@ export const NAV_HUBS: HubDef[] = [
   {
     id: 'research',
     label: 'Market Research Hub',
-    icon: <Compass className="w-4 h-4 text-emerald-400" />,
+    icon: <Compass className="w-4 h-4 text-success" />,
     defaultTab: 'technical',
     tabIds: ['technical', 'fundamentals', 'smartmoney', 'ai-analyst'],
     tabs: [
-      { id: 'technical', label: 'Technical Analysis', icon: <Flame className="w-3.5 h-3.5 text-amber-400" /> },
-      { id: 'fundamentals', label: 'Fundamental & Macro', icon: <Compass className="w-3.5 h-3.5 text-emerald-400" /> },
-      { id: 'smartmoney', label: 'Smart Money & COT', icon: <Footprints className="w-3.5 h-3.5 text-teal-400" /> },
-      { id: 'ai-analyst', label: 'AI Quant Advisor', icon: <Sparkles className="w-3.5 h-3.5 text-indigo-400" /> },
+      { id: 'technical', label: 'Technical Analysis', icon: <Flame className="w-3.5 h-3.5 text-warning" /> },
+      { id: 'fundamentals', label: 'Fundamental & Macro', icon: <Compass className="w-3.5 h-3.5 text-success" /> },
+      { id: 'smartmoney', label: 'Smart Money & COT', icon: <Footprints className="w-3.5 h-3.5 text-info" /> },
+      { id: 'ai-analyst', label: 'AI Quant Advisor', icon: <Sparkles className="w-3.5 h-3.5 text-primary" /> },
     ],
   },
   {
     id: 'strategylab',
     label: 'Strategy Lab',
-    icon: <BarChart3 className="w-4 h-4 text-violet-400" />,
+    icon: <BarChart3 className="w-4 h-4 text-primary" />,
     defaultTab: 'strategies',
     tabIds: ['strategies', 'backtest', 'optimization', 'pine'],
     tabs: [
-      { id: 'strategies', label: 'Strategy Studio', icon: <Code2 className="w-3.5 h-3.5 text-cyan-400" /> },
-      { id: 'backtest', label: 'Backtest & Batch Lab', icon: <BarChart3 className="w-3.5 h-3.5 text-violet-400" /> },
-      { id: 'optimization', label: 'Optimization & Heatmap', icon: <Sliders className="w-3.5 h-3.5 text-amber-400" /> },
-      { id: 'pine', label: 'Pine Script Converter', icon: <Layers className="w-3.5 h-3.5 text-purple-400" /> },
+      { id: 'strategies', label: 'Strategy Studio', icon: <Code2 className="w-3.5 h-3.5 text-info" /> },
+      { id: 'backtest', label: 'Backtest & Batch Lab', icon: <BarChart3 className="w-3.5 h-3.5 text-primary" /> },
+      { id: 'optimization', label: 'Optimization & Heatmap', icon: <Sliders className="w-3.5 h-3.5 text-warning" /> },
+      { id: 'pine', label: 'Pine Script Converter', icon: <Layers className="w-3.5 h-3.5 text-primary" /> },
     ],
   },
   {
     id: 'trading',
     label: 'Automated Trading Hub',
-    icon: <Activity className="w-4 h-4 text-cyan-400" />,
+    icon: <Activity className="w-4 h-4 text-info" />,
     defaultTab: 'markets',
     tabIds: ['markets', 'bots', 'data'],
     tabs: [
-      { id: 'markets', label: 'Trading Desk', icon: <Activity className="w-3.5 h-3.5 text-cyan-400" /> },
-      { id: 'bots', label: 'Automated Bot Fleet', icon: <Bot className="w-3.5 h-3.5 text-emerald-400" /> },
-      { id: 'data', label: 'Historical Vault', icon: <Database className="w-3.5 h-3.5 text-amber-400" /> },
+      { id: 'markets', label: 'Trading Desk', icon: <Activity className="w-3.5 h-3.5 text-info" /> },
+      { id: 'bots', label: 'Automated Bot Fleet', icon: <Bot className="w-3.5 h-3.5 text-success" /> },
+      { id: 'data', label: 'Historical Vault', icon: <Database className="w-3.5 h-3.5 text-warning" /> },
     ],
   },
   {
     id: 'admin',
     label: 'System & Security',
-    icon: <ShieldAlert className="w-4 h-4 text-rose-400" />,
+    icon: <ShieldAlert className="w-4 h-4 text-danger" />,
     defaultTab: 'accounts',
     tabIds: ['accounts', 'settings'],
     tabs: [
-      { id: 'accounts', label: 'Admin & Accounts', icon: <Users className="w-3.5 h-3.5 text-blue-400" /> },
+      { id: 'accounts', label: 'Admin & Accounts', icon: <Users className="w-3.5 h-3.5 text-info" /> },
       { id: 'settings', label: 'Environment & Risk', icon: <Settings className="w-3.5 h-3.5 text-text-muted" /> },
     ],
   },
@@ -169,6 +169,41 @@ export const Header: React.FC<HeaderProps> = ({
     setActiveTab(hub.defaultTab);
   };
 
+  // Dynamic company branding state
+  const [branding, setBranding] = useState<{ companyName: string; logoUrl: string }>(() => {
+    try {
+      const savedName = localStorage.getItem('zaboraa_company_name');
+      const savedLogo = localStorage.getItem('zaboraa_company_logo');
+      return {
+        companyName: savedName || 'Zaboraa FX',
+        logoUrl: savedLogo || '',
+      };
+    } catch {
+      return { companyName: 'Zaboraa FX', logoUrl: '' };
+    }
+  });
+
+  useEffect(() => {
+    const fetchBranding = () => {
+      fetch('/api/company/branding')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.companyName) {
+            setBranding({ companyName: data.companyName, logoUrl: data.logoUrl || '' });
+            try {
+              localStorage.setItem('zaboraa_company_name', data.companyName);
+              localStorage.setItem('zaboraa_company_logo', data.logoUrl || '');
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchBranding();
+    window.addEventListener('zaboraa_branding_updated', fetchBranding);
+    return () => window.removeEventListener('zaboraa_branding_updated', fetchBranding);
+  }, []);
+
   const hasConnectedAccount = brokerState.connected && Boolean(brokerState.accountLogin);
 
   return (
@@ -178,15 +213,23 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-4">
           {/* Brand Wordmark & Global Environment Badge */}
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white shadow-xs">
-              <TrendingUp className="w-4 h-4" />
-            </div>
+            {branding.logoUrl ? (
+              <img
+                src={branding.logoUrl}
+                alt={branding.companyName}
+                className="w-8 h-8 rounded-lg object-contain bg-surface border border-border"
+              />
+            ) : (
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white shadow-xs">
+                <TrendingUp className="w-4 h-4" />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-base text-text tracking-tight font-sans">
-                  Zaboraa FX
+                  {branding.companyName}
                 </span>
-                <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-warning/10 text-warning border border-warning/20">
+                <span className="px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning border border-warning/20">
                   Sample Data
                 </span>
                 <span className="text-text-muted text-xs hidden md:inline">

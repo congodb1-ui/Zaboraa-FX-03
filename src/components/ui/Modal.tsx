@@ -22,15 +22,48 @@ export const Modal: React.FC<ModalProps> = ({
   maxWidth = 'md',
   className = '',
 }) => {
+  const modalRef = React.useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
         onClose();
+        return;
+      }
+
+      if (e.key === 'Tab' && isOpen && modalRef.current) {
+        const focusables = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            last.focus();
+            e.preventDefault();
+          }
+        } else {
+          if (document.activeElement === last) {
+            first.focus();
+            e.preventDefault();
+          }
+        }
       }
     };
+
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       window.addEventListener('keydown', handleKeyDown);
+      setTimeout(() => {
+        if (modalRef.current) {
+          const first = modalRef.current.querySelector<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+          first?.focus();
+        }
+      }, 50);
     }
     return () => {
       document.body.style.overflow = '';
@@ -57,6 +90,7 @@ export const Modal: React.FC<ModalProps> = ({
 
       {/* Modal Dialog */}
       <div
+        ref={modalRef}
         className={`relative w-full ${widthMap[maxWidth]} bg-surface border border-border rounded-2xl shadow-xl text-text z-10 overflow-hidden transform transition-all ${className}`}
         role="dialog"
         aria-modal="true"
