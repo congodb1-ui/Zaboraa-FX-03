@@ -77,8 +77,6 @@ import {
   fredMacroBackfill,
   testSessionWindowsEvaluation,
   getMt5SymbolInfoXau,
-  exportAllDataBundle,
-  importAllDataBundle,
 } from './src/db/sqlite';
 import {
   isSupabaseConfigured,
@@ -1809,26 +1807,6 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     res.end();
   });
 
-  app.get('/api/data/export-bundle', (req: Request, res: Response) => {
-    try {
-      const bundle = exportAllDataBundle();
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="zaboraa_complete_data_${Date.now()}.json"`);
-      return res.json(bundle);
-    } catch (e: any) {
-      return res.status(500).json({ error: 'EXPORT_FAILED', message: e.message });
-    }
-  });
-
-  app.post('/api/data/import-bundle', express.json({ limit: '100mb' }), (req: Request, res: Response) => {
-    try {
-      const result = importAllDataBundle(req.body);
-      return res.json({ success: true, ...result });
-    } catch (e: any) {
-      return res.status(500).json({ error: 'IMPORT_FAILED', message: e.message });
-    }
-  });
-
   // ==========================================
   // 3. FUNDAMENTAL & COT (COMMITMENTS OF TRADERS) DATA (Stage 5)
   // ==========================================
@@ -2814,10 +2792,19 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
   const handleBacktestXauRoute = (req: Request, res: Response) => {
     isBacktestActive = true;
     try {
-      const m15Candles = loadCandlesFromDb('XAUUSD', 'M15');
+      const allM15Candles = loadCandlesFromDb('XAUUSD', 'M15');
+      // Enforce Train partition only: first 70% by time. Never read test or lockbox partitions!
+      const sortedCandles = [...allM15Candles].sort((a, b) => a.time - b.time);
+      const trainLimit = Math.floor(sortedCandles.length * 0.7);
+      const m15Candles = sortedCandles.slice(0, trainLimit);
+
       if (m15Candles.length < 30) {
         return res.json({
           success: true,
+          label: 'PRELIMINARY - not for decisions',
+          partition: 'TRAIN_ONLY (First 70% by time)',
+          trainCandlesCount: m15Candles.length,
+          totalCandlesCount: allM15Candles.length,
           trades: [],
           totalSetups: 0,
           winRate: '0%',
@@ -2825,11 +2812,11 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
           netReturnR: '0R',
           maxDrawdownR: '0R',
           expectancyR: '0R',
-          message: 'No run yet: Insufficient real XAUUSD candles in SQLite database.',
+          message: 'No run yet: Insufficient real XAUUSD candles in train partition.',
         });
       }
 
-      // Compute deterministic trade setups on real historical M15 candles from SQLite database
+      // Compute deterministic trade setups on real historical M15 candles from SQLite database (Train block only)
       const trades: any[] = [];
       const windowSize = 20;
 
