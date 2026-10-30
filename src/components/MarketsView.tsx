@@ -34,6 +34,7 @@ interface MarketsViewProps {
     tp?: number;
   }) => void;
   onClosePosition: (ticket: number) => void;
+  readOnly?: boolean;
 }
 
 export const MarketsView: React.FC<MarketsViewProps> = ({
@@ -42,6 +43,7 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
   orders,
   onPlaceOrder,
   onClosePosition,
+  readOnly = false,
 }) => {
   const [selectedSymbol, setSelectedSymbol] = useState<ForexSymbol>('EURUSD');
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
@@ -566,16 +568,20 @@ export const MarketsView: React.FC<MarketsViewProps> = ({
             {/* Natural Order Button with Review Step */}
             <button
               type="submit"
-              disabled={!brokerState.allowTrading || brokerState.killSwitchActive}
-              className={`w-full py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all cursor-pointer ${
-                !brokerState.allowTrading || brokerState.killSwitchActive
+              disabled={readOnly || !brokerState.allowTrading || brokerState.killSwitchActive}
+              className={`w-full py-3 rounded-xl font-bold text-sm text-white shadow-md transition-all ${
+                readOnly
+                  ? 'bg-surface border border-border text-text-muted cursor-not-allowed opacity-75'
+                  : !brokerState.allowTrading || brokerState.killSwitchActive
                   ? 'bg-surface border border-border text-text-muted cursor-not-allowed opacity-60'
                   : side === 'BUY'
-                  ? 'bg-success hover:opacity-90'
-                  : 'bg-danger hover:opacity-90'
+                  ? 'bg-success hover:opacity-90 cursor-pointer'
+                  : 'bg-danger hover:opacity-90 cursor-pointer'
               }`}
             >
-              {!brokerState.allowTrading
+              {readOnly
+                ? 'Order Execution Locked (Viewer Role)'
+                : !brokerState.allowTrading
                 ? 'Trading Disabled in Settings'
                 : brokerState.killSwitchActive
                 ? 'Emergency Halt Engaged'

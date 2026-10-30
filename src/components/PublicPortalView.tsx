@@ -73,6 +73,49 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
 
   const sessions = getSessionStatus();
 
+  // Dynamic branding configured by Admin Console
+  const [branding, setBranding] = useState<{
+    companyName: string;
+    heroHeadline: string;
+    heroSubtitle: string;
+    supportEmail: string;
+    deskPhone: string;
+    riskDisclosure: string;
+  }>({
+    companyName: 'Zaboraa FX',
+    heroHeadline: 'Algorithmic Quantitative FX & Gold Trading Desk',
+    heroSubtitle:
+      'Local-first high-frequency architecture connecting directly to MetaTrader 5 terminals. Built with sub-second deterministic risk firewalling, smart money institutional COT models, and isolated strategy execution sandboxes.',
+    supportEmail: 'desk@zaboraa.com',
+    deskPhone: '+1 (800) 555-FX01',
+    riskDisclosure:
+      'Mandatory Risk Disclosure: Leveraged Forex & Gold trading carries significant financial risk. Past algorithmic performance does not guarantee future results.',
+  });
+
+  useEffect(() => {
+    const loadBranding = () => {
+      fetch('/api/company/branding')
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) {
+            setBranding((prev) => ({
+              companyName: data.companyName || prev.companyName,
+              heroHeadline: data.heroHeadline || prev.heroHeadline,
+              heroSubtitle: data.heroSubtitle || prev.heroSubtitle,
+              supportEmail: data.supportEmail || prev.supportEmail,
+              deskPhone: data.deskPhone || prev.deskPhone,
+              riskDisclosure: data.riskDisclosure || prev.riskDisclosure,
+            }));
+          }
+        })
+        .catch(() => {});
+    };
+
+    loadBranding();
+    window.addEventListener('zaboraa_branding_updated', loadBranding);
+    return () => window.removeEventListener('zaboraa_branding_updated', loadBranding);
+  }, []);
+
   return (
     <div className="space-y-8 pb-12 animate-in fade-in duration-200">
       {/* 1. HERO INSTITUTIONAL SHOWCASE */}
@@ -81,7 +124,7 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary border border-primary/20">
               <Zap className="w-3.5 h-3.5" />
-              Institutional Quantitative Engine
+              {branding.companyName} Engine
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-success/10 text-success border border-success/20">
               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -94,13 +137,11 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
           </div>
 
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-text font-sans leading-tight">
-            Algorithmic Quantitative FX & Gold Trading Desk
+            {branding.heroHeadline}
           </h1>
 
           <p className="text-sm sm:text-base text-text-muted leading-relaxed font-sans max-w-2xl">
-            Local-first high-frequency architecture connecting directly to MetaTrader 5 terminals.
-            Built with sub-second deterministic risk firewalling, smart money institutional COT models,
-            and isolated strategy execution sandboxes.
+            {branding.heroSubtitle}
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
@@ -453,6 +494,22 @@ export const PublicPortalView: React.FC<PublicPortalViewProps> = ({
             <span>Proceed to Authentication Portal</span>
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
+        </div>
+      </div>
+
+      {/* 7. DESK CONTACTS & REGULATORY DISCLOSURE */}
+      <div className="p-5 rounded-2xl bg-surface/60 border border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-text-muted">
+        <div className="space-y-1 text-center sm:text-left">
+          <div className="font-semibold text-text">
+            {branding.companyName} Institutional Desk Operations
+          </div>
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-[11px]">
+            <span>Support: <strong className="text-text font-mono">{branding.supportEmail}</strong></span>
+            <span>Hotline: <strong className="text-text font-mono">{branding.deskPhone}</strong></span>
+          </div>
+        </div>
+        <div className="max-w-md text-[11px] leading-relaxed text-center sm:text-right">
+          {branding.riskDisclosure}
         </div>
       </div>
     </div>

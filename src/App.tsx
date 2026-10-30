@@ -15,6 +15,9 @@ import { SettingsView } from './components/SettingsView';
 import { KillSwitchModal } from './components/KillSwitchModal';
 import { SmartMoneyFootprintView } from './components/SmartMoneyFootprintView';
 import { AdminAccountsView } from './components/AdminAccountsView';
+import { LoginView } from './components/LoginView';
+import { PublicPortalView } from './components/PublicPortalView';
+import { useAuth } from './context/AuthContext';
 
 import {
   BacktestReport,
@@ -30,13 +33,55 @@ import {
 } from './types/forex';
 import { BUILT_IN_STRATEGIES, StrategyDefinition } from './engine/workerSandbox';
 import { globalRiskManager } from './engine/riskManager';
-import { ShieldCheck, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, TrendingUp, CheckCircle2, Lock, ShieldAlert } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<NavTab>('markets');
+  const { user, isPublic, effectiveRole, hasPermission } = useAuth();
+
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    try {
+      const cached = localStorage.getItem('zaboraa_local_session');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.role === 'admin' || parsed?.role === 'master_admin') {
+          return 'accounts';
+        }
+        return 'markets';
+      }
+    } catch {}
+    return 'public';
+  });
+
   const [isKillSwitchOpen, setIsKillSwitchOpen] = useState<boolean>(false);
   const [studioSelectedStrategyId, setStudioSelectedStrategyId] = useState<string | undefined>(undefined);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Dynamic route & RBAC protection
+  useEffect(() => {
+    if (isPublic) {
+      const publicAllowed: NavTab[] = ['public', 'login', 'technical', 'fundamentals', 'smartmoney'];
+      if (!publicAllowed.includes(activeTab)) {
+        setActiveTab('public');
+      }
+    } else {
+      if (activeTab === 'public') {
+        if (effectiveRole === 'admin' || effectiveRole === 'master_admin') {
+          setActiveTab('accounts');
+        } else {
+          setActiveTab('markets');
+        }
+      } else if (effectiveRole === 'viewer') {
+        const viewerAllowed: NavTab[] = ['markets', 'technical', 'fundamentals', 'smartmoney', 'ai-analyst'];
+        if (!viewerAllowed.includes(activeTab)) {
+          setActiveTab('markets');
+        }
+      } else if (effectiveRole === 'trader') {
+        if (activeTab === 'accounts' || activeTab === 'settings') {
+          setActiveTab('markets');
+        }
+      }
+    }
+  }, [isPublic, effectiveRole, activeTab]);
 
   // Dual Theme state (defaults to light mode)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -498,6 +543,23 @@ export const App: React.FC = () => {
     }
   };
 
+  if (activeTab === 'login') {
+    return (
+      <LoginView
+        onBackToPublic={() => setActiveTab('public')}
+        onLoginSuccess={(targetTab) => {
+          if (targetTab) {
+            setActiveTab(targetTab as NavTab);
+          } else if (effectiveRole === 'admin' || effectiveRole === 'master_admin') {
+            setActiveTab('accounts');
+          } else {
+            setActiveTab('markets');
+          }
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg text-text flex flex-col justify-between selection:bg-primary selection:text-white transition-colors">
       <div>
@@ -513,6 +575,13 @@ export const App: React.FC = () => {
 
         {/* Main Content Area */}
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          {activeTab === 'public' && (
+            <PublicPortalView
+              onNavigateToLogin={() => setActiveTab('login')}
+              onNavigateToTab={(tab) => setActiveTab(tab)}
+            />
+          )}
+
           {activeTab === 'markets' && (
             <MarketsView
               brokerState={brokerState}
@@ -520,6 +589,7 @@ export const App: React.FC = () => {
               orders={orders}
               onPlaceOrder={handlePlaceOrder}
               onClosePosition={handleClosePosition}
+              readOnly={effectiveRole === 'viewer'}
             />
           )}
 
@@ -594,43 +664,94 @@ export const App: React.FC = () => {
           )}
 
           {activeTab === 'bots' && (
-            <BotsView
-              bots={bots}
-              brokerState={brokerState}
-              riskEvents={riskEvents}
-              positions={positions}
-              orders={orders}
-              strategies={strategies}
-              datasets={datasets}
-              onClosePosition={handleClosePosition}
-              onToggleBotStatus={(botId, newStatus) =>
-                setBots((prev) =>
-                  prev.map((b) => (b.id === botId ? { ...b, status: newStatus } : b))
-                )
-              }
-              onChangeBotMode={(botId, newMode) =>
-                setBots((prev) =>
-                  prev.map((b) => (b.id === botId ? { ...b, mode: newMode } : b))
-                )
-              }
-              onAddBot={(bot) => setBots((prev) => [...prev, bot])}
-            />
+            effectiveRole === 'viewer' ? (
+              <div className="p-8 rounded-2xl bg-surface border border-border text-center space-y-3">
+                <Lock className="w-8 h-8 text-warning mx-auto" />
+                <h3 className="text-base font-bold text-text">Algorithmic Bot Fleet Locked</h3>
+                <p className="text-xs text-text-muted max-w-md mx-auto">
+                  Analyst (Viewer) accounts can review technical indicators and COT smart money positioning, but cannot deploy live or demo trading bots.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('technical')}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-semibold cursor-pointer"
+                >
+                  Explore Technical Research
+                </button>
+              </div>
+            ) : (
+              <BotsView
+                bots={bots}
+                brokerState={brokerState}
+                riskEvents={riskEvents}
+                positions={positions}
+                orders={orders}
+                strategies={strategies}
+                datasets={datasets}
+                onClosePosition={handleClosePosition}
+                onToggleBotStatus={(botId, newStatus) =>
+                  setBots((prev) =>
+                    prev.map((b) => (b.id === botId ? { ...b, status: newStatus } : b))
+                  )
+                }
+                onChangeBotMode={(botId, newMode) =>
+                  setBots((prev) =>
+                    prev.map((b) => (b.id === botId ? { ...b, mode: newMode } : b))
+                  )
+                }
+                onAddBot={(bot) => setBots((prev) => [...prev, bot])}
+              />
+            )
           )}
 
           {activeTab === 'accounts' && (
-            <AdminAccountsView
-              brokerState={brokerState}
-              onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
-            />
+            (effectiveRole === 'admin' || effectiveRole === 'master_admin') ? (
+              <AdminAccountsView
+                brokerState={brokerState}
+                onOpenKillSwitch={() => setIsKillSwitchOpen(true)}
+              />
+            ) : (
+              <div className="p-8 rounded-2xl bg-surface border border-danger/30 text-center space-y-3">
+                <ShieldAlert className="w-8 h-8 text-danger mx-auto" />
+                <h3 className="text-base font-bold text-text">Administrator Privileges Required</h3>
+                <p className="text-xs text-text-muted max-w-md mx-auto">
+                  The Admin Console, website branding, risk firewall, and user management are restricted to Trading Desk Admins and Master Administrators.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('markets')}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-semibold cursor-pointer"
+                >
+                  Return to Trading Desk
+                </button>
+              </div>
+            )
           )}
 
           {activeTab === 'settings' && (
-            <SettingsView
-              brokerState={brokerState}
-              onUpdateBrokerState={(state) =>
-                setBrokerState((prev) => ({ ...prev, ...state }))
-              }
-            />
+            (effectiveRole === 'admin' || effectiveRole === 'master_admin') ? (
+              <SettingsView
+                brokerState={brokerState}
+                onUpdateBrokerState={(state) =>
+                  setBrokerState((prev) => ({ ...prev, ...state }))
+                }
+              />
+            ) : (
+              <div className="p-8 rounded-2xl bg-surface border border-warning/30 text-center space-y-3">
+                <Lock className="w-8 h-8 text-warning mx-auto" />
+                <h3 className="text-base font-bold text-text">Settings Restricted</h3>
+                <p className="text-xs text-text-muted max-w-md mx-auto">
+                  Terminal broker configuration and server risk parameters can only be altered by desk administrators.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('markets')}
+                  className="px-4 py-2 rounded-lg bg-primary text-white text-xs font-semibold cursor-pointer"
+                >
+                  Return to Trading Desk
+                </button>
+              </div>
+            )
           )}
         </main>
       </div>

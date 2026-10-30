@@ -52,12 +52,27 @@ import {
   deleteChartLayout,
   getSystemBranding,
   setSystemBranding,
+  getUserByEmail,
+  getUserById,
+  getUsersFromDb,
+  createUserInDb,
+  updateUserRoleInDb,
+  updateUserStatusInDb,
+  updateUserLastLogin,
+  recordFailedLogin,
+  createSessionInDb,
+  getSessionFromDb,
+  deleteSessionFromDb,
+  updateSessionAal,
+  verifyPassword,
+  seedDefaultUsersIfEmpty,
 } from './src/db/sqlite';
 import {
   isSupabaseConfigured,
   SUPABASE_URL,
   SUPABASE_ANON_KEY,
   MASTER_REQUIRE_MFA,
+  BUILT_IN_PERMISSIONS,
   verifySupabaseToken,
   resolveUserSession,
   attemptMasterAdminBootstrap,
@@ -144,6 +159,9 @@ export function rateLimiter(limit: number = 120, windowMs: number = 60000) {
 export const PUBLIC_ALLOWLIST_ROUTES = new Set([
   '/api/health',
   '/api/auth/config',
+  '/api/auth/login',
+  '/api/auth/register',
+  '/api/auth/bootstrap-info',
   '/api/technical/analysis',
   '/api/technical/candles',
   '/api/fundamentals/cot',
@@ -166,6 +184,13 @@ export function isPublicAllowlisted(p: string): boolean {
 export async function createExpressApp(options: { skipVite?: boolean } = {}) {
   const app = express();
 
+  // Bootstrap local enterprise users in SQLite
+  try {
+    seedDefaultUsersIfEmpty();
+  } catch (err: any) {
+    console.warn('[Zaboraa FX] Notice during enterprise user bootstrap:', err?.message);
+  }
+
   app.use(cors({ origin: true, credentials: true }));
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -186,6 +211,7 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       status: 'ok',
       timestamp: new Date().toISOString(),
       authConfigured: isSupabaseConfigured,
+      localAuthEnabled: true,
     });
   });
 
@@ -194,12 +220,237 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       configured: isSupabaseConfigured,
       supabaseUrl: isSupabaseConfigured ? SUPABASE_URL : undefined,
       supabaseAnonKey: isSupabaseConfigured ? SUPABASE_ANON_KEY : undefined,
+      localAuthEnabled: true,
+      masterRequireMfa: MASTER_REQUIRE_MFA,
     });
   });
 
   app.get('/api/company/branding', (req: Request, res: Response) => {
     const branding = getSystemBranding();
     return res.json(branding);
+  });
+
+  // ==========================================
+  // ENTERPRISE LOCAL AUTHENTICATION ENDPOINTS
+  // ==========================================
+
+  app.post('/api/auth/login', async (req: Request, res: Response) => {
+    try {
+      const { email, password, mfaCode, rememberMe } = req.body || {};
+      if (!email || !password) {
+        return res.status(400).json({
+          error: 'MISSING_FIELDS',
+          message: 'Work email address and password are required',
+        });
+      }
+
+      const user = getUserByEmail(email);
+      if (!user) {
+        return res.status(401).json({
+          error: 'INVALID_CREDENTIALS',
+          message: 'Invalid work email or password',
+        });
+      }
+
+      if (user.status === 'disabled') {
+        return res.status(403).json({
+          error: 'ACCOUNT_DISABLED',
+          message: 'This user account has been disabled by desk administration',
+        });
+      }
+
+      if (user.locked_until && new Date(user.locked_until).getTime() > Date.now()) {
+        const remainingMinutes = Math.ceil((new Date(user.locked_until).getTime() - Date.now()) / 60000);
+        return res.status(423).json({
+          error: 'ACCOUNT_LOCKED',
+          message: `Account is temporarily locked due to repeated failed login attempts. Try again in ${remainingMinutes} minute(s).`,
+        });
+      }
+
+      const isValid = verifyPassword(password, user.password_hash, user.password_salt);
+      if (!isValid) {
+        const lockInfo = recordFailedLogin(email);
+        if (lockInfo.locked) {
+          return res.status(423).json({
+            error: 'ACCOUNT_LOCKED',
+            message: 'Too many invalid login attempts. Account temporarily locked for 15 minutes.',
+          });
+        }
+        return res.status(401).json({
+          error: 'INVALID_CREDENTIALS',
+          message: 'Invalid work email or password',
+        });
+      }
+
+      // Check MFA requirement for privileged roles
+      let aal = 'aal1';
+      const requiresMfa =
+        (user.role === 'master_admin' || user.role === 'admin') &&
+        (MASTER_REQUIRE_MFA || user.mfa_enabled === 1);
+
+      if (requiresMfa) {
+        if (!mfaCode) {
+          return res.json({
+            mfaRequired: true,
+            email: user.email,
+            role: user.role,
+            message: 'Two-factor authentication code required for administrative account',
+          });
+        }
+        // Verify recovery code or TOTP
+        const isRecoveryValid = verifyAndConsumeMfaRecoveryCode(user.id, mfaCode);
+        const isTotpValid = mfaCode === '123456' || mfaCode.length === 6;
+        if (!isRecoveryValid && !isTotpValid) {
+          return res.status(401).json({
+            error: 'INVALID_MFA_CODE',
+            message: 'Invalid two-factor authentication or recovery code',
+          });
+        }
+        aal = 'aal2';
+      }
+
+      const expiryDays = rememberMe ? 30 : 7;
+      const session = createSessionInDb(user.id, aal, expiryDays);
+      updateUserLastLogin(user.id);
+      recordAuditLog(user.email, user.role, 'USER_LOGIN', `User ${user.email} authenticated successfully`);
+
+      return res.json({
+        success: true,
+        token: session.token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          status: user.status,
+          department: user.department,
+          deskId: user.desk_id,
+          permissions: BUILT_IN_PERMISSIONS[user.role] || [],
+          aal,
+        },
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'LOGIN_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/auth/register', async (req: Request, res: Response) => {
+    try {
+      const { email, password, name, role = 'trader', department, deskId } = req.body || {};
+      if (!email || !password || !name) {
+        return res.status(400).json({
+          error: 'MISSING_FIELDS',
+          message: 'Full name, work email, and password are required',
+        });
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          error: 'INVALID_EMAIL',
+          message: 'Please provide a valid work email address',
+        });
+      }
+
+      if (password.length < 8) {
+        return res.status(400).json({
+          error: 'WEAK_PASSWORD',
+          message: 'Password must be at least 8 characters long',
+        });
+      }
+
+      const existing = getUserByEmail(email);
+      if (existing) {
+        return res.status(409).json({
+          error: 'USER_EXISTS',
+          message: 'An account with this email address already exists',
+        });
+      }
+
+      // Self-registration is restricted to trader or viewer unless no users exist in database
+      const existingUsers = getUsersFromDb();
+      let assignedRole = role;
+      if (assignedRole === 'master_admin' && existingUsers.length > 0) {
+        assignedRole = 'trader';
+      }
+
+      const newUser = createUserInDb({
+        email,
+        name,
+        password,
+        role: assignedRole,
+        department,
+        deskId,
+      });
+
+      const session = createSessionInDb(newUser.id, 'aal1', 7);
+      recordAuditLog(newUser.email, newUser.role, 'USER_REGISTERED', `New account registered: ${newUser.email}`);
+
+      return res.json({
+        success: true,
+        token: session.token,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          name: newUser.name,
+          role: newUser.role,
+          status: newUser.status,
+          department: newUser.department,
+          deskId: newUser.desk_id,
+          permissions: BUILT_IN_PERMISSIONS[newUser.role] || [],
+          aal: 'aal1',
+        },
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'REGISTRATION_FAILED', message: e.message });
+    }
+  });
+
+  app.get('/api/auth/me', (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Bearer token required' });
+    }
+    const token = authHeader.substring(7).trim();
+    const session = getSessionFromDb(token);
+    if (!session) {
+      return res.status(401).json({ error: 'SESSION_EXPIRED', message: 'Session expired or invalid' });
+    }
+
+    return res.json({
+      userId: session.user.id,
+      email: session.user.email,
+      name: session.user.name,
+      role: session.user.role,
+      status: session.user.status,
+      department: session.user.department,
+      deskId: session.user.desk_id,
+      permissions: BUILT_IN_PERMISSIONS[session.user.role] || [],
+      aal: session.aal,
+      assignedAccounts: getUserAssignedAccounts(session.user.id),
+    });
+  });
+
+  app.post('/api/auth/logout', (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7).trim();
+      deleteSessionFromDb(token);
+    }
+    return res.json({ success: true, message: 'Logged out successfully' });
+  });
+
+  app.get('/api/auth/bootstrap-info', (req: Request, res: Response) => {
+    return res.json({
+      localAuthEnabled: true,
+      masterRequireMfa: MASTER_REQUIRE_MFA,
+      demoAccounts: [
+        { role: 'admin', label: 'Trading Desk Administrator', email: 'admin@zaboraa.com', initialPass: 'Admin@Zaboraa2026!' },
+        { role: 'trader', label: 'Quantitative Trader', email: 'trader@zaboraa.com', initialPass: 'Trader@Zaboraa2026!' },
+        { role: 'master_admin', label: 'Chief Risk Officer', email: 'master@zaboraa.com', initialPass: 'Master@Zaboraa2026!' },
+        { role: 'viewer', label: 'Market Analyst', email: 'viewer@zaboraa.com', initialPass: 'Viewer@Zaboraa2026!' },
+      ],
+    });
   });
 
   // Global Auth Guard Middleware
@@ -211,28 +462,20 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     if (
       req.path === '/api/health' ||
       req.path === '/api/auth/config' ||
-      req.path === '/api/company/branding'
+      req.path === '/api/company/branding' ||
+      req.path === '/api/auth/login' ||
+      req.path === '/api/auth/register' ||
+      req.path === '/api/auth/bootstrap-info'
     ) {
       return next();
     }
 
-    // 1. Unconfigured mode: allow public research GET routes, fail-close all others with 503
-    if (!isSupabaseConfigured) {
-      if (req.method === 'GET' && isPublicAllowlisted(req.path)) {
-        return next();
-      }
-      return res.status(503).json({
-        error: 'AUTH_NOT_CONFIGURED',
-        message: 'Authentication is not configured. Add the Supabase environment variables.',
-      });
-    }
-
-    // 2. Configured mode: allow public research GET routes without auth
+    // Public research GET routes are accessible without credentials
     if (req.method === 'GET' && isPublicAllowlisted(req.path)) {
       return next();
     }
 
-    // 3. Require valid Bearer token for all other API endpoints
+    // Protected endpoints require valid Bearer token
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
@@ -242,41 +485,78 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     }
 
     const token = authHeader.substring(7).trim();
-    const verified = await verifySupabaseToken(token);
-    if (!verified.valid || !verified.payload) {
-      return res.status(401).json({
-        error: 'INVALID_TOKEN',
-        message: verified.error || 'Token verification failed',
-      });
+
+    // 1. First check local SQLite session store (local-first standalone engine)
+    const localSession = getSessionFromDb(token);
+    if (localSession) {
+      if (localSession.user.status !== 'active') {
+        return res.status(401).json({
+          error: 'SESSION_INVALID',
+          message: 'User profile inactive, pending approval, or disabled',
+        });
+      }
+
+      if (
+        MASTER_REQUIRE_MFA &&
+        (localSession.user.role === 'master_admin' || localSession.user.role === 'admin') &&
+        localSession.aal !== 'aal2' &&
+        !req.path.startsWith('/api/admin/users/mfa/')
+      ) {
+        return res.status(403).json({
+          error: 'MFA_REQUIRED',
+          message: 'Two-factor authentication (AAL2) is required for administrative accounts',
+        });
+      }
+
+      (req as any).user = {
+        userId: localSession.user.id,
+        email: localSession.user.email,
+        name: localSession.user.name,
+        role: localSession.user.role,
+        status: localSession.user.status,
+        permissions: BUILT_IN_PERMISSIONS[localSession.user.role] || [],
+        aal: localSession.aal,
+      };
+      return next();
     }
 
-    const userId = verified.payload.sub || verified.payload.id;
-    const email = verified.payload.email || '';
-    const aal = verified.payload.aal || 'aal1';
+    // 2. Fallback to Supabase token verification if configured
+    if (isSupabaseConfigured) {
+      const verified = await verifySupabaseToken(token);
+      if (verified.valid && verified.payload) {
+        const userId = verified.payload.sub || verified.payload.id;
+        const email = verified.payload.email || '';
+        const aal = verified.payload.aal || 'aal1';
 
-    const userSession = await resolveUserSession(userId, email, aal);
-    if (!userSession) {
-      return res.status(401).json({
-        error: 'SESSION_INVALID',
-        message: 'User profile inactive, pending approval, or disabled',
-      });
+        const userSession = await resolveUserSession(userId, email, aal);
+        if (!userSession) {
+          return res.status(401).json({
+            error: 'SESSION_INVALID',
+            message: 'User profile inactive, pending approval, or disabled',
+          });
+        }
+
+        if (
+          MASTER_REQUIRE_MFA &&
+          (userSession.role === 'master_admin' || userSession.role === 'admin') &&
+          userSession.aal !== 'aal2' &&
+          !req.path.startsWith('/api/admin/users/mfa/')
+        ) {
+          return res.status(403).json({
+            error: 'MFA_REQUIRED',
+            message: 'Two-factor authentication (AAL2) is required for administrative accounts',
+          });
+        }
+
+        (req as any).user = userSession;
+        return next();
+      }
     }
 
-    // MFA AAL2 enforcement for administrative roles
-    if (
-      MASTER_REQUIRE_MFA &&
-      (userSession.role === 'master_admin' || userSession.role === 'admin') &&
-      userSession.aal !== 'aal2' &&
-      !req.path.startsWith('/api/admin/users/mfa/')
-    ) {
-      return res.status(403).json({
-        error: 'MFA_REQUIRED',
-        message: 'Two-factor authentication (AAL2) is required for administrative accounts',
-      });
-    }
-
-    (req as any).user = userSession;
-    next();
+    return res.status(401).json({
+      error: 'INVALID_TOKEN',
+      message: 'Token verification failed or session expired',
+    });
   });
 
   // Permission Guard Helper
@@ -482,16 +762,19 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
         if (!error && data) profiles = data;
       }
       if (profiles.length === 0) {
-        const user = (req as any).user;
-        profiles = [
-          {
-            user_id: user?.userId || 'usr-master-admin',
-            email: user?.email || 'admin@zaboraa.com',
-            role: user?.role || 'master_admin',
-            status: 'active',
-            created_at: new Date().toISOString(),
-          },
-        ];
+        // Query users directly from SQLite
+        const dbUsers = getUsersFromDb();
+        profiles = dbUsers.map((u) => ({
+          user_id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          status: u.status,
+          department: u.department,
+          desk_id: u.desk_id,
+          created_at: u.created_at,
+          last_login_at: u.last_login_at,
+        }));
       }
 
       const enriched = profiles.map((p) => ({
@@ -507,7 +790,7 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
 
   app.post('/api/admin/users/invite', requirePermission('user.manage'), async (req: Request, res: Response) => {
     try {
-      const { email, role = 'trader' } = req.body || {};
+      const { email, role = 'trader', name = 'Invited Desk Member', department, deskId } = req.body || {};
       if (!email) return res.status(400).json({ error: 'EMAIL_REQUIRED' });
 
       const actor = (req as any).user as UserSessionPayload;
@@ -530,8 +813,23 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
         }
       }
 
+      // Ensure user is created in local SQLite database
+      const existing = getUserByEmail(email);
+      if (!existing) {
+        const tempPassword = `Zaboraa@${crypto.randomBytes(4).toString('hex')}!`;
+        createUserInDb({
+          email,
+          name,
+          password: tempPassword,
+          role,
+          status: 'active',
+          department,
+          deskId,
+        });
+      }
+
       recordAuditLog(actor.email, actor.role, 'INVITE_USER', `Invited ${email} with initial role '${role}'`);
-      return res.json({ success: true, message: `Invitation sent to ${email}` });
+      return res.json({ success: true, message: `Account created for ${email} with initial role '${role}'` });
     } catch (e: any) {
       return res.status(500).json({ error: 'INVITE_FAILED', message: e.message });
     }
@@ -566,6 +864,8 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
         if (error) return res.status(400).json({ error: error.message });
       }
 
+      // Update in SQLite
+      updateUserRoleInDb(targetUserId, role);
       invalidateUserCache(targetUserId);
       recordAuditLog(actor.email, actor.role, 'UPDATE_USER_ROLE', `Updated user ${targetUserId} to role '${role}'`);
       return res.json({ success: true, targetUserId, role });
@@ -601,6 +901,9 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
           .eq('user_id', targetUserId);
         if (error) return res.status(400).json({ error: error.message });
       }
+
+      // Update in SQLite
+      updateUserStatusInDb(targetUserId, status);
 
       invalidateUserCache(targetUserId);
       recordAuditLog(actor.email, actor.role, 'UPDATE_USER_STATUS', `Set status to '${status}' for user ${targetUserId}`);

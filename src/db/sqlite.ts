@@ -386,6 +386,37 @@ db.exec(`
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    password_salt TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'trader',
+    status TEXT NOT NULL DEFAULT 'active',
+    department TEXT,
+    desk_id TEXT,
+    mfa_enabled INTEGER NOT NULL DEFAULT 0,
+    mfa_secret TEXT,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    last_login_at TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
+  CREATE TABLE IF NOT EXISTS user_sessions (
+    token TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    aal TEXT NOT NULL DEFAULT 'aal1',
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id);
+  CREATE INDEX IF NOT EXISTS idx_user_sessions_expires ON user_sessions(expires_at);
 `);
 
 /**
@@ -1797,6 +1828,289 @@ export function setSystemBranding(
       upsert('default_symbol', extraConfig.defaultSymbol.trim().toUpperCase());
     }
   }
+}
+
+// ============================================================================
+// ENTERPRISE LOCAL AUTHENTICATION & SESSION MANAGEMENT
+// ============================================================================
+
+export interface DbUser {
+  id: string;
+  email: string;
+  name: string;
+  password_hash: string;
+  password_salt: string;
+  role: string;
+  status: string;
+  department?: string | null;
+  desk_id?: string | null;
+  mfa_enabled: number;
+  mfa_secret?: string | null;
+  failed_attempts: number;
+  locked_until?: string | null;
+  created_at: string;
+  updated_at: string;
+  last_login_at?: string | null;
+}
+
+export interface DbSession {
+  token: string;
+  user_id: string;
+  aal: string;
+  created_at: string;
+  expires_at: string;
+}
+
+export function hashPassword(password: string, salt: string): string {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+}
+
+export function verifyPassword(password: string, storedHash: string, salt: string): boolean {
+  try {
+    const computed = hashPassword(password, salt);
+    return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(storedHash, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+export function getUserByEmail(email: string): DbUser | null {
+  const row = db.prepare('SELECT * FROM users WHERE LOWER(email) = LOWER(?)').get(email.trim());
+  return (row as DbUser) || null;
+}
+
+export function getUserById(id: string): DbUser | null {
+  const row = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
+  return (row as DbUser) || null;
+}
+
+export function getUsersFromDb(): Omit<DbUser, 'password_hash' | 'password_salt' | 'mfa_secret'>[] {
+  const rows = db.prepare(`
+    SELECT id, email, name, role, status, department, desk_id, mfa_enabled, failed_attempts, locked_until, created_at, updated_at, last_login_at
+    FROM users
+    ORDER BY created_at ASC
+  `).all();
+  return rows as any[];
+}
+
+export function createUserInDb(params: {
+  id?: string;
+  email: string;
+  name: string;
+  password: string;
+  role?: string;
+  status?: string;
+  department?: string;
+  deskId?: string;
+}): DbUser {
+  const id = params.id || `usr-${crypto.randomBytes(8).toString('hex')}`;
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(params.password, salt);
+  const now = new Date().toISOString();
+
+  const role = params.role || 'trader';
+  const status = params.status || 'active';
+
+  db.prepare(`
+    INSERT INTO users (id, email, name, password_hash, password_salt, role, status, department, desk_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    params.email.trim().toLowerCase(),
+    params.name.trim(),
+    passwordHash,
+    salt,
+    role,
+    status,
+    params.department || null,
+    params.deskId || null,
+    now,
+    now
+  );
+
+  return getUserById(id)!;
+}
+
+export function updateUserRoleInDb(userId: string, role: string): boolean {
+  const res = db.prepare(`
+    UPDATE users
+    SET role = ?, updated_at = ?
+    WHERE id = ?
+  `).run(role, new Date().toISOString(), userId);
+  return res.changes > 0;
+}
+
+export function updateUserStatusInDb(userId: string, status: string): boolean {
+  const res = db.prepare(`
+    UPDATE users
+    SET status = ?, updated_at = ?
+    WHERE id = ?
+  `).run(status, new Date().toISOString(), userId);
+  return res.changes > 0;
+}
+
+export function updateUserLastLogin(userId: string): void {
+  db.prepare('UPDATE users SET last_login_at = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?')
+    .run(new Date().toISOString(), userId);
+}
+
+export function recordFailedLogin(email: string): { locked: boolean; attempts: number } {
+  const user = getUserByEmail(email);
+  if (!user) return { locked: false, attempts: 0 };
+
+  const attempts = (user.failed_attempts || 0) + 1;
+  let lockedUntil: string | null = null;
+  if (attempts >= 5) {
+    // Lock for 15 minutes after 5 failed attempts
+    lockedUntil = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+  }
+
+  db.prepare('UPDATE users SET failed_attempts = ?, locked_until = ? WHERE id = ?')
+    .run(attempts, lockedUntil, user.id);
+
+  return { locked: Boolean(lockedUntil), attempts };
+}
+
+export function createSessionInDb(userId: string, aal: string = 'aal1', expiryDays: number = 7): DbSession {
+  const token = `zbx_${crypto.randomBytes(32).toString('hex')}`;
+  const now = new Date();
+  const expires = new Date(now.getTime() + expiryDays * 24 * 60 * 60 * 1000);
+
+  db.prepare(`
+    INSERT INTO user_sessions (token, user_id, aal, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(token, userId, aal, now.toISOString(), expires.toISOString());
+
+  return {
+    token,
+    user_id: userId,
+    aal,
+    created_at: now.toISOString(),
+    expires_at: expires.toISOString(),
+  };
+}
+
+export function getSessionFromDb(token: string): (DbSession & { user: DbUser }) | null {
+  if (!token) return null;
+  const row = db.prepare(`
+    SELECT s.token, s.user_id, s.aal, s.created_at, s.expires_at,
+           u.id as u_id, u.email, u.name, u.role, u.status, u.department, u.desk_id,
+           u.mfa_enabled, u.failed_attempts, u.locked_until, u.created_at as u_created_at,
+           u.updated_at as u_updated_at, u.last_login_at
+    FROM user_sessions s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.token = ?
+  `).get(token) as any;
+
+  if (!row) return null;
+
+  // Check if session expired
+  if (new Date(row.expires_at).getTime() <= Date.now()) {
+    deleteSessionFromDb(token);
+    return null;
+  }
+
+  // Check if user is locked
+  if (row.locked_until && new Date(row.locked_until).getTime() > Date.now()) {
+    return null;
+  }
+
+  return {
+    token: row.token,
+    user_id: row.user_id,
+    aal: row.aal,
+    created_at: row.created_at,
+    expires_at: row.expires_at,
+    user: {
+      id: row.u_id,
+      email: row.email,
+      name: row.name,
+      password_hash: '',
+      password_salt: '',
+      role: row.role,
+      status: row.status,
+      department: row.department,
+      desk_id: row.desk_id,
+      mfa_enabled: row.mfa_enabled,
+      failed_attempts: row.failed_attempts,
+      locked_until: row.locked_until,
+      created_at: row.u_created_at,
+      updated_at: row.u_updated_at,
+      last_login_at: row.last_login_at,
+    },
+  };
+}
+
+export function deleteSessionFromDb(token: string): boolean {
+  const res = db.prepare('DELETE FROM user_sessions WHERE token = ?').run(token);
+  return res.changes > 0;
+}
+
+export function updateSessionAal(token: string, aal: string): boolean {
+  const res = db.prepare('UPDATE user_sessions SET aal = ? WHERE token = ?').run(aal, token);
+  return res.changes > 0;
+}
+
+/**
+ * Seeds default enterprise accounts in SQLite if none exist.
+ * This guarantees that when the repository is downloaded and run locally on Windows,
+ * all enterprise roles can log in immediately with realistic hashed credentials.
+ */
+export function seedDefaultUsersIfEmpty(): { seeded: boolean; count: number } {
+  const countRow = db.prepare('SELECT COUNT(*) as cnt FROM users').get() as { cnt: number };
+  if (countRow.cnt > 0) {
+    return { seeded: false, count: countRow.cnt };
+  }
+
+  const defaultAccounts = [
+    {
+      id: 'usr-admin-default',
+      email: 'admin@zaboraa.com',
+      name: 'Trading Desk Administrator',
+      password: 'Admin@Zaboraa2026!',
+      role: 'admin',
+      department: 'Desk Operations',
+      desk_id: 'DESK-LON-01',
+    },
+    {
+      id: 'usr-master-default',
+      email: 'master@zaboraa.com',
+      name: 'Chief Risk Officer',
+      password: 'Master@Zaboraa2026!',
+      role: 'master_admin',
+      department: 'Executive Risk',
+      desk_id: 'DESK-HQ-01',
+    },
+    {
+      id: 'usr-trader-default',
+      email: 'trader@zaboraa.com',
+      name: 'Senior Quantitative Trader',
+      password: 'Trader@Zaboraa2026!',
+      role: 'trader',
+      department: 'FX & Precious Metals',
+      desk_id: 'DESK-ALGO-01',
+    },
+    {
+      id: 'usr-viewer-default',
+      email: 'viewer@zaboraa.com',
+      name: 'Institutional Market Analyst',
+      password: 'Viewer@Zaboraa2026!',
+      role: 'viewer',
+      department: 'Macro Research',
+      desk_id: 'DESK-RSCH-01',
+    },
+  ];
+
+  for (const acc of defaultAccounts) {
+    createUserInDb(acc);
+  }
+
+  // Assign primary Exness demo account to default users
+  assignUserAccount('usr-admin-default', '50192834', 'system');
+  assignUserAccount('usr-master-default', '50192834', 'system');
+  assignUserAccount('usr-trader-default', '50192834', 'system');
+
+  return { seeded: true, count: defaultAccounts.length };
 }
 
 

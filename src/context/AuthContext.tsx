@@ -26,7 +26,26 @@ interface AuthContextType {
   isPublic: boolean;
   sessionExpired: boolean;
   setSessionExpired: (val: boolean) => void;
-  signInWithPassword: (email: string, pass: string) => Promise<{ error?: string }>;
+  signInWithCredentials: (
+    email: string,
+    pass: string,
+    mfaCode?: string,
+    rememberMe?: boolean
+  ) => Promise<{ error?: string; mfaRequired?: boolean }>;
+  signInWithPassword: (
+    email: string,
+    pass: string,
+    mfaCode?: string,
+    rememberMe?: boolean
+  ) => Promise<{ error?: string; mfaRequired?: boolean }>;
+  registerAccount: (params: {
+    email: string;
+    password: string;
+    name: string;
+    role?: string;
+    department?: string;
+    deskId?: string;
+  }) => Promise<{ error?: string }>;
   signInWithOtp: (email: string) => Promise<{ error?: string }>;
   signInWithLocalAccount: (email: string, role: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
@@ -84,6 +103,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('zaboraa_auth_token') || null;
+    } catch {
+      return null;
+    }
+  });
   const [previewRole, setPreviewRole] = useState<string | null>(null);
   const [isConfigured, setIsConfigured] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -94,36 +120,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let isMounted = true;
 
     async function initAuth() {
-      // 1. Check local session cache first
+      // 1. Verify saved enterprise token with backend SQLite session store
       try {
-        const cached = localStorage.getItem('zaboraa_local_session');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && parsed.email && parsed.role) {
-            const localUser = {
-              id: 'local-' + parsed.role,
-              email: parsed.email,
+        const savedToken = localStorage.getItem('zaboraa_auth_token');
+        if (savedToken) {
+          const res = await fetch('/api/auth/me', {
+            headers: {
+              Authorization: `Bearer ${savedToken}`,
+            },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const authedUser = {
+              id: data.userId,
+              email: data.email,
               app_metadata: {},
-              user_metadata: {},
+              user_metadata: { name: data.name },
               aud: 'authenticated',
               created_at: new Date().toISOString(),
             } as unknown as User;
 
-            const localProfile: UserProfile = {
-              userId: localUser.id,
-              email: parsed.email,
-              role: parsed.role,
-              status: 'active',
-              permissions: DEFAULT_ROLE_PERMISSIONS[parsed.role] || [],
-              aal: parsed.role === 'master_admin' || parsed.role === 'admin' ? 'aal2' : 'aal1',
+            const authedProfile: UserProfile = {
+              userId: data.userId,
+              email: data.email,
+              role: data.role,
+              status: data.status,
+              permissions: data.permissions || DEFAULT_ROLE_PERMISSIONS[data.role] || [],
+              aal: data.aal || 'aal1',
             };
 
-            setUser(localUser);
-            setProfile(localProfile);
+            if (isMounted) {
+              setUser(authedUser);
+              setProfile(authedProfile);
+              setAuthToken(savedToken);
+              setIsLoading(false);
+              return;
+            }
+          } else {
+            // Token expired or invalid
+            localStorage.removeItem('zaboraa_auth_token');
+            if (isMounted) setAuthToken(null);
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn('Failed to verify local session:', err);
+      }
 
+      // 2. Check Supabase if configured
       const config = await fetchAuthConfig();
       if (!isMounted) return;
 
@@ -197,73 +240,152 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithLocalAccount = async (email: string, targetRole: string): Promise<{ error?: string }> => {
-    const validRoles = ['master_admin', 'admin', 'trader', 'viewer'];
-    const assignedRole = validRoles.includes(targetRole) ? targetRole : 'trader';
-    const localUser = {
-      id: 'local-' + assignedRole + '-' + Date.now().toString(36),
-      email,
-      app_metadata: {},
-      user_metadata: {},
-      aud: 'authenticated',
-      created_at: new Date().toISOString(),
-    } as unknown as User;
-
-    const localProfile: UserProfile = {
-      userId: localUser.id,
-      email,
-      role: assignedRole,
-      status: 'active',
-      permissions: DEFAULT_ROLE_PERMISSIONS[assignedRole] || [],
-      aal: assignedRole === 'master_admin' || assignedRole === 'admin' ? 'aal2' : 'aal1',
-    };
-
-    setUser(localUser);
-    setProfile(localProfile);
-    setSessionExpired(false);
+  /**
+   * Enterprise Credentials Authentication against backend SQLite
+   */
+  const signInWithCredentials = async (
+    email: string,
+    pass: string,
+    mfaCode?: string,
+    rememberMe: boolean = true
+  ): Promise<{ error?: string; mfaRequired?: boolean }> => {
     try {
-      localStorage.setItem('zaboraa_local_session', JSON.stringify({ email, role: assignedRole }));
-    } catch {}
-    return {};
-  };
-
-  const signInWithPassword = async (email: string, pass: string): Promise<{ error?: string }> => {
-    const supabase = getSupabaseClient();
-    if (supabase) {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password: pass,
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass, mfaCode, rememberMe }),
       });
 
-      if (!error && data.session) {
-        setSession(data.session);
-        setUser(data.user);
-        await loadUserProfile(data.session.access_token);
+      const data = await res.json();
+      if (!res.ok) {
+        return { error: data.message || data.error || 'Authentication failed' };
+      }
+
+      if (data.mfaRequired) {
+        return { mfaRequired: true };
+      }
+
+      if (data.token && data.user) {
+        try {
+          localStorage.setItem('zaboraa_auth_token', data.token);
+        } catch {}
+        setAuthToken(data.token);
+
+        const authedUser = {
+          id: data.user.id,
+          email: data.user.email,
+          app_metadata: {},
+          user_metadata: { name: data.user.name },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as unknown as User;
+
+        const authedProfile: UserProfile = {
+          userId: data.user.id,
+          email: data.user.email,
+          role: data.user.role,
+          status: data.user.status,
+          permissions: data.user.permissions || DEFAULT_ROLE_PERMISSIONS[data.user.role] || [],
+          aal: data.user.aal || 'aal1',
+        };
+
+        setUser(authedUser);
+        setProfile(authedProfile);
+        setSessionExpired(false);
         return {};
       }
-      if (error && isConfigured) {
-        return { error: error.message };
-      }
-    }
 
-    // Local / Demo password sign-in fallback
-    const lower = email.toLowerCase();
-    let deducedRole = 'trader';
-    if (lower.includes('master') || lower === 'master_admin@zaboraa.com') {
-      deducedRole = 'master_admin';
-    } else if (lower.includes('admin') || lower === 'admin@zaboraa.com') {
-      deducedRole = 'admin';
-    } else if (lower.includes('viewer') || lower === 'viewer@zaboraa.com') {
-      deducedRole = 'viewer';
+      return { error: 'Invalid response from authentication server' };
+    } catch (err: any) {
+      return { error: `Connection failed: ${err.message}` };
     }
-    return signInWithLocalAccount(email, deducedRole);
+  };
+
+  const signInWithPassword = async (
+    email: string,
+    pass: string,
+    mfaCode?: string,
+    rememberMe?: boolean
+  ): Promise<{ error?: string; mfaRequired?: boolean }> => {
+    return signInWithCredentials(email, pass, mfaCode, rememberMe);
+  };
+
+  /**
+   * Enterprise User Self-Registration
+   */
+  const registerAccount = async (params: {
+    email: string;
+    password: string;
+    name: string;
+    role?: string;
+    department?: string;
+    deskId?: string;
+  }): Promise<{ error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { error: data.message || data.error || 'Registration failed' };
+      }
+
+      if (data.token && data.user) {
+        try {
+          localStorage.setItem('zaboraa_auth_token', data.token);
+        } catch {}
+        setAuthToken(data.token);
+
+        const authedUser = {
+          id: data.user.id,
+          email: data.user.email,
+          app_metadata: {},
+          user_metadata: { name: data.user.name },
+          aud: 'authenticated',
+          created_at: new Date().toISOString(),
+        } as unknown as User;
+
+        const authedProfile: UserProfile = {
+          userId: data.user.id,
+          email: data.user.email,
+          role: data.user.role,
+          status: data.user.status,
+          permissions: data.user.permissions || DEFAULT_ROLE_PERMISSIONS[data.user.role] || [],
+          aal: data.user.aal || 'aal1',
+        };
+
+        setUser(authedUser);
+        setProfile(authedProfile);
+        setSessionExpired(false);
+        return {};
+      }
+
+      return { error: 'Registration failed' };
+    } catch (err: any) {
+      return { error: `Connection failed: ${err.message}` };
+    }
+  };
+
+  const signInWithLocalAccount = async (email: string, targetRole: string): Promise<{ error?: string }> => {
+    // Forward to credentials with default password
+    const defaultPassword =
+      targetRole === 'admin'
+        ? 'Admin@Zaboraa2026!'
+        : targetRole === 'master_admin'
+        ? 'Master@Zaboraa2026!'
+        : targetRole === 'viewer'
+        ? 'Viewer@Zaboraa2026!'
+        : 'Trader@Zaboraa2026!';
+    return signInWithCredentials(email, defaultPassword);
   };
 
   const signInWithOtp = async (email: string): Promise<{ error?: string }> => {
     const supabase = getSupabaseClient();
     if (!supabase) {
-      // Local fallback for OTP
-      return signInWithLocalAccount(email, 'trader');
+      return { error: 'Magic Link is only supported when Supabase SMTP is configured. Please use enterprise password credentials.' };
     }
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -278,15 +400,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    const token = authToken || session?.access_token;
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      }).catch(() => {});
+    }
+
     const supabase = getSupabaseClient();
     if (supabase) {
       try {
         await supabase.auth.signOut();
       } catch {}
     }
+
     try {
+      localStorage.removeItem('zaboraa_auth_token');
       localStorage.removeItem('zaboraa_local_session');
     } catch {}
+
+    setAuthToken(null);
     setSession(null);
     setUser(null);
     setProfile(null);
@@ -294,8 +428,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getAccessToken = useCallback((): string | null => {
-    return session?.access_token || null;
-  }, [session]);
+    return authToken || session?.access_token || null;
+  }, [authToken, session]);
 
   const isPublic = !user;
   const role = user ? (profile?.role || 'trader') : 'public';
@@ -341,7 +475,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isPublic,
         sessionExpired,
         setSessionExpired,
+        signInWithCredentials,
         signInWithPassword,
+        registerAccount,
         signInWithOtp,
         signInWithLocalAccount,
         signOut,
