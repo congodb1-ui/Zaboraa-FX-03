@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { runSmartMoneyEventStudy } from '../smartMoney/eventStudy';
-import { generateHistoricalCotBaseline } from '../smartMoney/cotIngest';
 import { Candle } from '../../types/forex';
+import { SmartMoneyCotRow } from '../../db/sqlite';
+import { computeEffectiveAt } from '../smartMoney/cotFeatures';
 
 function createContiguousCandles(count: number): Candle[] {
   const candles: Candle[] = [];
@@ -20,8 +21,31 @@ function createContiguousCandles(count: number): Candle[] {
   return candles;
 }
 
+function generateTestCotRows(): SmartMoneyCotRow[] {
+  const rows: SmartMoneyCotRow[] = [];
+  const baseDate = new Date('2024-01-02T00:00:00Z');
+  for (let i = 0; i < 120; i++) {
+    const d = new Date(baseDate);
+    d.setUTCDate(baseDate.getUTCDate() + i * 7);
+    const dateStr = d.toISOString().split('T')[0];
+    rows.push({
+      market: 'COMEX Gold',
+      report_date: dateStr,
+      open_interest: 480000 + (i % 10) * 2000,
+      long: 210000 + (i % 10) * 1500,
+      short: 50000 - (i % 10) * 500,
+      net: 160000 + (i % 10) * 2000,
+      net_pct_oi: 33.3,
+      source: 'CFTC Public Reporting API',
+      fetched_at: new Date().toISOString(),
+      effective_at: computeEffectiveAt(dateStr),
+    });
+  }
+  return rows;
+}
+
 describe('Smart Money Event Study Engine', () => {
-  const cotRows = generateHistoricalCotBaseline();
+  const cotRows = generateTestCotRows();
   const mockCandles = createContiguousCandles(350);
 
   it('generates identical results with fixed seed (determinism)', () => {

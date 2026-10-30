@@ -26,6 +26,7 @@ import {
   AlertCircle,
   Globe,
   Lock,
+  Target,
 } from 'lucide-react';
 import { BrokerState } from '../types/forex';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +40,7 @@ export type NavTab =
   | 'ai-analyst'
   | 'backtest'
   | 'strategies'
+  | 'xau-guide'
   | 'optimization'
   | 'pine'
   | 'data'
@@ -82,9 +84,10 @@ export const NAV_HUBS: HubDef[] = [
     id: 'strategylab',
     label: 'Strategy Lab',
     icon: <BarChart3 className="w-4 h-4 text-primary" />,
-    defaultTab: 'strategies',
-    tabIds: ['strategies', 'backtest', 'optimization', 'pine'],
+    defaultTab: 'xau-guide',
+    tabIds: ['xau-guide', 'strategies', 'backtest', 'optimization', 'pine'],
     tabs: [
+      { id: 'xau-guide', label: 'XAU Strategy Guide', icon: <Target className="w-3.5 h-3.5 text-warning" />, badge: 'DEMO' },
       { id: 'strategies', label: 'Strategy Studio', icon: <Code2 className="w-3.5 h-3.5 text-info" /> },
       { id: 'backtest', label: 'Backtest & Batch Lab', icon: <BarChart3 className="w-3.5 h-3.5 text-primary" /> },
       { id: 'optimization', label: 'Optimization & Heatmap', icon: <Sliders className="w-3.5 h-3.5 text-warning" /> },
@@ -138,27 +141,29 @@ export const Header: React.FC<HeaderProps> = ({
   // Filter Hubs based on user and RBAC permissions
   const authorizedHubs = useMemo(() => {
     if (isPublic) {
-      // Public visitors only see public market research hub
+      // Public visitors see public market research hub and XAU Strategy Guide (DEMO)
       return [
         {
           id: 'research' as NavHubId,
           label: 'Public Market Research',
           icon: <Compass className="w-4 h-4 text-success" />,
           defaultTab: 'technical' as NavTab,
-          tabIds: ['technical', 'fundamentals', 'smartmoney'] as NavTab[],
+          tabIds: ['technical', 'fundamentals', 'smartmoney', 'xau-guide'] as NavTab[],
           tabs: [
             { id: 'technical' as NavTab, label: 'Technical Analysis', icon: <Flame className="w-3.5 h-3.5 text-warning" /> },
             { id: 'fundamentals' as NavTab, label: 'Fundamental & Macro', icon: <Compass className="w-3.5 h-3.5 text-success" /> },
             { id: 'smartmoney' as NavTab, label: 'Smart Money & COT', icon: <Footprints className="w-3.5 h-3.5 text-info" /> },
+            { id: 'xau-guide' as NavTab, label: 'XAU Strategy Guide', icon: <Target className="w-3.5 h-3.5 text-warning" />, badge: 'DEMO' },
           ],
         },
       ];
     }
 
     if (effectiveRole === 'viewer') {
-      // Viewer sees research and view-only trading desk
+      // Viewer sees research, XAU guide, and view-only trading desk
       return [
         NAV_HUBS[0], // Research
+        NAV_HUBS[1], // Strategy Lab
         {
           id: 'trading' as NavHubId,
           label: 'Trading Desk (Viewer)',

@@ -18,6 +18,7 @@ import { AdminAccountsView } from './components/AdminAccountsView';
 import { LoginView } from './components/LoginView';
 import { PublicPortalView } from './components/PublicPortalView';
 import { ProfileView } from './components/ProfileView';
+import { XauStrategyGuideView } from './components/XauStrategyGuideView';
 import { useAuth } from './context/AuthContext';
 
 import {
@@ -60,7 +61,7 @@ export const App: React.FC = () => {
   // Dynamic route & RBAC protection
   useEffect(() => {
     if (isPublic) {
-      const publicAllowed: NavTab[] = ['public', 'login', 'technical', 'fundamentals', 'smartmoney'];
+      const publicAllowed: NavTab[] = ['public', 'login', 'technical', 'fundamentals', 'smartmoney', 'xau-guide'];
       if (!publicAllowed.includes(activeTab)) {
         setActiveTab(activeTab === 'profile' ? 'login' : 'public');
       }
@@ -72,7 +73,7 @@ export const App: React.FC = () => {
           setActiveTab('markets');
         }
       } else if (effectiveRole === 'viewer') {
-        const viewerAllowed: NavTab[] = ['markets', 'technical', 'fundamentals', 'smartmoney', 'ai-analyst', 'profile'];
+        const viewerAllowed: NavTab[] = ['markets', 'technical', 'fundamentals', 'smartmoney', 'ai-analyst', 'xau-guide', 'profile'];
         if (!viewerAllowed.includes(activeTab)) {
           setActiveTab('markets');
         }
@@ -633,6 +634,10 @@ export const App: React.FC = () => {
               onCreateStrategy={handleCreateStrategy}
               onDeleteStrategy={handleDeleteStrategy}
             />
+          )}
+
+          {activeTab === 'xau-guide' && (
+            <XauStrategyGuideView />
           )}
 
           {activeTab === 'optimization' && (
