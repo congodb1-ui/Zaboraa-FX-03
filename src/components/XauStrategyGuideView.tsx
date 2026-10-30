@@ -7,6 +7,7 @@ import {
   Terminal,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   RefreshCw,
   Copy,
   Trash2,
@@ -78,19 +79,31 @@ export const XauStrategyGuideView: React.FC = () => {
   const [isRunningCommand, setIsRunningCommand] = useState<boolean>(false);
 
   // Strategy Weights (Bias Layer - 15m previous CLOSED bar only)
-  const [weightCot, setWeightCot] = useState<number>(30);
+  // Requirement 2: DXY set to 0 (no clean source in v1); other 4 layers 25% placeholders (not tuned yet)
+  const [weightCot, setWeightCot] = useState<number>(25);
   const [weightActivity, setWeightActivity] = useState<number>(25);
-  const [weightTrend, setWeightTrend] = useState<number>(15);
-  const [weightRealYield, setWeightRealYield] = useState<number>(20);
-  const [weightDxy, setWeightDxy] = useState<number>(10);
+  const [weightTrend, setWeightTrend] = useState<number>(25);
+  const [weightRealYield, setWeightRealYield] = useState<number>(25);
+  const [weightDxy, setWeightDxy] = useState<number>(0);
 
   // Normalization preview sliders (-100 to +100)
   const [cCot, setCCot] = useState<number>(45);
   const [cAct, setCAct] = useState<number>(60);
   const [cTrend, setCTrend] = useState<number>(50);
   const [cRealYield, setCRealYield] = useState<number>(-30);
-  const [cDxy, setCDxy] = useState<number>(-40);
+  const [cDxy, setCDxy] = useState<number>(0);
   const [trainThreshold, setTrainThreshold] = useState<number>(35);
+
+  // MT5 Symbol Info state (Requirement 3: if not fetched, show "not fetched")
+  const [symbolInfo, setSymbolInfo] = useState<{
+    symbol: string;
+    broker_symbol: string;
+    trade_contract_size: number;
+    volume_min: number;
+    volume_step: number;
+    volume_max: number;
+    spread_points_typical: number;
+  } | null>(null);
 
   // Interactive Timing & Sizing state
   const [m5Atr, setM5Atr] = useState<number>(2.4);
@@ -99,9 +112,28 @@ export const XauStrategyGuideView: React.FC = () => {
   const [calcEntry, setCalcEntry] = useState<number>(2650.0);
   const [calcStopPrice, setCalcStopPrice] = useState<number>(2646.5);
 
-  // Backtest simulation state
-  const [isSimulatingBacktest, setIsSimulatingBacktest] = useState<boolean>(false);
-  const [backtestExecuted, setBacktestExecuted] = useState<boolean>(false);
+  // Backtest state - computed strictly from real database (Requirement 1)
+  const [backtestResult, setBacktestResult] = useState<{
+    trades: Array<{
+      date: string;
+      side: string;
+      entry: string;
+      sl: string;
+      tp: string;
+      exit: string;
+      spread: string;
+      outcome: string;
+      won: boolean;
+      rReturn: number;
+    }>;
+    totalSetups: number;
+    winRate: string;
+    profitFactor: number;
+    netReturnR: string;
+    maxDrawdownR: string;
+    expectancyR: string;
+  } | null>(null);
+  const [isRunningBacktest, setIsRunningBacktest] = useState<boolean>(false);
 
   const getAuthHeaders = (): Record<string, string> => {
     const token =
@@ -115,7 +147,7 @@ export const XauStrategyGuideView: React.FC = () => {
     };
   };
 
-  // Fetch SQLite Stats
+  // Fetch SQLite Stats & MT5 Symbol Info
   const fetchStats = async () => {
     setLoadingStats(true);
     try {
@@ -125,6 +157,15 @@ export const XauStrategyGuideView: React.FC = () => {
       if (res.ok) {
         const data = await res.json();
         setStats(data);
+      }
+
+      // Also query symbol info from backend
+      const symRes = await fetch('/api/runbook/symbol-info', {
+        headers: getAuthHeaders(),
+      });
+      if (symRes.ok) {
+        const symData = await symRes.json();
+        setSymbolInfo(symData);
       }
     } catch (err: any) {
       appendConsoleLog('stats:fetch', `Failed to load stats: ${err.message}`, 'error');
@@ -368,6 +409,7 @@ export const XauStrategyGuideView: React.FC = () => {
       });
       const data = await res.json();
       if (res.ok) {
+        setSymbolInfo(data);
         appendConsoleLog(
           'runbook:symbol-info',
           `MT5 SYMBOL SPECIFICATION (XAUUSD):\n` +
@@ -417,31 +459,57 @@ export const XauStrategyGuideView: React.FC = () => {
   // Timing layer: 0.6x M5 ATR14
   const sweepDistance = Number((0.6 * m5Atr).toFixed(2));
 
-  // Risk Sizing: stop_distance * trade_contract_size * lots
-  // lots = risk_usd / (stop_distance * trade_contract_size)
+  // Risk Sizing (Requirement 3):
+  // Take contract size, volume_min, and volume_step from bridge symbol info; if not fetched, show "not fetched"
+  // Always round lots DOWN to volume_step (e.g. risk $100, stop $3.50, contract size 100 gives 0.2857 -> 0.28 lots, not 0.29)
   const stopDistance = Math.abs(calcEntry - calcStopPrice);
   const riskAmountUsd = (calcEquity * calcRiskPct) / 100;
-  const contractSize = 100; // 100 oz per lot for XAUUSD
+  const contractSize = symbolInfo ? symbolInfo.trade_contract_size : null;
+  const volumeStep = symbolInfo ? symbolInfo.volume_step : null;
+  const volumeMin = symbolInfo ? symbolInfo.volume_min : null;
+
+  const rawLots =
+    contractSize !== null && stopDistance > 0 && Number.isFinite(stopDistance)
+      ? riskAmountUsd / (stopDistance * contractSize)
+      : null;
+
+  // Always round lots DOWN to volume_step
   const computedLots =
-    stopDistance > 0 ? Number((riskAmountUsd / (stopDistance * contractSize)).toFixed(2)) : 0;
+    rawLots !== null && volumeStep !== null && volumeMin !== null && Number.isFinite(rawLots)
+      ? Number((Math.max(volumeMin, Math.floor((rawLots + 1e-9) / volumeStep) * volumeStep)).toFixed(2))
+      : null;
+
   const targetProfitUsd = Number((riskAmountUsd * 1.8).toFixed(2));
   const targetPrice =
     directionBias === 'BULLISH'
       ? Number((calcEntry + stopDistance * 1.8).toFixed(2))
       : Number((calcEntry - stopDistance * 1.8).toFixed(2));
 
-  // Simulated Backtest Handler
-  const handleRunSimulatedBacktest = () => {
-    setIsSimulatingBacktest(true);
-    setTimeout(() => {
-      setIsSimulatingBacktest(false);
-      setBacktestExecuted(true);
-      appendConsoleLog(
-        'backtest:run',
-        `SIMULATED BACKTEST COMPLETE:\n- Total Setups Identified: 42\n- Win Rate: 64.3%\n- Profit Factor: 2.14\n- Net Return: +24.8R\n- Max Drawdown: 2.8R\n- No parallel executions; single easy guide setup.`,
-        'success'
-      );
-    }, 700);
+  // Real Database Backtest Handler (Requirement 1: Computed from real SQLite candles)
+  const handleRunRealBacktest = async () => {
+    setIsRunningBacktest(true);
+    try {
+      appendConsoleLog('backtest:xau', 'Evaluating real historical XAUUSD candles from SQLite database...', 'info');
+      const res = await fetch('/api/runbook/backtest-xau', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setBacktestResult(data);
+        appendConsoleLog(
+          'backtest:xau',
+          `REAL BACKTEST RUN COMPLETED:\n- Total Setups: ${data.totalSetups}\n- Win Rate: ${data.winRate}\n- Profit Factor: ${data.profitFactor}\n- Net Return: ${data.netReturnR}\n- Max Drawdown: ${data.maxDrawdownR}\n- Expectancy: ${data.expectancyR}`,
+          'success'
+        );
+      } else {
+        appendConsoleLog('backtest:xau', `Backtest failed: ${data.message || data.error}`, 'error');
+      }
+    } catch (err: any) {
+      appendConsoleLog('backtest:xau', `Backtest error: ${err.message}`, 'error');
+    } finally {
+      setIsRunningBacktest(false);
+    }
   };
 
   return (
@@ -810,16 +878,24 @@ export const XauStrategyGuideView: React.FC = () => {
                 </span>
                 <button
                   onClick={() => {
-                    setWeightCot(30);
+                    setWeightCot(25);
                     setWeightActivity(25);
-                    setWeightTrend(15);
-                    setWeightRealYield(20);
-                    setWeightDxy(10);
+                    setWeightTrend(25);
+                    setWeightRealYield(25);
+                    setWeightDxy(0);
                   }}
                   className="px-2.5 py-1 text-xs rounded bg-surface hover:bg-surface-hover border border-border text-text transition-colors"
                 >
-                  Reset Defaults
+                  Reset Defaults (25% Placeholders)
                 </button>
+              </div>
+            </div>
+
+            {/* Weights Partition Callout Notice (Requirement 2) */}
+            <div className="mb-4 p-3 rounded-lg bg-bg border border-border text-xs text-text-muted flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 text-warning shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold text-text">Weights Partition Rule:</span> Weights are <strong>not final</strong>; they are set on the <strong>TRAIN block partition only</strong> to prevent lookahead and data leakage. The four core layers are currently shown as equal 25% placeholders (&ldquo;not tuned yet&rdquo;). DXY is set to 0% (no clean source in v1).
               </div>
             </div>
 
@@ -833,9 +909,9 @@ export const XauStrategyGuideView: React.FC = () => {
                   max="100"
                   value={weightCot}
                   onChange={(e) => setWeightCot(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
-                <span className="text-xs text-text-muted mt-1 block">Institutional positioning</span>
+                <span className="text-[11px] text-warning mt-1 block font-medium">not tuned yet (25% placeholder)</span>
               </div>
 
               <div>
@@ -846,9 +922,9 @@ export const XauStrategyGuideView: React.FC = () => {
                   max="100"
                   value={weightActivity}
                   onChange={(e) => setWeightActivity(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
-                <span className="text-xs text-text-muted mt-1 block">Volume Z & displacement</span>
+                <span className="text-[11px] text-warning mt-1 block font-medium">not tuned yet (25% placeholder)</span>
               </div>
 
               <div>
@@ -859,9 +935,9 @@ export const XauStrategyGuideView: React.FC = () => {
                   max="100"
                   value={weightTrend}
                   onChange={(e) => setWeightTrend(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
-                <span className="text-xs text-text-muted mt-1 block">M15 EMA / Structure</span>
+                <span className="text-[11px] text-warning mt-1 block font-medium">not tuned yet (25% placeholder)</span>
               </div>
 
               <div>
@@ -872,9 +948,9 @@ export const XauStrategyGuideView: React.FC = () => {
                   max="100"
                   value={weightRealYield}
                   onChange={(e) => setWeightRealYield(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
-                <span className="text-xs text-text-muted mt-1 block">DFII10 inverted macro</span>
+                <span className="text-[11px] text-warning mt-1 block font-medium">not tuned yet (25% placeholder)</span>
               </div>
 
               <div>
@@ -885,9 +961,9 @@ export const XauStrategyGuideView: React.FC = () => {
                   max="100"
                   value={weightDxy}
                   onChange={(e) => setWeightDxy(Number(e.target.value))}
-                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="w-full px-3 py-1.5 text-sm bg-surface border border-border rounded-lg text-text focus:outline-none focus:ring-1 focus:ring-primary font-mono"
                 />
-                <span className="text-xs text-text-muted mt-1 block">US Dollar index regime</span>
+                <span className="text-[11px] text-text-muted mt-1 block">0% (no clean source in v1)</span>
               </div>
             </div>
 
@@ -1104,11 +1180,11 @@ export const XauStrategyGuideView: React.FC = () => {
                 </p>
               </div>
               <span className="px-2.5 py-1 text-xs font-semibold rounded bg-warning/10 text-warning border border-warning/20">
-                ALL 8 PARAMETERS LOCKED
+                PRE-BACKTEST MATRIX
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-4">
               <div className="p-3.5 rounded-lg bg-bg border border-border">
                 <div className="text-xs text-text-muted">1. Sweep Distance</div>
                 <div className="text-sm font-semibold text-text mt-1">0.6x M5 ATR(14)</div>
@@ -1145,31 +1221,91 @@ export const XauStrategyGuideView: React.FC = () => {
                 <div className="text-xs text-text-muted mt-0.5">spread_points x point &le; 0.60</div>
               </div>
 
+              {/* Requirement 5: News blackout, max trades per day, and time exit at window end show as 'unset, owner must lock' */}
               <div className="p-3.5 rounded-lg bg-bg border border-border">
                 <div className="text-xs text-text-muted">7. News Blackout</div>
-                <div className="text-sm font-semibold text-text mt-1">30m Before / 15m After</div>
-                <div className="text-xs text-text-muted mt-0.5">CPI, NFP, FOMC High Impact</div>
+                <div className="mt-1">
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-warning/10 text-warning border border-warning/20">
+                    unset, owner must lock
+                  </span>
+                </div>
+                <div className="text-xs text-text-muted mt-1">CPI, NFP, FOMC Blackout Window</div>
               </div>
 
               <div className="p-3.5 rounded-lg bg-bg border border-border">
                 <div className="text-xs text-text-muted">8. Max Trades Per Day</div>
-                <div className="text-sm font-semibold text-text mt-1">1 - 2 Trades Max</div>
-                <div className="text-xs text-text-muted mt-0.5">Hard risk circuit breaker</div>
+                <div className="mt-1">
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-warning/10 text-warning border border-warning/20">
+                    unset, owner must lock
+                  </span>
+                </div>
+                <div className="text-xs text-text-muted mt-1">Daily risk ceiling execution cap</div>
+              </div>
+
+              <div className="p-3.5 rounded-lg bg-bg border border-border">
+                <div className="text-xs text-text-muted">9. Time Exit at Window End</div>
+                <div className="mt-1">
+                  <span className="px-2 py-0.5 text-xs font-semibold rounded bg-warning/10 text-warning border border-warning/20">
+                    unset, owner must lock
+                  </span>
+                </div>
+                <div className="text-xs text-text-muted mt-1">Close open position at session cutoff</div>
               </div>
             </div>
           </div>
 
           {/* Sizing & Risk Formula Box */}
           <div className="bg-surface border border-border rounded-xl p-6 shadow-sm">
-            <h3 className="text-lg font-bold text-text flex items-center gap-2">
-              <Calculator className="w-4 h-4 text-primary" />
-              Sizing & Risk Calculation Engine
-            </h3>
-            <p className="text-xs text-text-muted mt-0.5">
-              Strict financial formula: <code className="text-text font-mono bg-bg px-1.5 py-0.5 rounded border border-border">Risk ($) = stop_distance x trade_contract_size x lots</code> (Contract Size = 100 oz for XAUUSD).
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-2">
+              <div>
+                <h3 className="text-lg font-bold text-text flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-primary" />
+                  Sizing & Risk Calculation Engine
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Strict financial formula: <code className="text-text font-mono bg-bg px-1.5 py-0.5 rounded border border-border">Risk ($) = stop_distance x trade_contract_size x lots</code>. Always round lots DOWN to volume_step.
+                </p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4 p-4 rounded-lg bg-bg border border-border">
+              <button
+                onClick={handleMt5SymbolInfo}
+                disabled={isRunningCommand}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-surface hover:bg-surface-hover border border-border text-text flex items-center gap-1.5 self-start sm:self-auto"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isRunningCommand ? 'animate-spin' : ''}`} />
+                {symbolInfo ? 'Re-Query Symbol Specs' : 'Query MT5 Symbol Specs'}
+              </button>
+            </div>
+
+            {/* Symbol Specs Summary (Requirement 3: contract size, volume min, volume step from bridge symbol info) */}
+            <div className="mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 rounded-lg bg-bg border border-border text-xs">
+              <div>
+                <span className="text-text-muted block">Contract Size:</span>
+                <span className="font-mono font-semibold text-text">
+                  {symbolInfo ? `${symbolInfo.trade_contract_size} oz/lot` : <span className="text-warning">not fetched</span>}
+                </span>
+              </div>
+              <div>
+                <span className="text-text-muted block">Volume Step:</span>
+                <span className="font-mono font-semibold text-text">
+                  {symbolInfo ? `${symbolInfo.volume_step} lot` : <span className="text-warning">not fetched</span>}
+                </span>
+              </div>
+              <div>
+                <span className="text-text-muted block">Volume Min:</span>
+                <span className="font-mono font-semibold text-text">
+                  {symbolInfo ? `${symbolInfo.volume_min} lot` : <span className="text-warning">not fetched</span>}
+                </span>
+              </div>
+              <div>
+                <span className="text-text-muted block">Broker Suffix / Server:</span>
+                <span className="font-mono font-semibold text-text">
+                  {symbolInfo ? `${symbolInfo.broker_symbol}` : <span className="text-warning">not fetched</span>}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-lg bg-bg border border-border">
               <div>
                 <label className="text-xs font-medium text-text-muted block mb-1">Account Balance ($)</label>
                 <input
@@ -1224,8 +1360,13 @@ export const XauStrategyGuideView: React.FC = () => {
                 <div className="text-base font-bold font-mono text-text mt-1">${stopDistance.toFixed(2)}</div>
               </div>
               <div>
-                <div className="text-xs text-text-muted">Calculated Lot Size</div>
-                <div className="text-lg font-extrabold font-mono text-primary mt-0.5">{computedLots} lots</div>
+                <div className="text-xs text-text-muted">Calculated Lot Size (Round DOWN)</div>
+                <div className="text-lg font-extrabold font-mono text-primary mt-0.5">
+                  {computedLots !== null ? `${computedLots} lots` : <span className="text-xs font-normal text-warning">not fetched</span>}
+                </div>
+                <span className="text-[10px] text-text-muted block mt-0.5">
+                  {symbolInfo ? `Rounded DOWN to step ${symbolInfo.volume_step}` : 'Query MT5 symbol specs first'}
+                </span>
               </div>
               <div>
                 <div className="text-xs text-text-muted">1.8R Target ($ / Price)</div>
@@ -1236,23 +1377,23 @@ export const XauStrategyGuideView: React.FC = () => {
             </div>
           </div>
 
-          {/* Locked Backtest Simulation Section */}
+          {/* Real Database Backtest Section (Requirement 1: Real DB rows only, No run yet empty state) */}
           <div className="bg-surface border border-border rounded-xl p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-lg font-bold text-text">Single Setup Backtest Table (DEMO Partition)</h3>
+                <h3 className="text-lg font-bold text-text">Single Setup Backtest Table (Real Database Execution)</h3>
                 <p className="text-xs text-text-muted mt-0.5">
-                  Sequential event-by-event backtest. No parallel backtesting in v1 to preserve deterministic order fills.
+                  Computed directly from stored SQLite historical candles. Zero mock or sample rows allowed.
                 </p>
               </div>
 
               <button
-                onClick={handleRunSimulatedBacktest}
-                disabled={isSimulatingBacktest}
+                onClick={handleRunRealBacktest}
+                disabled={isRunningBacktest}
                 className="px-4 py-2 text-xs font-semibold rounded-lg bg-primary hover:bg-primary/90 text-white flex items-center gap-2 transition-colors disabled:opacity-50"
               >
-                <Play className={`w-3.5 h-3.5 ${isSimulatingBacktest ? 'animate-spin' : ''}`} />
-                {isSimulatingBacktest ? 'Computing Trades...' : 'Run Backtest (DEMO Simulation)'}
+                <Play className={`w-3.5 h-3.5 ${isRunningBacktest ? 'animate-spin' : ''}`} />
+                {isRunningBacktest ? 'Evaluating DB Candles...' : 'Run Backtest from Real Database'}
               </button>
             </div>
 
@@ -1260,27 +1401,39 @@ export const XauStrategyGuideView: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4">
               <div className="p-3 rounded-lg bg-bg border border-border text-center">
                 <div className="text-xs text-text-muted">Total Setups</div>
-                <div className="text-base font-bold text-text mt-0.5">{backtestExecuted ? '42' : '---'}</div>
+                <div className="text-base font-bold text-text mt-0.5">
+                  {backtestResult ? backtestResult.totalSetups : '---'}
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-bg border border-border text-center">
                 <div className="text-xs text-text-muted">Win Rate</div>
-                <div className="text-base font-bold text-success mt-0.5">{backtestExecuted ? '64.3%' : '---'}</div>
+                <div className="text-base font-bold text-success mt-0.5">
+                  {backtestResult ? backtestResult.winRate : '---'}
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-bg border border-border text-center">
                 <div className="text-xs text-text-muted">Profit Factor</div>
-                <div className="text-base font-bold text-text mt-0.5">{backtestExecuted ? '2.14' : '---'}</div>
+                <div className="text-base font-bold text-text mt-0.5">
+                  {backtestResult ? backtestResult.profitFactor : '---'}
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-bg border border-border text-center">
                 <div className="text-xs text-text-muted">Net Return</div>
-                <div className="text-base font-bold text-success mt-0.5">{backtestExecuted ? '+24.8R' : '---'}</div>
+                <div className="text-base font-bold text-success mt-0.5">
+                  {backtestResult ? backtestResult.netReturnR : '---'}
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-bg border border-border text-center">
                 <div className="text-xs text-text-muted">Max Drawdown</div>
-                <div className="text-base font-bold text-warning mt-0.5">{backtestExecuted ? '2.8R' : '---'}</div>
+                <div className="text-base font-bold text-warning mt-0.5">
+                  {backtestResult ? backtestResult.maxDrawdownR : '---'}
+                </div>
               </div>
               <div className="p-3 rounded-lg bg-bg border border-border text-center">
                 <div className="text-xs text-text-muted">Expectancy</div>
-                <div className="text-base font-bold text-primary mt-0.5">{backtestExecuted ? '+0.59R' : '---'}</div>
+                <div className="text-base font-bold text-primary mt-0.5">
+                  {backtestResult ? backtestResult.expectancyR : '---'}
+                </div>
               </div>
             </div>
 
@@ -1300,14 +1453,8 @@ export const XauStrategyGuideView: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {backtestExecuted ? (
-                    [
-                      { date: '2026-03-24 08:35 UTC', side: 'LONG', entry: '$2,652.40', sl: '$2,648.80', tp: '$2,658.88', exit: '$2,658.88', spread: '$0.25', outcome: '+1.8R (WIN)', won: true },
-                      { date: '2026-03-23 13:15 UTC', side: 'SHORT', entry: '$2,645.10', sl: '$2,648.20', tp: '$2,639.52', exit: '$2,639.52', spread: '$0.28', outcome: '+1.8R (WIN)', won: true },
-                      { date: '2026-03-20 09:10 UTC', side: 'LONG', entry: '$2,638.00', sl: '$2,634.50', tp: '$2,644.30', exit: '$2,634.50', spread: '$0.22', outcome: '-1.0R (LOSS)', won: false },
-                      { date: '2026-03-19 08:45 UTC', side: 'LONG', entry: '$2,641.50', sl: '$2,637.20', tp: '$2,649.24', exit: '$2,649.24', spread: '$0.24', outcome: '+1.8R (WIN)', won: true },
-                      { date: '2026-03-18 14:05 UTC', side: 'SHORT', entry: '$2,650.00', sl: '$2,653.80', tp: '$2,643.16', exit: '$2,643.16', spread: '$0.30', outcome: '+1.8R (WIN)', won: true },
-                    ].map((row, idx) => (
+                  {backtestResult && backtestResult.trades.length > 0 ? (
+                    backtestResult.trades.map((row, idx) => (
                       <tr key={idx} className="hover:bg-surface-hover transition-colors">
                         <td className="px-4 py-2.5 font-mono text-text">{row.date}</td>
                         <td className="px-4 py-2.5">
@@ -1329,8 +1476,14 @@ export const XauStrategyGuideView: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-text-muted">
-                        No backtest executed yet. Click &quot;Run Backtest (DEMO Simulation)&quot; to compute historical trade outcomes against locked parameters.
+                      <td colSpan={8} className="px-4 py-12 text-center text-text-muted">
+                        <div className="flex flex-col items-center justify-center space-y-2">
+                          <AlertCircle className="w-7 h-7 text-text-muted opacity-40" />
+                          <div className="text-sm font-semibold text-text">No run yet</div>
+                          <div className="text-xs text-text-muted max-w-sm">
+                            Backtest table displays rows computed strictly from real SQLite candles. Click &ldquo;Run Backtest from Real Database&rdquo; to compute trade setups.
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}
@@ -1371,7 +1524,7 @@ export const XauStrategyGuideView: React.FC = () => {
               <button
                 onClick={handleApplyCleanup}
                 disabled={isRunningCommand || !dryRunDone}
-                className="p-3.5 rounded-lg border border-border bg-bg hover:bg-surface-hover text-left transition-all disabled:opacity-50"
+                className="p-3.5 rounded-lg border border-border bg-bg hover:bg-surface-hover text-left transition-all disabled:opacity-50 relative group"
               >
                 <div className="flex items-center justify-between text-xs font-semibold text-text">
                   <span>2. Apply Cleanup</span>
@@ -1380,9 +1533,12 @@ export const XauStrategyGuideView: React.FC = () => {
                 <p className="text-xs text-text-muted mt-1">
                   Creates SQLite .backup file first, then purges synthetic data.
                 </p>
+                <div className="mt-2 p-1.5 rounded bg-danger/10 border border-danger/20 text-[11px] text-danger font-medium leading-tight">
+                  ⚠️ WARNING: Server must be stopped before applying in production! Atomic backup is saved to data/backups/. On-the-hour candles are strictly preserved.
+                </div>
               </button>
 
-              {/* Button 3: Patch COT Ingest */}
+              {/* Button 3: Patch COT Ingest (Requirement 4: 260 weeks) */}
               <button
                 onClick={handlePatchCot}
                 disabled={isRunningCommand}
@@ -1393,22 +1549,22 @@ export const XauStrategyGuideView: React.FC = () => {
                   <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                 </div>
                 <p className="text-xs text-text-muted mt-1">
-                  Locks limit=110 and enforces CFTC Public Reporting API only.
+                  Locks limit=260 weeks and enforces CFTC Public Reporting API only.
                 </p>
               </button>
 
-              {/* Button 4: Backfill COT */}
+              {/* Button 4: Backfill COT (Requirement 4: 260 weeks) */}
               <button
                 onClick={handleBackfillCot}
                 disabled={isRunningCommand}
                 className="p-3.5 rounded-lg border border-border bg-bg hover:bg-surface-hover text-left transition-all disabled:opacity-50"
               >
                 <div className="flex items-center justify-between text-xs font-semibold text-text">
-                  <span>4. Backfill COT</span>
+                  <span>4. Backfill COT (260 Weeks)</span>
                   <Database className="w-3.5 h-3.5 text-primary" />
                 </div>
                 <p className="text-xs text-text-muted mt-1">
-                  Ingests CFTC Public Reporting API with Tuesday + 6d lag.
+                  Ingests CFTC Public Reporting API for 260 weeks with Tuesday + 6d lag.
                 </p>
               </button>
 

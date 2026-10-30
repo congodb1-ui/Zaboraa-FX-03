@@ -48,6 +48,15 @@ describe('Route Inventory & Fail-Closed Allowlist Guard (Stage 1a)', () => {
     expect(isPublicAllowlisted('/api/ai/analyze-market')).toBe(false);
     expect(isPublicAllowlisted('/api/data/load')).toBe(false);
     expect(isPublicAllowlisted('/api/data/export')).toBe(false);
+    expect(isPublicAllowlisted('/api/data/export-bundle')).toBe(false);
+    expect(isPublicAllowlisted('/api/data/import-bundle')).toBe(false);
+    expect(isPublicAllowlisted('/api/runbook/stats')).toBe(false);
+    expect(isPublicAllowlisted('/api/runbook/dry-run-cleanup')).toBe(false);
+    expect(isPublicAllowlisted('/api/runbook/apply-cleanup')).toBe(false);
+    expect(isPublicAllowlisted('/api/runbook/patch-cot')).toBe(false);
+    expect(isPublicAllowlisted('/api/runbook/backfill-cot')).toBe(false);
+    expect(isPublicAllowlisted('/api/runbook/backtest-xau')).toBe(false);
+    expect(isPublicAllowlisted('/api/xau-guide/backtest-xau')).toBe(false);
   });
 
   it('guarantees all registered API endpoints are accounted for in route inventory', () => {
@@ -59,7 +68,9 @@ describe('Route Inventory & Fail-Closed Allowlist Guard (Stage 1a)', () => {
         r.path.startsWith('/api/orders') ||
         r.path.startsWith('/api/strategies') ||
         r.path.startsWith('/api/backtests') ||
-        r.path.startsWith('/api/ai')
+        r.path.startsWith('/api/ai') ||
+        r.path.startsWith('/api/runbook') ||
+        r.path.startsWith('/api/xau-guide')
     );
 
     // All sensitive routes must NOT be allowlisted

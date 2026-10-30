@@ -50,6 +50,16 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
   const [importUtcOffset, setImportUtcOffset] = useState<number>(0);
   const [importFeedback, setImportFeedback] = useState<string | null>(null);
 
+  // Full Data Package (Bundle) Import/Export State
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState<boolean>(false);
+  const [bundleJsonText, setBundleJsonText] = useState<string>('');
+  const [isImportingBundle, setIsImportingBundle] = useState<boolean>(false);
+  const [bundleFeedback, setBundleFeedback] = useState<{
+    success: boolean;
+    message: string;
+    details?: any;
+  } | null>(null);
+
   // Autofix logs
   const [autofixLogs, setAutofixLogs] = useState<string[]>([]);
 
@@ -112,6 +122,54 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
       });
     } finally {
       setIsSeedingData(false);
+    }
+  };
+
+  const handleExportBundle = async () => {
+    try {
+      const res = await fetch('/api/data/export-bundle');
+      if (!res.ok) throw new Error('Failed to export data package');
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zaboraa_fx_full_data_package_${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(`Export error: ${e.message}`);
+    }
+  };
+
+  const handleImportBundle = async () => {
+    if (!bundleJsonText.trim()) return;
+    setIsImportingBundle(true);
+    setBundleFeedback(null);
+    try {
+      const parsed = JSON.parse(bundleJsonText);
+      const payload = parsed.bundle || parsed;
+      const res = await fetch('/api/data/import-bundle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle: payload }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to import bundle');
+      setBundleFeedback({
+        success: true,
+        message: `Successfully imported full package: ${result.imported.candles} candles, ${result.imported.cot} COT records, ${result.imported.macro} macro rows, and ${result.imported.strategies} strategies into SQLite.`,
+        details: result.imported,
+      });
+      await loadCatalogFromBackend();
+      loadStorageSummary();
+    } catch (e: any) {
+      setBundleFeedback({
+        success: false,
+        message: `Import error: ${e.message}`,
+      });
+    } finally {
+      setIsImportingBundle(false);
     }
   };
 
@@ -386,10 +444,27 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
             <button
               type="button"
               onClick={() => setIsImportOpen(true)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md transition-all cursor-pointer"
             >
               <Upload className="w-3.5 h-3.5" />
               Import Custom CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBundleModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-primary/20 hover:bg-primary/30 text-primary border border-primary/40 shadow-md transition-all cursor-pointer"
+            >
+              <Database className="w-3.5 h-3.5" />
+              Import Complete Data Package (JSON)
+            </button>
+            <button
+              type="button"
+              onClick={handleExportBundle}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-bold bg-surface hover:bg-surface text-text border border-border transition-all cursor-pointer"
+              title="Download full database package containing candles, COT, macro series, and strategies"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export Full Package
             </button>
             {activeDs && (
               <>
@@ -1219,6 +1294,121 @@ export const DataManagerView: React.FC<DataManagerViewProps> = ({
               >
                 Audit & Commit to SQLite
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Complete Data Package (JSON Bundle) Import Modal */}
+      {isBundleModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl rounded-lg border border-border bg-surface p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Database className="w-5 h-5 text-primary" />
+                <div>
+                  <h3 className="text-sm font-bold text-white">Manual Data Import: Complete Data Package (JSON Bundle)</h3>
+                  <p className="text-xs text-text-muted">Import historical candles, CFTC COT reports, FRED macro series, and strategy definitions for offline sandbox execution.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsBundleModalOpen(false)}
+                className="text-text-muted hover:text-white text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-text-muted text-xs mb-1 font-sans">
+                  Choose JSON File to Upload:
+                </label>
+                <input
+                  type="file"
+                  accept=".json,application/json"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const content = ev.target?.result as string;
+                        setBundleJsonText(content || '');
+                      };
+                      reader.readAsText(file);
+                    }
+                  }}
+                  className="w-full text-xs text-text-muted file:mr-3 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:font-semibold file:bg-primary file:text-white hover:file:bg-primary/90 cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-text-muted text-xs font-sans">
+                    Or Paste JSON Package Content:
+                  </label>
+                  <span className="text-[10px] text-text-muted font-mono">
+                    {bundleJsonText ? `${(bundleJsonText.length / 1024).toFixed(1)} KB` : 'Empty'}
+                  </span>
+                </div>
+                <textarea
+                  value={bundleJsonText}
+                  onChange={(e) => setBundleJsonText(e.target.value)}
+                  placeholder='{"candles": [...], "cot": [...], "macro": [...], "strategies": [...]}'
+                  rows={8}
+                  className="w-full rounded bg-bg p-2.5 font-mono text-xs text-white border border-border focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {bundleFeedback && (
+                <div
+                  className={`p-3 rounded text-xs border font-mono ${
+                    bundleFeedback.success
+                      ? 'bg-success/10 border-success/30 text-success'
+                      : 'bg-danger/10 border-danger/30 text-danger'
+                  }`}
+                >
+                  <div className="font-bold">{bundleFeedback.message}</div>
+                  {bundleFeedback.details && (
+                    <div className="mt-1 text-[11px] text-text-muted grid grid-cols-2 gap-1">
+                      <div>Candles: {bundleFeedback.details.candles}</div>
+                      <div>COT Reports: {bundleFeedback.details.cot}</div>
+                      <div>Macro Observations: {bundleFeedback.details.macro}</div>
+                      <div>Strategies: {bundleFeedback.details.strategies}</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={handleExportBundle}
+                className="px-3 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text border border-border flex items-center gap-1.5 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Export Current Data Package
+              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBundleModalOpen(false)}
+                  className="px-4 py-1.5 rounded text-xs font-semibold bg-surface hover:bg-surface text-text-muted cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  disabled={isImportingBundle || !bundleJsonText.trim()}
+                  onClick={handleImportBundle}
+                  className="px-4 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  {isImportingBundle ? 'Importing Package...' : 'Commit Package to SQLite'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

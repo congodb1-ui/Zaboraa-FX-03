@@ -65,6 +65,9 @@ export const StrategyStudioView: React.FC<StrategyStudioViewProps> = ({
   // Active Editor Sub-tab
   const [activeEditorTab, setActiveEditorTab] = useState<'code' | 'params' | 'meta'>('code');
 
+  // Edit Existing Strategy Modal
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+
   // Feedback states
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
   const [smokeOutput, setSmokeOutput] = useState<{
@@ -337,21 +340,31 @@ function onBar(ctx, bar) {
   return (
     <div className="space-y-6">
       {/* Top Banner Notice */}
-      <div className="flex items-center justify-between px-4 py-2.5 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-lg border border-primary/30 bg-primary/10 text-xs text-primary">
         <div className="flex items-center gap-2">
           <Info className="w-4 h-4 text-primary shrink-0" />
           <span>
-            <strong>Strategy Studio & Parameter Studio:</strong> You can edit logic, add custom parameters, clone presets, and create brand-new algorithmic strategies.
+            <strong>Strategy Studio & Parameter Studio:</strong> Edit existing strategies, tune parameter profiles, test logic safely in sandbox, and persist to SQLite.
           </span>
         </div>
-        <button
-          type="button"
-          onClick={handleCreateNew}
-          className="flex items-center gap-1 px-3 py-1 rounded bg-primary hover:bg-primary text-white font-bold font-mono shadow-sm"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Create New Strategy
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded bg-surface hover:bg-surface text-text border border-border font-bold font-mono text-xs shadow-sm cursor-pointer"
+          >
+            <Edit3 className="w-3.5 h-3.5 text-primary" />
+            Edit Existing Strategy
+          </button>
+          <button
+            type="button"
+            onClick={handleCreateNew}
+            className="flex items-center gap-1 px-3 py-1 rounded bg-primary hover:bg-primary text-white font-bold font-mono shadow-sm cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            Create New Strategy
+          </button>
+        </div>
       </div>
 
       {/* Save Success Banner */}
@@ -380,11 +393,9 @@ function onBar(ctx, bar) {
 
           <div className="space-y-2">
             {strategyList.map((s) => (
-              <button
+              <div
                 key={s.id}
-                type="button"
-                onClick={() => handleSelectStrategy(s)}
-                className={`w-full text-left p-3 rounded-lg border transition-all ${
+                className={`w-full p-3 rounded-lg border transition-all ${
                   selectedStrategy.id === s.id
                     ? 'border-primary bg-primary/10 ring-1 ring-primary shadow-sm'
                     : 'border-border bg-bg hover:bg-surface'
@@ -392,22 +403,44 @@ function onBar(ctx, bar) {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-white line-clamp-1">{s.name}</span>
-                  {s.id.startsWith('custom') || s.id.startsWith('strat-copy') ? (
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-primary/20 text-primary font-mono">
-                      Custom
-                    </span>
-                  ) : null}
+                  <div className="flex items-center gap-1">
+                    {s.id.startsWith('custom') || s.id.startsWith('strat-copy') ? (
+                      <span className="text-[9px] px-1 py-0.2 rounded bg-primary/20 text-primary font-mono">
+                        Custom
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleSelectStrategy(s);
+                        setIsEditModalOpen(true);
+                      }}
+                      title="Edit this strategy"
+                      className="p-1 rounded hover:bg-surface text-primary hover:text-white transition-colors cursor-pointer"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <div className="text-xs text-text-muted mt-1 line-clamp-2">
                   {s.description}
                 </div>
                 <div className="mt-2 flex items-center justify-between text-xs font-mono text-text-muted">
                   <span>v{s.version}</span>
-                  <span className="text-primary">
-                    {Object.keys(s.params || {}).length} params
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary">
+                      {Object.keys(s.params || {}).length} params
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectStrategy(s)}
+                      className="text-xs text-text hover:text-primary font-sans font-medium underline cursor-pointer"
+                    >
+                      {selectedStrategy.id === s.id ? 'Active' : 'Edit'}
+                    </button>
+                  </div>
                 </div>
-              </button>
+              </div>
             ))}
           </div>
         </div>
@@ -704,6 +737,118 @@ function onBar(ctx, bar) {
           </div>
         </div>
       </div>
+
+      {/* Modal: Edit Existing Strategy */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg rounded-xl border border-border bg-surface p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-primary" />
+                <h3 className="font-bold text-white text-sm">Edit Existing Strategy</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-text-muted hover:text-white text-xs cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-text-muted font-mono mb-1">
+                  Select Strategy to Edit:
+                </label>
+                <select
+                  value={selectedStrategy.id}
+                  onChange={(e) => {
+                    const match = strategyList.find((s) => s.id === e.target.value);
+                    if (match) handleSelectStrategy(match);
+                  }}
+                  className="w-full px-3 py-2 rounded bg-bg border border-border text-white text-xs font-mono"
+                >
+                  {strategyList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} (v{s.version})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-text-muted font-mono mb-1">Strategy Name:</label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3 py-2 rounded bg-bg border border-border text-white text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-text-muted font-mono mb-1">Version:</label>
+                  <input
+                    type="text"
+                    value={editVersion}
+                    onChange={(e) => setEditVersion(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-bg border border-border text-white text-xs font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-text-muted font-mono mb-1">Author:</label>
+                  <input
+                    type="text"
+                    value={editAuthor}
+                    onChange={(e) => setEditAuthor(e.target.value)}
+                    className="w-full px-3 py-2 rounded bg-bg border border-border text-white text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-text-muted font-mono mb-1">Description:</label>
+                <textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="w-full px-3 py-2 rounded bg-bg border border-border text-white text-xs"
+                />
+              </div>
+
+              <div className="p-3 rounded bg-bg border border-border text-[11px] text-text-muted flex items-start gap-2">
+                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <span>
+                  Modifying code logic and parameters can also be done directly in the Studio Code and Parameters tabs. Changes are validated with AST security checks.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                className="px-3 py-1.5 rounded text-xs text-text-muted hover:text-white border border-border cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleSave();
+                  setIsEditModalOpen(false);
+                }}
+                className="px-4 py-1.5 rounded text-xs font-bold bg-primary hover:bg-primary text-white shadow-md cursor-pointer flex items-center gap-1.5"
+              >
+                <Save className="w-3.5 h-3.5" />
+                Save & Update Strategy
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

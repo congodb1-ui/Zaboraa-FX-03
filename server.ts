@@ -77,6 +77,8 @@ import {
   fredMacroBackfill,
   testSessionWindowsEvaluation,
   getMt5SymbolInfoXau,
+  exportAllDataBundle,
+  importAllDataBundle,
 } from './src/db/sqlite';
 import {
   isSupabaseConfigured,
@@ -143,6 +145,10 @@ function validateTimeframe(tf: string): tf is Timeframe {
   return VALID_TIMEFRAMES.has(tf.toUpperCase());
 }
 
+// Concurrency lock trackers for runbook safety gate (Requirement 7)
+let isDownloadActive = false;
+let isBacktestActive = false;
+
 // In-memory rate limiting store (120 req/min per IP)
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 export function rateLimiter(limit: number = 120, windowMs: number = 60000) {
@@ -189,7 +195,6 @@ export function isPublicAllowlisted(p: string): boolean {
   if (p.startsWith('/api/smartmoney/')) return true;
   if (p.startsWith('/api/fundamentals/')) return true;
   if (p.startsWith('/api/technical/')) return true;
-  if (p.startsWith('/api/xau-guide/')) return true;
   return false;
 }
 
@@ -585,11 +590,6 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     }
 
     const token = authHeader.substring(7).trim();
-
-    // Runbook and XAU guide diagnostics require a Bearer token and proceed
-    if (req.path.startsWith('/api/runbook/') || req.path.startsWith('/api/xau-guide/')) {
-      return next();
-    }
 
     // 1. First check local SQLite session store (local-first standalone engine)
     const localSession = getSessionFromDb(token);
@@ -1649,6 +1649,7 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
     const suffix = 'm';
     const brokerSymbol = symbol.endsWith(suffix) ? symbol : `${symbol}${suffix}`;
 
+    isDownloadActive = true;
     try {
       const bridgeUrl = `${BRIDGE_URL}/candles?symbol=${brokerSymbol}&timeframe=${timeframe}&count=${count}`;
       const controller = new AbortController();
@@ -1713,6 +1714,8 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
         error: 'BRIDGE_UNREACHABLE',
         message: 'Could not connect to MT5 Bridge on 127.0.0.1:8001. Please run uvicorn in mt5-bridge.',
       });
+    } finally {
+      isDownloadActive = false;
     }
   });
 
@@ -1804,6 +1807,26 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       res.write(line);
     }
     res.end();
+  });
+
+  app.get('/api/data/export-bundle', (req: Request, res: Response) => {
+    try {
+      const bundle = exportAllDataBundle();
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="zaboraa_complete_data_${Date.now()}.json"`);
+      return res.json(bundle);
+    } catch (e: any) {
+      return res.status(500).json({ error: 'EXPORT_FAILED', message: e.message });
+    }
+  });
+
+  app.post('/api/data/import-bundle', express.json({ limit: '100mb' }), (req: Request, res: Response) => {
+    try {
+      const result = importAllDataBundle(req.body);
+      return res.json({ success: true, ...result });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'IMPORT_FAILED', message: e.message });
+    }
   });
 
   // ==========================================
@@ -2605,6 +2628,26 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
   // ==========================================
   // 3.9 XAU STRATEGY GUIDE & RUNBOOK API
   // ==========================================
+  function requireAdminRunbook(req: Request, res: Response, next: NextFunction) {
+    const user = (req as any).user as UserSessionPayload | undefined;
+    if (!user) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Bearer token required' });
+    }
+    if (user.role !== 'admin' && user.role !== 'master_admin') {
+      return res.status(403).json({
+        error: 'FORBIDDEN',
+        message: 'Admin authorization required: Only admin or master_admin can access runbook endpoints.',
+      });
+    }
+    if (isDownloadActive || isBacktestActive) {
+      return res.status(409).json({
+        error: 'OPERATION_IN_PROGRESS',
+        message: 'Runbook operation refused: A download or backtest operation is currently active.',
+      });
+    }
+    next();
+  }
+
   const handleStatsRoute = (req: Request, res: Response) => {
     try {
       const stats = getXauDataStats();
@@ -2613,8 +2656,8 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'FAILED_TO_GET_XAU_STATS', message: e.message });
     }
   };
-  app.get('/api/xau-guide/stats', handleStatsRoute);
-  app.get('/api/runbook/stats', handleStatsRoute);
+  app.get('/api/xau-guide/stats', requireAdminRunbook, handleStatsRoute);
+  app.get('/api/runbook/stats', requireAdminRunbook, handleStatsRoute);
 
   const handleDryRunCleanupRoute = (req: Request, res: Response) => {
     try {
@@ -2624,8 +2667,8 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'DRY_RUN_FAILED', message: e.message });
     }
   };
-  app.post('/api/xau-guide/dry-run-cleanup', handleDryRunCleanupRoute);
-  app.post('/api/runbook/dry-run-cleanup', handleDryRunCleanupRoute);
+  app.post('/api/xau-guide/dry-run-cleanup', requireAdminRunbook, handleDryRunCleanupRoute);
+  app.post('/api/runbook/dry-run-cleanup', requireAdminRunbook, handleDryRunCleanupRoute);
 
   const handleApplyCleanupRoute = (req: Request, res: Response) => {
     try {
@@ -2635,8 +2678,8 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'CLEANUP_FAILED', message: e.message });
     }
   };
-  app.post('/api/xau-guide/apply-cleanup', handleApplyCleanupRoute);
-  app.post('/api/runbook/apply-cleanup', handleApplyCleanupRoute);
+  app.post('/api/xau-guide/apply-cleanup', requireAdminRunbook, handleApplyCleanupRoute);
+  app.post('/api/runbook/apply-cleanup', requireAdminRunbook, handleApplyCleanupRoute);
 
   const handlePatchCotRoute = (req: Request, res: Response) => {
     try {
@@ -2646,19 +2689,19 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'PATCH_FAILED', message: e.message });
     }
   };
-  app.post('/api/xau-guide/patch-cot', handlePatchCotRoute);
-  app.post('/api/runbook/patch-cot', handlePatchCotRoute);
+  app.post('/api/xau-guide/patch-cot', requireAdminRunbook, handlePatchCotRoute);
+  app.post('/api/runbook/patch-cot', requireAdminRunbook, handlePatchCotRoute);
 
   const handleBackfillCotRoute = (req: Request, res: Response) => {
     try {
-      const result = backfillCotPublicReportingApi(110);
+      const result = backfillCotPublicReportingApi(260);
       return res.json(result);
     } catch (e: any) {
       return res.status(500).json({ error: 'BACKFILL_COT_FAILED', message: e.message });
     }
   };
-  app.post('/api/xau-guide/backfill-cot', handleBackfillCotRoute);
-  app.post('/api/runbook/backfill-cot', handleBackfillCotRoute);
+  app.post('/api/xau-guide/backfill-cot', requireAdminRunbook, handleBackfillCotRoute);
+  app.post('/api/runbook/backfill-cot', requireAdminRunbook, handleBackfillCotRoute);
 
   const handleFredDryRunRoute = (req: Request, res: Response) => {
     try {
@@ -2668,8 +2711,8 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'FRED_DRY_RUN_FAILED', message: e.message });
     }
   };
-  app.post('/api/xau-guide/fred-dry-run', handleFredDryRunRoute);
-  app.post('/api/runbook/fred-dry-run', handleFredDryRunRoute);
+  app.post('/api/xau-guide/fred-dry-run', requireAdminRunbook, handleFredDryRunRoute);
+  app.post('/api/runbook/fred-dry-run', requireAdminRunbook, handleFredDryRunRoute);
 
   const handleFredBackfillRoute = (req: Request, res: Response) => {
     try {
@@ -2679,10 +2722,11 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'FRED_BACKFILL_FAILED', message: e.message });
     }
   };
-  app.post('/api/xau-guide/fred-backfill', handleFredBackfillRoute);
-  app.post('/api/runbook/fred-backfill', handleFredBackfillRoute);
+  app.post('/api/xau-guide/fred-backfill', requireAdminRunbook, handleFredBackfillRoute);
+  app.post('/api/runbook/fred-backfill', requireAdminRunbook, handleFredBackfillRoute);
 
   const handleDownloadCandlesRoute = async (req: Request, res: Response) => {
+    isDownloadActive = true;
     try {
       const existing = getXauDataStats();
       if (existing.m1.count === 0 || existing.m5.count === 0 || existing.m15.count === 0) {
@@ -2737,21 +2781,24 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       });
     } catch (e: any) {
       return res.status(500).json({ error: 'CANDLE_SYNC_FAILED', message: e.message });
+    } finally {
+      isDownloadActive = false;
     }
   };
-  app.post('/api/xau-guide/download-real-candles', handleDownloadCandlesRoute);
-  app.post('/api/runbook/download-real-candles', handleDownloadCandlesRoute);
+  app.post('/api/xau-guide/download-real-candles', requireAdminRunbook, handleDownloadCandlesRoute);
+  app.post('/api/runbook/download-real-candles', requireAdminRunbook, handleDownloadCandlesRoute);
 
   const handleSessionWindowsRoute = (req: Request, res: Response) => {
     try {
-      const result = testSessionWindowsEvaluation();
+      const dateStr = req.query.date ? String(req.query.date) : undefined;
+      const result = testSessionWindowsEvaluation(dateStr);
       return res.json(result);
     } catch (e: any) {
       return res.status(500).json({ error: 'SESSION_WINDOWS_FAILED', message: e.message });
     }
   };
-  app.get('/api/xau-guide/session-windows', handleSessionWindowsRoute);
-  app.get('/api/runbook/session-windows', handleSessionWindowsRoute);
+  app.get('/api/xau-guide/session-windows', requireAdminRunbook, handleSessionWindowsRoute);
+  app.get('/api/runbook/session-windows', requireAdminRunbook, handleSessionWindowsRoute);
 
   const handleSymbolInfoRoute = (req: Request, res: Response) => {
     try {
@@ -2761,8 +2808,162 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       return res.status(500).json({ error: 'SYMBOL_INFO_FAILED', message: e.message });
     }
   };
-  app.get('/api/xau-guide/symbol-info', handleSymbolInfoRoute);
-  app.get('/api/runbook/symbol-info', handleSymbolInfoRoute);
+  app.get('/api/xau-guide/symbol-info', requireAdminRunbook, handleSymbolInfoRoute);
+  app.get('/api/runbook/symbol-info', requireAdminRunbook, handleSymbolInfoRoute);
+
+  const handleBacktestXauRoute = (req: Request, res: Response) => {
+    isBacktestActive = true;
+    try {
+      const m15Candles = loadCandlesFromDb('XAUUSD', 'M15');
+      if (m15Candles.length < 30) {
+        return res.json({
+          success: true,
+          trades: [],
+          totalSetups: 0,
+          winRate: '0%',
+          profitFactor: 0,
+          netReturnR: '0R',
+          maxDrawdownR: '0R',
+          expectancyR: '0R',
+          message: 'No run yet: Insufficient real XAUUSD candles in SQLite database.',
+        });
+      }
+
+      // Compute deterministic trade setups on real historical M15 candles from SQLite database
+      const trades: any[] = [];
+      const windowSize = 20;
+
+      for (let i = windowSize; i < m15Candles.length - 8; i++) {
+        const slice = m15Candles.slice(i - windowSize, i);
+        const highestHigh = Math.max(...slice.map((c) => c.high));
+        const lowestLow = Math.min(...slice.map((c) => c.low));
+        const curr = m15Candles[i];
+        const next = m15Candles[i + 1];
+
+        // M15 average range for volatility reference
+        const avgRange = slice.reduce((acc, c) => acc + (c.high - c.low), 0) / windowSize;
+        const sweepDist = 0.6 * avgRange;
+
+        // Long Setup: swept session low and closed back up
+        if (curr.low < lowestLow - sweepDist && curr.close > lowestLow) {
+          const entryPrice = next.open;
+          const sl = Number((curr.low - 1.50).toFixed(2));
+          const stopDist = Math.abs(entryPrice - sl);
+          if (stopDist <= 0 || !Number.isFinite(stopDist)) continue;
+
+          const tp = Number((entryPrice + stopDist * 1.8).toFixed(2));
+
+          // Forward evaluation strictly on real candles
+          let won = false;
+          let exitPrice = tp;
+          for (let f = i + 1; f < Math.min(i + 24, m15Candles.length); f++) {
+            const bar = m15Candles[f];
+            if (bar.low <= sl) {
+              won = false;
+              exitPrice = sl;
+              break;
+            }
+            if (bar.high >= tp) {
+              won = true;
+              exitPrice = tp;
+              break;
+            }
+          }
+
+          trades.push({
+            date: new Date(next.time * 1000).toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+            side: 'LONG',
+            entry: `$${entryPrice.toFixed(2)}`,
+            sl: `$${sl.toFixed(2)}`,
+            tp: `$${tp.toFixed(2)}`,
+            exit: `$${exitPrice.toFixed(2)}`,
+            spread: '$0.25',
+            outcome: won ? '+1.8R (WIN)' : '-1.0R (LOSS)',
+            won,
+            rReturn: won ? 1.8 : -1.0,
+          });
+          i += 6; // Skip overlapping bars
+        }
+        // Short Setup: swept session high and closed back down
+        else if (curr.high > highestHigh + sweepDist && curr.close < highestHigh) {
+          const entryPrice = next.open;
+          const sl = Number((curr.high + 1.50).toFixed(2));
+          const stopDist = Math.abs(sl - entryPrice);
+          if (stopDist <= 0 || !Number.isFinite(stopDist)) continue;
+
+          const tp = Number((entryPrice - stopDist * 1.8).toFixed(2));
+
+          let won = false;
+          let exitPrice = tp;
+          for (let f = i + 1; f < Math.min(i + 24, m15Candles.length); f++) {
+            const bar = m15Candles[f];
+            if (bar.high >= sl) {
+              won = false;
+              exitPrice = sl;
+              break;
+            }
+            if (bar.low <= tp) {
+              won = true;
+              exitPrice = tp;
+              break;
+            }
+          }
+
+          trades.push({
+            date: new Date(next.time * 1000).toISOString().replace('T', ' ').substring(0, 16) + ' UTC',
+            side: 'SHORT',
+            entry: `$${entryPrice.toFixed(2)}`,
+            sl: `$${sl.toFixed(2)}`,
+            tp: `$${tp.toFixed(2)}`,
+            exit: `$${exitPrice.toFixed(2)}`,
+            spread: '$0.25',
+            outcome: won ? '+1.8R (WIN)' : '-1.0R (LOSS)',
+            won,
+            rReturn: won ? 1.8 : -1.0,
+          });
+          i += 6; // Skip overlapping bars
+        }
+      }
+
+      const totalSetups = trades.length;
+      const wins = trades.filter((t) => t.won).length;
+      const winRate = totalSetups > 0 ? Number(((wins / totalSetups) * 100).toFixed(1)) : 0;
+      const totalGainR = wins * 1.8;
+      const totalLossR = (totalSetups - wins) * 1.0;
+      const profitFactor = totalLossR > 0 ? Number((totalGainR / totalLossR).toFixed(2)) : totalGainR > 0 ? 99.0 : 0;
+      const netReturnR = Number((totalGainR - totalLossR).toFixed(1));
+
+      // Calculate max drawdown in R
+      let peakR = 0;
+      let cumR = 0;
+      let maxDd = 0;
+      for (const t of trades) {
+        cumR += t.rReturn;
+        if (cumR > peakR) peakR = cumR;
+        const dd = peakR - cumR;
+        if (dd > maxDd) maxDd = dd;
+      }
+      const maxDrawdownR = Number(maxDd.toFixed(1));
+      const expectancyR = totalSetups > 0 ? Number((netReturnR / totalSetups).toFixed(2)) : 0;
+
+      return res.json({
+        success: true,
+        trades,
+        totalSetups,
+        winRate: `${winRate}%`,
+        profitFactor,
+        netReturnR: `${netReturnR > 0 ? '+' : ''}${netReturnR}R`,
+        maxDrawdownR: `${maxDrawdownR}R`,
+        expectancyR: `${expectancyR > 0 ? '+' : ''}${expectancyR}R`,
+      });
+    } catch (e: any) {
+      return res.status(500).json({ error: 'BACKTEST_XAU_FAILED', message: e.message });
+    } finally {
+      isBacktestActive = false;
+    }
+  };
+  app.post('/api/xau-guide/backtest-xau', requireAdminRunbook, handleBacktestXauRoute);
+  app.post('/api/runbook/backtest-xau', requireAdminRunbook, handleBacktestXauRoute);
 
   // ==========================================
   // 4. FRONTEND VITE INTEGRATION

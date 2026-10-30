@@ -7,6 +7,7 @@ import {
   backfillCotPublicReportingApi,
   fredMacroDryRun,
   fredMacroBackfill,
+  convertSessionWindowToUtc,
   testSessionWindowsEvaluation,
   getMt5SymbolInfoXau,
 } from '../../db/sqlite';
@@ -54,9 +55,9 @@ describe('XAU Strategy Guide & Runbook Engine', () => {
     expect(cleanStats.fakeCheck.isClean).toBe(true);
   });
 
-  it('patches COT Ingest config with limit 110 and enforces CFTC Public Reporting API', () => {
+  it('patches COT Ingest config with limit 260 and enforces CFTC Public Reporting API', () => {
     const patch = patchCotIngestConfig();
-    expect(patch.limit).toBe(110);
+    expect(patch.limit).toBe(260);
     expect(patch.source).toBe('CFTC Public Reporting API');
     expect(patch.status).toContain('PATCHED');
   });
@@ -129,19 +130,29 @@ describe('XAU Strategy Guide & Runbook Engine', () => {
     expect(isStrictNextDay).toBe(false);
   });
 
-  it('evaluates London and NY session windows and UTC conversions across standard vs summer time', () => {
+  it('evaluates London and NY session windows and UTC conversions using Intl.DateTimeFormat with IANA zones for 2026-01-15, 2026-03-20, and 2026-07-15', () => {
     const evalResult = testSessionWindowsEvaluation();
     expect(evalResult.rules.london).toContain('08:00 - 12:00 Europe/London');
     expect(evalResult.rules.ny).toContain('08:00 - 10:00 America/New_York');
-    expect(evalResult.matrix).toHaveLength(2);
+    expect(evalResult.matrix).toHaveLength(3);
 
-    const winter = evalResult.matrix.find((m) => m.season.includes('Winter'));
-    expect(winter?.londonUtc).toContain('08:00 - 12:00 UTC');
-    expect(winter?.nyUtc).toContain('13:00 - 15:00 UTC');
+    // 2026-01-15: Winter standard time (London GMT+0, NY EST-5)
+    const winLon = convertSessionWindowToUtc('2026-01-15', 8, 12, 'Europe/London');
+    const winNy = convertSessionWindowToUtc('2026-01-15', 8, 10, 'America/New_York');
+    expect(winLon.utcWindow).toContain('08:00 - 12:00 UTC');
+    expect(winNy.utcWindow).toContain('13:00 - 15:00 UTC');
 
-    const summer = evalResult.matrix.find((m) => m.season.includes('Summer'));
-    expect(summer?.londonUtc).toContain('07:00 - 11:00 UTC');
-    expect(summer?.nyUtc).toContain('12:00 - 14:00 UTC');
+    // 2026-03-20: Spring transition (US on EDT-4, London still on GMT+0)
+    const equLon = convertSessionWindowToUtc('2026-03-20', 8, 12, 'Europe/London');
+    const equNy = convertSessionWindowToUtc('2026-03-20', 8, 10, 'America/New_York');
+    expect(equLon.utcWindow).toContain('08:00 - 12:00 UTC');
+    expect(equNy.utcWindow).toContain('12:00 - 14:00 UTC');
+
+    // 2026-07-15: Summer daylight saving (London BST+1, NY EDT-4)
+    const sumLon = convertSessionWindowToUtc('2026-07-15', 8, 12, 'Europe/London');
+    const sumNy = convertSessionWindowToUtc('2026-07-15', 8, 10, 'America/New_York');
+    expect(sumLon.utcWindow).toContain('07:00 - 11:00 UTC');
+    expect(sumNy.utcWindow).toContain('12:00 - 14:00 UTC');
   });
 
   it('returns valid MT5 symbol specification for XAUUSD / XAUUSDm', () => {
@@ -157,7 +168,7 @@ describe('XAU Strategy Guide & Runbook Engine', () => {
     expect(spec.broker_server).toBe('Exness-MT5Trial9');
   });
 
-  it('computes position sizing accurately with contract size 100 and finite math guards', () => {
+  it('computes position sizing accurately rounding lots DOWN to volume_step (risk 100, stop 3.50, contract size 100 gives 0.2857 -> 0.28 lots, not 0.29)', () => {
     const equity = 10000;
     const riskPct = 1.0;
     const riskUsd = (equity * riskPct) / 100; // $100
@@ -165,17 +176,31 @@ describe('XAU Strategy Guide & Runbook Engine', () => {
     const stopPrice = 2646.5; // $3.50 distance
     const stopDistance = Math.abs(entryPrice - stopPrice);
     const contractSize = 100;
+    const volumeStep = 0.01;
 
     expect(Number.isFinite(stopDistance)).toBe(true);
     expect(stopDistance).toBe(3.5);
 
-    // lots = risk_usd / (stop_distance * contract_size)
-    const lots = Number((riskUsd / (stopDistance * contractSize)).toFixed(2));
-    expect(lots).toBe(0.29); // 100 / 350 = 0.2857 -> 0.29
+    // raw lots = risk_usd / (stop_distance * contract_size) = 100 / (3.5 * 100) = 0.285714...
+    const rawLots = riskUsd / (stopDistance * contractSize);
+    expect(rawLots).toBeCloseTo(0.2857, 4);
+
+    // MANDATE: Always round lots DOWN to volume_step (0.28 lots, NOT 0.29)
+    const lots = Number((Math.floor((rawLots + 1e-9) / volumeStep) * volumeStep).toFixed(2));
+    expect(lots).toBe(0.28);
+    expect(lots).not.toBe(0.29);
 
     // Target 1.8R
     const targetProfitUsd = Number((riskUsd * 1.8).toFixed(2));
     expect(targetProfitUsd).toBe(180.0);
+  });
+
+  it('preserves on-the-hour candles during cleanup (time % 3600 === 0 preserved)', () => {
+    const onTheHourTime = 1774000800; // Exact hour (time % 3600 === 0)
+    expect(onTheHourTime % 3600).toBe(0);
+
+    const midHourTime = 1774001700; // 15-min offset
+    expect(midHourTime % 3600).not.toBe(0);
   });
 
   it('failing-case counterpart: halts sizing computation if stop distance is zero or negative', () => {

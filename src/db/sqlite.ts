@@ -2375,26 +2375,28 @@ export function dryRunCleanup(): {
 
 /**
  * Apply cleanup: takes SQLite backup first, then deletes synthetic data.
+ * STRICT SAFEGUARD: Never delete on-the-hour candles ((time % 3600) === 0).
  */
 export function applyCleanupWithBackup(): {
   success: boolean;
   backupFile: string;
   deletedCatalogRows: number;
   deletedCotRows: number;
+  deletedCandlesRows: number;
   timestamp: string;
 } {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const backupFileName = `zaboraa_pre_cleanup_${timestamp}.sqlite`;
   const backupFilePath = path.join(BACKUP_DIR, backupFileName);
 
-  // 1. Take atomic backup of database
+  // 1. Take atomic backup of database BEFORE any deletions
   try {
     fs.copyFileSync(DB_PATH, backupFilePath);
   } catch (err: any) {
     throw new Error(`Failed to create database backup before cleanup: ${err.message}`);
   }
 
-  // 2. Perform deletions inside transaction
+  // 2. Perform deletions inside transaction, strictly protecting on-the-hour candles
   const tx = db.transaction(() => {
     const resCat = db.prepare(`
       DELETE FROM data_catalog
@@ -2406,9 +2408,17 @@ export function applyCleanupWithBackup(): {
       WHERE source != 'CFTC Public Reporting API'
     `).run();
 
+    // If cleaning any corrupted or uncataloged candles, NEVER delete on-the-hour candles
+    const resCandles = db.prepare(`
+      DELETE FROM candles
+      WHERE symbol LIKE '%-synthetic%'
+        AND (time % 3600) != 0
+    `).run();
+
     return {
       deletedCatalogRows: resCat.changes,
       deletedCotRows: resCot.changes,
+      deletedCandlesRows: resCandles.changes,
     };
   });
 
@@ -2419,33 +2429,35 @@ export function applyCleanupWithBackup(): {
     backupFile: backupFileName,
     deletedCatalogRows: result.deletedCatalogRows,
     deletedCotRows: result.deletedCotRows,
+    deletedCandlesRows: result.deletedCandlesRows,
     timestamp: new Date().toISOString(),
   };
 }
 
 /**
- * Patches COT Ingest configuration to limit 110 and enforce CFTC Public Reporting API
+ * Patches COT Ingest configuration to limit 260 and enforce CFTC Public Reporting API
  */
 export function patchCotIngestConfig(): { limit: number; source: string; status: string } {
   db.prepare(`
     INSERT INTO system_state (key, value, updated_at)
-    VALUES ('cot_ingest_config', json_object('limit', 110, 'source', 'CFTC Public Reporting API', 'strict', true), ?)
+    VALUES ('cot_ingest_config', json_object('limit', 260, 'source', 'CFTC Public Reporting API', 'strict', true), ?)
     ON CONFLICT(key) DO UPDATE SET
       value = excluded.value,
       updated_at = excluded.updated_at
   `).run(new Date().toISOString());
 
   return {
-    limit: 110,
+    limit: 260,
     source: 'CFTC Public Reporting API',
-    status: 'PATCHED: COT Ingest limit locked to 110; synthetic fallback defused.',
+    status: 'PATCHED: COT Ingest limit locked to 260; synthetic fallback defused.',
   };
 }
 
 /**
  * Backfills authentic CFTC Public Reporting API records with Tuesday + 6 days = Monday 00:00 UTC lag
+ * Default limit is 260 weeks.
  */
-export function backfillCotPublicReportingApi(limit = 110): {
+export function backfillCotPublicReportingApi(limit = 260): {
   ingested: number;
   earliestReportDate: string;
   latestReportDate: string;
@@ -2466,7 +2478,7 @@ export function backfillCotPublicReportingApi(limit = 110): {
       effective_at = excluded.effective_at
   `);
 
-  // Target Tuesdays over recent 110 weeks
+  // Target Tuesdays over recent limit weeks (default 260 weeks)
   const rows: any[] = [];
   const now = new Date();
   const day = now.getUTCDay();
@@ -2606,9 +2618,65 @@ export function fredMacroBackfill(count = 120): {
 }
 
 /**
- * Evaluates session windows converting London & NY local times to UTC across seasons
+ * Calculates UTC hour conversion for a given local time window using Intl.DateTimeFormat with IANA zones
  */
-export function testSessionWindowsEvaluation(): {
+export function convertSessionWindowToUtc(
+  dateStr: string,
+  localStartHour: number,
+  localEndHour: number,
+  timeZone: string
+): {
+  utcWindow: string;
+  utcStartHour: number;
+  utcEndHour: number;
+  offsetHours: number;
+  zoneName: string;
+} {
+  // Use noon UTC on target date to safely detect timezone offset without midnight boundary issues
+  const testUtc = new Date(`${dateStr}T12:00:00Z`);
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'short',
+    hour12: false,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const parts = dtf.formatToParts(testUtc);
+  const partMap: Record<string, string> = {};
+  for (const p of parts) {
+    partMap[p.type] = p.value;
+  }
+
+  // Local hour at 12:00 UTC
+  const localHourAt12Utc = parseInt(partMap.hour, 10);
+  const offsetHours = localHourAt12Utc - 12;
+  const zoneName = partMap.timeZoneName || timeZone;
+
+  // Local window to UTC window: utcHour = localHour - offsetHours
+  const utcStartHour = (localStartHour - offsetHours + 24) % 24;
+  const utcEndHour = (localEndHour - offsetHours + 24) % 24;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const utcWindow = `${pad(utcStartHour)}:00 - ${pad(utcEndHour)}:00 UTC (Offset ${offsetHours >= 0 ? '+' : ''}${offsetHours}h)`;
+
+  return {
+    utcWindow,
+    utcStartHour,
+    utcEndHour,
+    offsetHours,
+    zoneName,
+  };
+}
+
+/**
+ * Evaluates session windows converting London & NY local times to UTC using Intl.DateTimeFormat with IANA zones
+ * Evaluates the required dates: 2026-01-15, 2026-03-20, and 2026-07-15
+ */
+export function testSessionWindowsEvaluation(dateStr?: string): {
   rules: {
     london: string;
     ny: string;
@@ -2620,31 +2688,40 @@ export function testSessionWindowsEvaluation(): {
     londonUtc: string;
     nyLocal: string;
     nyUtc: string;
+    londonZone: string;
+    nyZone: string;
   }>;
 } {
+  const dates = dateStr
+    ? [{ date: dateStr, season: `Evaluated Date: ${dateStr}` }]
+    : [
+        { date: '2026-01-15', season: 'Winter / Standard Time (GMT / EST)' },
+        { date: '2026-03-20', season: 'Spring Transition (London GMT / NY EDT)' },
+        { date: '2026-07-15', season: 'Summer / Daylight Saving Time (BST / EDT)' },
+      ];
+
+  const matrix = dates.map((d) => {
+    const lon = convertSessionWindowToUtc(d.date, 8, 12, 'Europe/London');
+    const ny = convertSessionWindowToUtc(d.date, 8, 10, 'America/New_York');
+
+    return {
+      season: d.season,
+      sampleDate: d.date,
+      londonLocal: `08:00 - 12:00 ${lon.zoneName}`,
+      londonUtc: lon.utcWindow,
+      nyLocal: `08:00 - 10:00 ${ny.zoneName}`,
+      nyUtc: ny.utcWindow,
+      londonZone: lon.zoneName,
+      nyZone: ny.zoneName,
+    };
+  });
+
   return {
     rules: {
       london: '08:00 - 12:00 Europe/London (London Session Open)',
       ny: '08:00 - 10:00 America/New_York (NY Cash Open Window)',
     },
-    matrix: [
-      {
-        season: 'Winter / Standard Time (GMT / EST)',
-        sampleDate: '2026-01-15',
-        londonLocal: '08:00 - 12:00 GMT',
-        londonUtc: '08:00 - 12:00 UTC (Offset +0h)',
-        nyLocal: '08:00 - 10:00 EST',
-        nyUtc: '13:00 - 15:00 UTC (Offset +5h)',
-      },
-      {
-        season: 'Summer / Daylight Saving Time (BST / EDT)',
-        sampleDate: '2026-07-15',
-        londonLocal: '08:00 - 12:00 BST',
-        londonUtc: '07:00 - 11:00 UTC (Offset +1h)',
-        nyLocal: '08:00 - 10:00 EDT',
-        nyUtc: '12:00 - 14:00 UTC (Offset +4h)',
-      },
-    ],
+    matrix,
   };
 }
 
@@ -2684,6 +2761,186 @@ export function getMt5SymbolInfoXau(): {
     broker_server: 'Exness-MT5Trial9',
     spread_points_typical: 25,
     spread_usd_typical: 0.25,
+  };
+}
+
+/**
+ * Universal Data & Code Bundle Export
+ * Bundles candles, catalog, COT, macro series, strategies, and backtest results
+ */
+export function exportAllDataBundle(): {
+  exportedAt: string;
+  version: string;
+  candleCount: number;
+  candles: any[];
+  catalog: any[];
+  cotRows: any[];
+  macroSeries: any[];
+  strategies: any[];
+  backtestResults: any[];
+} {
+  const candles = db.prepare('SELECT * FROM candles ORDER BY symbol, timeframe, time ASC').all();
+  const catalog = db.prepare('SELECT * FROM data_catalog').all();
+  const cotRows = db.prepare('SELECT * FROM smartmoney_cot ORDER BY market, report_date ASC').all();
+  const macroSeries = db.prepare('SELECT * FROM macro_series ORDER BY series_id, effective_at ASC').all();
+  const strategies = getStrategiesFromDb();
+  const backtestResults = getBacktestResultsFromDb();
+
+  return {
+    exportedAt: new Date().toISOString(),
+    version: 'zaboraa_vault_v1',
+    candleCount: candles.length,
+    candles,
+    catalog,
+    cotRows,
+    macroSeries,
+    strategies,
+    backtestResults,
+  };
+}
+
+/**
+ * Universal Data & Code Bundle Import
+ * Safely ingests complete or partial data bundles into SQLite for offline sandbox usage
+ */
+export function importAllDataBundle(bundle: {
+  candles?: Array<{
+    symbol: string;
+    timeframe: string;
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    tick_volume?: number;
+    tickVolume?: number;
+    spread?: number;
+  }>;
+  cotRows?: SmartMoneyCotRow[];
+  macroSeries?: Array<{ series_id: string; effective_at: string; value: number; source?: string }>;
+  strategies?: Array<{
+    id: string;
+    name: string;
+    description?: string;
+    author?: string;
+    version?: string;
+    params?: any;
+    code: string;
+    pineSource?: string;
+  }>;
+}): {
+  importedCandles: number;
+  importedCot: number;
+  importedMacro: number;
+  importedStrategies: number;
+  timestamp: string;
+} {
+  let importedCandles = 0;
+  let importedCot = 0;
+  let importedMacro = 0;
+  let importedStrategies = 0;
+
+  const tx = db.transaction(() => {
+    // 1. Candles
+    if (bundle.candles && Array.isArray(bundle.candles)) {
+      const insertCandle = db.prepare(`
+        INSERT OR REPLACE INTO candles (symbol, timeframe, time, open, high, low, close, tick_volume, spread)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const c of bundle.candles) {
+        if (!c.symbol || !c.timeframe || !c.time) continue;
+        insertCandle.run(
+          c.symbol,
+          c.timeframe,
+          c.time,
+          c.open,
+          c.high,
+          c.low,
+          c.close,
+          c.tick_volume ?? c.tickVolume ?? 1,
+          c.spread ?? 0
+        );
+        importedCandles++;
+      }
+    }
+
+    // 2. COT
+    if (bundle.cotRows && Array.isArray(bundle.cotRows)) {
+      const insertCot = db.prepare(`
+        INSERT INTO smartmoney_cot (
+          market, report_date, open_interest, long, short, net, net_pct_oi, source, fetched_at, effective_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(market, report_date) DO UPDATE SET
+          open_interest = excluded.open_interest,
+          long = excluded.long,
+          short = excluded.short,
+          net = excluded.net,
+          net_pct_oi = excluded.net_pct_oi,
+          source = excluded.source,
+          fetched_at = excluded.fetched_at,
+          effective_at = excluded.effective_at
+      `);
+      for (const cot of bundle.cotRows) {
+        if (!cot.market || !cot.report_date) continue;
+        insertCot.run(
+          cot.market,
+          cot.report_date,
+          cot.open_interest,
+          cot.long,
+          cot.short,
+          cot.net,
+          cot.net_pct_oi,
+          cot.source || 'CFTC Public Reporting API',
+          cot.fetched_at || new Date().toISOString(),
+          cot.effective_at || new Date().toISOString()
+        );
+        importedCot++;
+      }
+    }
+
+    // 3. Macro Series
+    if (bundle.macroSeries && Array.isArray(bundle.macroSeries)) {
+      const insertMacro = db.prepare(`
+        INSERT INTO macro_series (series_id, effective_at, value, source)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(series_id, effective_at) DO UPDATE SET
+          value = excluded.value,
+          source = excluded.source
+      `);
+      for (const m of bundle.macroSeries) {
+        if (!m.series_id || !m.effective_at || typeof m.value !== 'number') continue;
+        insertMacro.run(m.series_id, m.effective_at, m.value, m.source || 'FRED');
+        importedMacro++;
+      }
+    }
+
+    // 4. Custom Strategies
+    if (bundle.strategies && Array.isArray(bundle.strategies)) {
+      for (const s of bundle.strategies) {
+        if (!s.id || !s.name || !s.code) continue;
+        saveStrategyToDb({
+          id: s.id,
+          name: s.name,
+          description: s.description || '',
+          author: s.author || 'Imported User',
+          version: s.version || '1.0.0',
+          params: s.params || {},
+          code: s.code,
+          pineSource: s.pineSource,
+        });
+        importedStrategies++;
+      }
+    }
+  });
+
+  tx();
+
+  return {
+    importedCandles,
+    importedCot,
+    importedMacro,
+    importedStrategies,
+    timestamp: new Date().toISOString(),
   };
 }
 
