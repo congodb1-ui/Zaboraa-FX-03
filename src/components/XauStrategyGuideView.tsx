@@ -1381,9 +1381,14 @@ export const XauStrategyGuideView: React.FC = () => {
           <div className="bg-surface border border-border rounded-xl p-6 shadow-sm">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
               <div>
-                <h3 className="text-lg font-bold text-text">Single Setup Backtest Table (Real Database Execution)</h3>
-                <p className="text-xs text-text-muted mt-0.5">
-                  Computed directly from stored SQLite historical candles. Zero mock or sample rows allowed.
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <h3 className="text-lg font-bold text-text">Single Setup Backtest Table</h3>
+                  <span className="px-2.5 py-0.5 rounded text-xs font-bold font-mono bg-warning/20 text-warning border border-warning/30">
+                    PRELIMINARY - not for decisions
+                  </span>
+                </div>
+                <p className="text-xs text-text-muted mt-1">
+                  <strong>PRELIMINARY - not for decisions.</strong> Computed strictly from the training portion (first 70% of chronological M15 candles in SQLite). Test and lockbox partitions are strictly isolated.
                 </p>
               </div>
 
@@ -1435,6 +1440,16 @@ export const XauStrategyGuideView: React.FC = () => {
                   {backtestResult ? backtestResult.expectancyR : '---'}
                 </div>
               </div>
+            </div>
+
+            {/* Backtest Trades Table Header */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+                Backtest Trades Table (Training Portion Only)
+              </span>
+              <span className="text-xs font-mono font-bold text-warning">
+                PRELIMINARY - not for decisions
+              </span>
             </div>
 
             {/* Backtest Trades Table */}

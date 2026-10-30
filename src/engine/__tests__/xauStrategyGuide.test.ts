@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import fs from 'fs';
+import path from 'path';
 import {
+  db,
   getXauDataStats,
   dryRunCleanup,
   applyCleanupWithBackup,
@@ -11,6 +14,7 @@ import {
   testSessionWindowsEvaluation,
   getMt5SymbolInfoXau,
 } from '../../db/sqlite';
+import { calculateLotSize } from '../engineMath';
 
 describe('XAU Strategy Guide & Runbook Engine', () => {
   it('loads real sources statistics with CFTC Public Reporting API and FRED macro indicators', () => {
@@ -210,5 +214,79 @@ describe('XAU Strategy Guide & Runbook Engine', () => {
 
     const canComputeLots = stopDistance > 0 && Number.isFinite(stopDistance);
     expect(canComputeLots).toBe(false);
+  });
+
+  // Requirement 3: restrict off-the-hour delete to timeframe = 'H1' only
+  it('restricts off-the-hour delete to timeframe = H1 only; M1 at 12:01 and M15 at 12:15 survive apply, off-hour H1 candle is deleted', () => {
+    const baseHour = 1774000800; // 12:00:00 (baseHour % 3600 === 0)
+    const time1201 = baseHour + 60; // 12:01:00 (time % 3600 === 60)
+    const time1215 = baseHour + 900; // 12:15:00 (time % 3600 === 900)
+    const time1230 = baseHour + 1800; // 12:30:00 (off-hour H1)
+
+    // Insert M1 candle at 12:01
+    db.prepare(`
+      INSERT OR REPLACE INTO candles (symbol, timeframe, time, open, high, low, close, tick_volume, spread)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('TEST_CLEANUP', 'M1', time1201, 2650.0, 2651.0, 2649.5, 2650.5, 100, 0.25);
+
+    // Insert M15 candle at 12:15
+    db.prepare(`
+      INSERT OR REPLACE INTO candles (symbol, timeframe, time, open, high, low, close, tick_volume, spread)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('TEST_CLEANUP', 'M15', time1215, 2650.0, 2652.0, 2649.0, 2651.5, 250, 0.25);
+
+    // Insert off-hour H1 candle at 12:30
+    db.prepare(`
+      INSERT OR REPLACE INTO candles (symbol, timeframe, time, open, high, low, close, tick_volume, spread)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('TEST_CLEANUP', 'H1', time1230, 2650.0, 2655.0, 2648.0, 2653.0, 500, 0.25);
+
+    // Insert on-hour H1 candle at 12:00
+    db.prepare(`
+      INSERT OR REPLACE INTO candles (symbol, timeframe, time, open, high, low, close, tick_volume, spread)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('TEST_CLEANUP', 'H1', baseHour, 2645.0, 2655.0, 2640.0, 2650.0, 1000, 0.25);
+
+    // Execute apply cleanup
+    applyCleanupWithBackup();
+
+    // Query candles
+    const m1Candle = db.prepare('SELECT * FROM candles WHERE symbol = ? AND timeframe = ? AND time = ?')
+      .get('TEST_CLEANUP', 'M1', time1201);
+    const m15Candle = db.prepare('SELECT * FROM candles WHERE symbol = ? AND timeframe = ? AND time = ?')
+      .get('TEST_CLEANUP', 'M15', time1215);
+    const offHourH1 = db.prepare('SELECT * FROM candles WHERE symbol = ? AND timeframe = ? AND time = ?')
+      .get('TEST_CLEANUP', 'H1', time1230);
+    const onHourH1 = db.prepare('SELECT * FROM candles WHERE symbol = ? AND timeframe = ? AND time = ?')
+      .get('TEST_CLEANUP', 'H1', baseHour);
+
+    expect(m1Candle).toBeDefined(); // M1 candle at 12:01 survived!
+    expect(m15Candle).toBeDefined(); // M15 candle at 12:15 survived!
+    expect(offHourH1).toBeUndefined(); // Off-hour H1 candle was deleted!
+    expect(onHourH1).toBeDefined(); // On-hour H1 candle survived!
+
+    // Clean up test rows
+    db.prepare("DELETE FROM candles WHERE symbol = 'TEST_CLEANUP'").run();
+  });
+
+  // Requirement 4: verify npm test does not modify data/zaboraa.sqlite
+  it('verifies npm test does not modify data/zaboraa.sqlite (uses isolated temp directory)', () => {
+    // 1. ZABORAA_DATA_DIR is set to a temp folder, not default "data"
+    expect(process.env.ZABORAA_DATA_DIR).toBeDefined();
+    expect(process.env.ZABORAA_DATA_DIR).toContain('zaboraa_test_data');
+
+    // 2. Active sqlite db path is within temp directory
+    expect(db.name).toContain('zaboraa_test_data');
+
+    // 3. Ensure active test db is isolated from production data/zaboraa.sqlite
+    const prodDbPath = path.resolve(process.cwd(), 'data/zaboraa.sqlite');
+    expect(db.name).not.toBe(prodDbPath);
+  });
+
+  // Requirement 5: lot sizing for risk 100, stop 3.50, contract 100, step 0.01 returns 0.28
+  it('returns 0.28 for lot sizing with risk 100, stop 3.50, contract 100, step 0.01', () => {
+    const lots = calculateLotSize(100, 3.50, 100, 0.01);
+    expect(lots).toBe(0.28);
+    expect(lots).not.toBe(0.29);
   });
 });

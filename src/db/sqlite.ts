@@ -13,7 +13,8 @@ import {
   BacktestReport,
 } from '../types/forex';
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
+const rawDataDir = process.env.ZABORAA_DATA_DIR || 'data';
+const DATA_DIR = path.isAbsolute(rawDataDir) ? rawDataDir : path.resolve(process.cwd(), rawDataDir);
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
@@ -23,7 +24,9 @@ const BACKUP_DIR = path.join(DATA_DIR, 'backups');
 if (!fs.existsSync(BACKUP_DIR)) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
-if (fs.existsSync(DB_PATH)) {
+
+// Skip pre-start backup when VITEST is set
+if (!process.env.VITEST && fs.existsSync(DB_PATH)) {
   try {
     const backupFile = path.join(BACKUP_DIR, `zaboraa_pre_firewall_${Date.now()}.sqlite`);
     fs.copyFileSync(DB_PATH, backupFile);
@@ -2408,10 +2411,10 @@ export function applyCleanupWithBackup(): {
       WHERE source != 'CFTC Public Reporting API'
     `).run();
 
-    // If cleaning any corrupted or uncataloged candles, NEVER delete on-the-hour candles
+    // Restrict off-the-hour delete to timeframe = 'H1' only
     const resCandles = db.prepare(`
       DELETE FROM candles
-      WHERE symbol LIKE '%-synthetic%'
+      WHERE timeframe = 'H1'
         AND (time % 3600) != 0
     `).run();
 

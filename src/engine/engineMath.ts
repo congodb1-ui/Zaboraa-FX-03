@@ -391,3 +391,27 @@ export function calculateOverfittingScore(params: {
     plainExplanation,
   };
 }
+
+/**
+ * Computes position lot size rounding DOWN to volume_step.
+ * Strict financial formula: lots = riskUsd / (stopDistance * contractSize)
+ * Always rounds DOWN to volume_step (e.g. risk 100, stop 3.50, contract 100, step 0.01 -> 0.28).
+ */
+export function calculateLotSize(
+  riskUsd: number,
+  stopDistance: number,
+  contractSize: number,
+  volumeStep: number = 0.01
+): number {
+  if (riskUsd <= 0 || stopDistance <= 0 || contractSize <= 0 || volumeStep <= 0) return 0;
+  if (
+    !Number.isFinite(riskUsd) ||
+    !Number.isFinite(stopDistance) ||
+    !Number.isFinite(contractSize) ||
+    !Number.isFinite(volumeStep)
+  )
+    return 0;
+  const rawLots = riskUsd / (stopDistance * contractSize);
+  return Number((Math.floor((rawLots + 1e-9) / volumeStep) * volumeStep).toFixed(2));
+}
+
