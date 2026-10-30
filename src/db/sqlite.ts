@@ -1708,27 +1708,97 @@ export function deleteChartLayout(id: string, ownerId: string): boolean {
   return res.changes > 0;
 }
 
-export function getSystemBranding(): { companyName: string; logoUrl: string } {
-  const rowName = db.prepare('SELECT value FROM system_state WHERE key = ?').get('company_name') as { value: string } | undefined;
-  const rowLogo = db.prepare('SELECT value FROM system_state WHERE key = ?').get('company_logo') as { value: string } | undefined;
+export interface SystemWebsiteConfig {
+  companyName: string;
+  logoUrl: string;
+  announcementEnabled: boolean;
+  announcementText: string;
+  announcementType: 'info' | 'warning' | 'danger' | 'success';
+  supportEmail: string;
+  deskPhone: string;
+  riskDisclosure: string;
+  heroHeadline: string;
+  heroSubtitle: string;
+  defaultSymbol: string;
+}
+
+export function getSystemWebsiteConfig(): SystemWebsiteConfig {
+  const getVal = (k: string, fallback: string = ''): string => {
+    const row = db.prepare('SELECT value FROM system_state WHERE key = ?').get(k) as { value: string } | undefined;
+    return row?.value !== undefined ? row.value : fallback;
+  };
+
   return {
-    companyName: rowName?.value || 'Zaboraa FX',
-    logoUrl: rowLogo?.value || '',
+    companyName: getVal('company_name', 'Zaboraa FX'),
+    logoUrl: getVal('company_logo', ''),
+    announcementEnabled: getVal('announcement_enabled', 'false') === 'true',
+    announcementText: getVal('announcement_text', 'Live algorithmic risk firewall and paper execution active.'),
+    announcementType: (getVal('announcement_type', 'info') as 'info' | 'warning' | 'danger' | 'success'),
+    supportEmail: getVal('support_email', 'desk@zaboraa.com'),
+    deskPhone: getVal('desk_phone', '+1 (800) 555-FX01'),
+    riskDisclosure: getVal('risk_disclosure', 'Mandatory Risk Disclosure: Leveraged Forex & Gold trading carries significant financial risk. Past algorithmic performance does not guarantee future results.'),
+    heroHeadline: getVal('hero_headline', 'Institutional Quantitative FX & Gold Trading Desk'),
+    heroSubtitle: getVal('hero_subtitle', 'Local-first algorithmic execution, multi-market MT5 connectivity, and sub-second deterministic risk firewalling.'),
+    defaultSymbol: getVal('default_symbol', 'XAUUSD'),
   };
 }
 
-export function setSystemBranding(companyName: string, logoUrl: string): void {
-  const now = new Date().toISOString();
-  db.prepare(`
-    INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-  `).run('company_name', companyName.trim() || 'Zaboraa FX', now);
-
-  db.prepare(`
-    INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
-  `).run('company_logo', logoUrl.trim(), now);
+export function getSystemBranding(): { companyName: string; logoUrl: string } & SystemWebsiteConfig {
+  const config = getSystemWebsiteConfig();
+  return {
+    ...config,
+    companyName: config.companyName || 'Zaboraa FX',
+    logoUrl: config.logoUrl || '',
+  };
 }
+
+export function setSystemBranding(
+  companyName: string,
+  logoUrl: string,
+  extraConfig?: Partial<SystemWebsiteConfig>
+): void {
+  const now = new Date().toISOString();
+  const upsert = (k: string, val: string) => {
+    db.prepare(`
+      INSERT INTO system_state (key, value, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+    `).run(k, val, now);
+  };
+
+  upsert('company_name', companyName.trim() || 'Zaboraa FX');
+  upsert('company_logo', logoUrl.trim());
+
+  if (extraConfig) {
+    if (extraConfig.announcementEnabled !== undefined) {
+      upsert('announcement_enabled', String(extraConfig.announcementEnabled));
+    }
+    if (extraConfig.announcementText !== undefined) {
+      upsert('announcement_text', extraConfig.announcementText.trim());
+    }
+    if (extraConfig.announcementType !== undefined) {
+      upsert('announcement_type', extraConfig.announcementType);
+    }
+    if (extraConfig.supportEmail !== undefined) {
+      upsert('support_email', extraConfig.supportEmail.trim());
+    }
+    if (extraConfig.deskPhone !== undefined) {
+      upsert('desk_phone', extraConfig.deskPhone.trim());
+    }
+    if (extraConfig.riskDisclosure !== undefined) {
+      upsert('risk_disclosure', extraConfig.riskDisclosure.trim());
+    }
+    if (extraConfig.heroHeadline !== undefined) {
+      upsert('hero_headline', extraConfig.heroHeadline.trim());
+    }
+    if (extraConfig.heroSubtitle !== undefined) {
+      upsert('hero_subtitle', extraConfig.heroSubtitle.trim());
+    }
+    if (extraConfig.defaultSymbol !== undefined) {
+      upsert('default_symbol', extraConfig.defaultSymbol.trim().toUpperCase());
+    }
+  }
+}
+
 
 
 

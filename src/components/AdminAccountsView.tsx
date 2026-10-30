@@ -223,9 +223,22 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
   // Token mask state
   const [maskedTokens, setMaskedTokens] = useState<Record<string, boolean>>({});
 
-  // Company Branding State
+  // Company Branding & Website Customization State
   const [brandingName, setBrandingName] = useState<string>('Zaboraa FX');
   const [brandingLogo, setBrandingLogo] = useState<string>('');
+  const [announcementEnabled, setAnnouncementEnabled] = useState<boolean>(false);
+  const [announcementText, setAnnouncementText] = useState<string>('Live algorithmic risk firewall and paper execution active.');
+  const [announcementType, setAnnouncementType] = useState<'info' | 'warning' | 'danger' | 'success'>('info');
+  const [supportEmail, setSupportEmail] = useState<string>('desk@zaboraa.com');
+  const [deskPhone, setDeskPhone] = useState<string>('+1 (800) 555-FX01');
+  const [riskDisclosure, setRiskDisclosure] = useState<string>(
+    'Mandatory Risk Disclosure: Leveraged Forex & Gold trading carries significant financial risk. Past algorithmic performance does not guarantee future results.'
+  );
+  const [heroHeadline, setHeroHeadline] = useState<string>('Institutional Quantitative FX & Gold Trading Desk');
+  const [heroSubtitle, setHeroSubtitle] = useState<string>(
+    'Local-first algorithmic execution, multi-market MT5 connectivity, and sub-second deterministic risk firewalling.'
+  );
+  const [defaultSymbol, setDefaultSymbol] = useState<string>('XAUUSD');
   const [brandingSaving, setBrandingSaving] = useState<boolean>(false);
 
   useEffect(() => {
@@ -234,7 +247,16 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       .then((data) => {
         if (data) {
           if (data.companyName) setBrandingName(data.companyName);
-          if (data.logoUrl) setBrandingLogo(data.logoUrl);
+          if (data.logoUrl !== undefined) setBrandingLogo(data.logoUrl);
+          if (data.announcementEnabled !== undefined) setAnnouncementEnabled(data.announcementEnabled);
+          if (data.announcementText) setAnnouncementText(data.announcementText);
+          if (data.announcementType) setAnnouncementType(data.announcementType);
+          if (data.supportEmail) setSupportEmail(data.supportEmail);
+          if (data.deskPhone) setDeskPhone(data.deskPhone);
+          if (data.riskDisclosure) setRiskDisclosure(data.riskDisclosure);
+          if (data.heroHeadline) setHeroHeadline(data.heroHeadline);
+          if (data.heroSubtitle) setHeroSubtitle(data.heroSubtitle);
+          if (data.defaultSymbol) setDefaultSymbol(data.defaultSymbol);
         }
       })
       .catch(() => {});
@@ -244,27 +266,45 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
     try {
       setBrandingSaving(true);
       const token = getAccessToken();
+      const payload = {
+        companyName: brandingName,
+        logoUrl: brandingLogo,
+        announcementEnabled,
+        announcementText,
+        announcementType,
+        supportEmail,
+        deskPhone,
+        riskDisclosure,
+        heroHeadline,
+        heroSubtitle,
+        defaultSymbol,
+      };
+
       const res = await fetch('/api/admin/company/branding', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ companyName: brandingName, logoUrl: brandingLogo }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (res.ok) {
-        setFeedback({ success: true, message: 'Company name and logo updated successfully.' });
+        setFeedback({ success: true, message: 'Website and portal modifications saved successfully.' });
         try {
           localStorage.setItem('zaboraa_company_name', brandingName);
           localStorage.setItem('zaboraa_company_logo', brandingLogo);
+          localStorage.setItem('zaboraa_announcement_enabled', String(announcementEnabled));
+          localStorage.setItem('zaboraa_announcement_text', announcementText);
+          localStorage.setItem('zaboraa_announcement_type', announcementType);
+          localStorage.setItem('zaboraa_risk_disclosure', riskDisclosure);
         } catch {}
         window.dispatchEvent(new Event('zaboraa_branding_updated'));
       } else {
-        setFeedback({ success: false, message: data.message || 'Failed to update company branding.' });
+        setFeedback({ success: false, message: data.message || 'Failed to update website configuration.' });
       }
     } catch (e: any) {
-      setFeedback({ success: false, message: e.message || 'Network error updating branding.' });
+      setFeedback({ success: false, message: e.message || 'Network error updating website configuration.' });
     } finally {
       setBrandingSaving(false);
     }
@@ -658,7 +698,7 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
             }`}
           >
             <Building className="w-3.5 h-3.5" />
-            <span>Branding</span>
+            <span>Website & Portal</span>
           </button>
         </div>
       </div>
@@ -1414,86 +1454,260 @@ export const AdminAccountsView: React.FC<AdminAccountsViewProps> = ({
       {/* SUB-TAB 5: COMPANY BRANDING & LOGO */}
       {/* ============================================================== */}
       {subTab === 'branding' && (
-        <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-5 animate-in fade-in">
+        <div className="p-5 rounded-2xl bg-surface border border-border shadow-sm space-y-6 animate-in fade-in">
           <div className="pb-3 border-b border-border">
-            <h2 className="text-base font-bold text-text font-sans">Company Branding & Portal Identity</h2>
+            <h2 className="text-base font-bold text-text font-sans">Website & Portal Customization Console</h2>
             <p className="text-xs text-text-muted mt-0.5 font-sans">
-              Change the portal brand wordmark, displayed company name, and header icon or logo image.
+              As an Administrator, customize the website branding, global announcement banner, public portal copy, support contacts, and risk disclosures.
             </p>
           </div>
 
-          <div className="max-w-xl space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
-                Company Name
-              </label>
-              <input
-                type="text"
-                value={brandingName}
-                onChange={(e) => setBrandingName(e.target.value)}
-                placeholder="e.g. Zaboraa FX or Custom Capital Desk"
-                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
-              />
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Form Controls */}
+            <div className="space-y-4">
+              {/* Section 1: Brand & Logo */}
+              <div className="p-4 rounded-xl bg-bg border border-border space-y-3">
+                <div className="text-xs font-bold text-text uppercase tracking-wider font-sans flex items-center gap-1.5">
+                  <Building className="w-3.5 h-3.5 text-primary" />
+                  <span>1. Desk Identity & Wordmark</span>
+                </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
-                Company Logo URL
-              </label>
-              <input
-                type="text"
-                value={brandingLogo}
-                onChange={(e) => setBrandingLogo(e.target.value)}
-                placeholder="https://... or data:image/... (leave empty for default icon)"
-                className="w-full px-3 py-2 rounded-xl bg-bg border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-mono"
-              />
-              <span className="text-xs text-text-muted mt-1 block">
-                Enter an image URL or leave empty to use the default platform icon.
-              </span>
-            </div>
-
-            {/* Live Preview Card */}
-            <div className="p-4 rounded-xl bg-bg border border-border space-y-2">
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider font-sans">
-                Header Live Preview
-              </div>
-              <div className="flex items-center gap-3 p-3 rounded-lg bg-surface border border-border shadow-xs w-fit">
-                {brandingLogo ? (
-                  <img
-                    src={brandingLogo}
-                    alt={brandingName}
-                    className="w-8 h-8 rounded-lg object-contain bg-surface border border-border"
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                    }}
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Trading Desk / Company Name
+                  </label>
+                  <input
+                    type="text"
+                    value={brandingName}
+                    onChange={(e) => setBrandingName(e.target.value)}
+                    placeholder="e.g. Zaboraa FX or Custom Capital Desk"
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
                   />
-                ) : (
-                  <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white shadow-xs">
-                    <TrendingUp className="w-4 h-4" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Custom Logo URL
+                  </label>
+                  <input
+                    type="text"
+                    value={brandingLogo}
+                    onChange={(e) => setBrandingLogo(e.target.value)}
+                    placeholder="https://... (leave empty for default institutional icon)"
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Section 2: Global Announcement Banner */}
+              <div className="p-4 rounded-xl bg-bg border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-text uppercase tracking-wider font-sans flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warning" />
+                    <span>2. Portal Announcement Banner</span>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-xs text-text-muted">Display Banner:</span>
+                    <input
+                      type="checkbox"
+                      checked={announcementEnabled}
+                      onChange={(e) => setAnnouncementEnabled(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                    />
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Banner Message
+                  </label>
+                  <input
+                    type="text"
+                    value={announcementText}
+                    onChange={(e) => setAnnouncementText(e.target.value)}
+                    placeholder="e.g. ⚡ Market Notice: US CPI release today at 13:30 UTC. High volatility expected."
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Alert Style
+                  </label>
+                  <select
+                    value={announcementType}
+                    onChange={(e) => setAnnouncementType(e.target.value as any)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
+                  >
+                    <option value="info">Information (Blue · General Desk Notice)</option>
+                    <option value="warning">Warning (Amber · Volatility / High Spread Alert)</option>
+                    <option value="danger">Danger (Red · Urgent Market Warning)</option>
+                    <option value="success">Success (Green · System / Maintenance Update)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Section 3: Public Portal Copy */}
+              <div className="p-4 rounded-xl bg-bg border border-border space-y-3">
+                <div className="text-xs font-bold text-text uppercase tracking-wider font-sans flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5 text-success" />
+                  <span>3. Public Portal Hero Copy</span>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Public Hero Headline
+                  </label>
+                  <input
+                    type="text"
+                    value={heroHeadline}
+                    onChange={(e) => setHeroHeadline(e.target.value)}
+                    placeholder="Institutional Quantitative FX & Gold Trading Desk"
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Public Hero Subtitle
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={heroSubtitle}
+                    onChange={(e) => setHeroSubtitle(e.target.value)}
+                    placeholder="Local-first algorithmic execution, multi-market MT5 connectivity..."
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
+                  />
+                </div>
+              </div>
+
+              {/* Section 4: Desk Support & Disclosures */}
+              <div className="p-4 rounded-xl bg-bg border border-border space-y-3">
+                <div className="text-xs font-bold text-text uppercase tracking-wider font-sans flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-info" />
+                  <span>4. Contacts & Regulatory Risk Notice</span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                      Support Email
+                    </label>
+                    <input
+                      type="email"
+                      value={supportEmail}
+                      onChange={(e) => setSupportEmail(e.target.value)}
+                      placeholder="desk@zaboraa.com"
+                      className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                      Desk Hotline
+                    </label>
+                    <input
+                      type="text"
+                      value={deskPhone}
+                      onChange={(e) => setDeskPhone(e.target.value)}
+                      placeholder="+1 (800) 555-FX01"
+                      className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-text-muted mb-1 font-sans">
+                    Regulatory Risk Disclosure
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={riskDisclosure}
+                    onChange={(e) => setRiskDisclosure(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-text text-xs focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary font-sans"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <Button
+                  variant="primary"
+                  size="md"
+                  loading={brandingSaving}
+                  onClick={handleSaveBranding}
+                  className="w-full sm:w-auto shadow-md cursor-pointer"
+                >
+                  Save Website Modifications
+                </Button>
+              </div>
+            </div>
+
+            {/* Right Column: Live Previews */}
+            <div className="space-y-4">
+              <div className="p-4 rounded-xl bg-bg border border-border space-y-4">
+                <div className="text-xs font-bold text-text uppercase tracking-wider font-sans">
+                  Live Preview: Header & Announcement
+                </div>
+
+                {/* Banner Preview */}
+                {announcementEnabled && (
+                  <div
+                    className={`p-3 rounded-lg text-xs flex items-center gap-2 border font-medium ${
+                      announcementType === 'warning'
+                        ? 'bg-warning/10 text-warning border-warning/30'
+                        : announcementType === 'danger'
+                        ? 'bg-danger/10 text-danger border-danger/30'
+                        : announcementType === 'success'
+                        ? 'bg-success/10 text-success border-success/30'
+                        : 'bg-info/10 text-info border-info/30'
+                    }`}
+                  >
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    <span>{announcementText || 'Portal announcement message preview'}</span>
                   </div>
                 )}
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-base text-text tracking-tight font-sans">
-                      {brandingName || 'Zaboraa FX'}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning border border-warning/20">
-                      Sample Data
-                    </span>
+
+                {/* Header Wordmark Preview */}
+                <div className="p-3.5 rounded-xl bg-surface border border-border shadow-xs flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {brandingLogo ? (
+                      <img
+                        src={brandingLogo}
+                        alt={brandingName}
+                        className="w-8 h-8 rounded-lg object-contain bg-surface border border-border"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-primary text-white shadow-xs">
+                        <TrendingUp className="w-4 h-4" />
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-base text-text tracking-tight font-sans">
+                          {brandingName || 'Zaboraa FX'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                          Sample Data
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-text-muted">Algorithmic Forex Portal</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Public Hero Card Preview */}
+                <div className="p-4 rounded-xl bg-surface border border-border space-y-2">
+                  <div className="text-[10px] uppercase font-bold text-text-muted">Public Hero Card Preview</div>
+                  <h4 className="text-base font-bold text-text font-sans">{heroHeadline}</h4>
+                  <p className="text-xs text-text-muted font-sans leading-relaxed">{heroSubtitle}</p>
+                  <div className="text-[11px] text-text-muted pt-2 border-t border-border flex items-center justify-between">
+                    <span>Hotline: <strong className="text-text font-mono">{deskPhone}</strong></span>
+                    <span>Support: <strong className="text-text font-mono">{supportEmail}</strong></span>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="pt-2">
-              <Button
-                variant="primary"
-                size="md"
-                loading={brandingSaving}
-                onClick={handleSaveBranding}
-              >
-                Save Branding Settings
-              </Button>
             </div>
           </div>
         </div>

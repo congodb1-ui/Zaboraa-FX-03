@@ -1157,13 +1157,37 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
   });
 
   app.post('/api/admin/company/branding', requirePermission('users.manage'), (req: Request, res: Response) => {
-    const { companyName = 'Zaboraa FX', logoUrl = '' } = req.body || {};
-    setSystemBranding(companyName, logoUrl);
+    const {
+      companyName = 'Zaboraa FX',
+      logoUrl = '',
+      announcementEnabled,
+      announcementText,
+      announcementType,
+      supportEmail,
+      deskPhone,
+      riskDisclosure,
+      heroHeadline,
+      heroSubtitle,
+      defaultSymbol,
+    } = req.body || {};
+
+    setSystemBranding(companyName, logoUrl, {
+      announcementEnabled,
+      announcementText,
+      announcementType,
+      supportEmail,
+      deskPhone,
+      riskDisclosure,
+      heroHeadline,
+      heroSubtitle,
+      defaultSymbol,
+    });
+
+    const updated = getSystemBranding();
     return res.json({
       success: true,
-      companyName,
-      logoUrl,
-      message: 'Company branding updated successfully',
+      ...updated,
+      message: 'Portal branding and website configuration updated successfully',
     });
   });
 
