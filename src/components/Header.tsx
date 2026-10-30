@@ -33,6 +33,7 @@ import { useAuth } from '../context/AuthContext';
 export type NavTab =
   | 'public'
   | 'login'
+  | 'profile'
   | 'markets'
   | 'smartmoney'
   | 'ai-analyst'
@@ -477,11 +478,20 @@ export const Header: React.FC<HeaderProps> = ({
                   </div>
                 )}
 
-                {/* User Role Badge */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-border text-xs">
-                  <User className="w-3.5 h-3.5 text-text-muted" />
-                  <span className="font-mono text-text text-xs max-w-[130px] truncate hidden md:inline">
-                    {profile?.email || user?.email || 'Authenticated'}
+                {/* User Profile Button */}
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('profile')}
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs transition-all cursor-pointer ${
+                    activeTab === 'profile'
+                      ? 'bg-primary/10 border-primary/30 text-primary font-semibold shadow-xs'
+                      : 'bg-surface border-border text-text hover:border-primary/30 hover:bg-surface/80'
+                  }`}
+                  title="View and edit profile details, department & password"
+                >
+                  <User className="w-3.5 h-3.5 text-primary" />
+                  <span className="font-medium text-xs max-w-[130px] truncate hidden md:inline">
+                    {profile?.name || user?.user_metadata?.name || profile?.email || 'Profile'}
                   </span>
                   <span
                     className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border ${getRoleBadgeStyle(
@@ -490,7 +500,7 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     {getRoleLabel(effectiveRole)}
                   </span>
-                </div>
+                </button>
 
                 {/* Hold-to-Confirm Emergency Kill Switch (For Traders & Admins) */}
                 {effectiveRole !== 'viewer' && (

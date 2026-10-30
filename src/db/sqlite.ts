@@ -1949,6 +1949,61 @@ export function updateUserStatusInDb(userId: string, status: string): boolean {
   return res.changes > 0;
 }
 
+export function updateUserProfileInDb(
+  userId: string,
+  updates: { name?: string; department?: string; deskId?: string }
+): DbUser | null {
+  const user = getUserById(userId);
+  if (!user) return null;
+
+  const newName = updates.name !== undefined ? updates.name.trim() : user.name;
+  const newDept = updates.department !== undefined ? updates.department.trim() : user.department;
+  const newDesk = updates.deskId !== undefined ? updates.deskId.trim() : user.desk_id;
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE users
+    SET name = ?, department = ?, desk_id = ?, updated_at = ?
+    WHERE id = ?
+  `).run(newName, newDept, newDesk, now, userId);
+
+  return getUserById(userId);
+}
+
+export function updateUserPasswordInDb(
+  userId: string,
+  currentPassword: string,
+  newPassword: string
+): { success: boolean; error?: string } {
+  const user = getUserById(userId);
+  if (!user) {
+    return { success: false, error: 'USER_NOT_FOUND' };
+  }
+
+  // Validate current password with timing-safe comparison
+  const isValid = verifyPassword(currentPassword, user.password_hash, user.password_salt);
+  if (!isValid) {
+    return { success: false, error: 'INVALID_CURRENT_PASSWORD' };
+  }
+
+  // Validate new password requirements (minimum 8 characters)
+  if (!newPassword || newPassword.length < 8) {
+    return { success: false, error: 'PASSWORD_TOO_SHORT' };
+  }
+
+  const salt = crypto.randomBytes(16).toString('hex');
+  const passwordHash = hashPassword(newPassword, salt);
+  const now = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE users
+    SET password_hash = ?, password_salt = ?, updated_at = ?
+    WHERE id = ?
+  `).run(passwordHash, salt, now, userId);
+
+  return { success: true };
+}
+
 export function updateUserLastLogin(userId: string): void {
   db.prepare('UPDATE users SET last_login_at = ?, failed_attempts = 0, locked_until = NULL WHERE id = ?')
     .run(new Date().toISOString(), userId);

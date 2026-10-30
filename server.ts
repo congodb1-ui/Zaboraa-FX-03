@@ -58,6 +58,8 @@ import {
   createUserInDb,
   updateUserRoleInDb,
   updateUserStatusInDb,
+  updateUserProfileInDb,
+  updateUserPasswordInDb,
   updateUserLastLogin,
   recordFailedLogin,
   createSessionInDb,
@@ -425,9 +427,97 @@ export async function createExpressApp(options: { skipVite?: boolean } = {}) {
       status: session.user.status,
       department: session.user.department,
       deskId: session.user.desk_id,
+      createdAt: session.user.created_at,
+      lastLoginAt: session.user.last_login_at,
       permissions: BUILT_IN_PERMISSIONS[session.user.role] || [],
       aal: session.aal,
       assignedAccounts: getUserAssignedAccounts(session.user.id),
+    });
+  });
+
+  app.post('/api/auth/profile', (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Bearer token required' });
+    }
+    const token = authHeader.substring(7).trim();
+    const session = getSessionFromDb(token);
+    if (!session) {
+      return res.status(401).json({ error: 'SESSION_EXPIRED', message: 'Session expired or invalid' });
+    }
+
+    const { name, department, deskId, currentPassword, newPassword } = req.body || {};
+
+    // 1. Password update validation & execution
+    if (newPassword !== undefined) {
+      if (!currentPassword) {
+        return res.status(400).json({
+          error: 'CURRENT_PASSWORD_REQUIRED',
+          message: 'Current password is required to set a new password',
+        });
+      }
+      const passResult = updateUserPasswordInDb(session.user.id, currentPassword, newPassword);
+      if (!passResult.success) {
+        if (passResult.error === 'INVALID_CURRENT_PASSWORD') {
+          return res.status(400).json({
+            error: 'INVALID_CURRENT_PASSWORD',
+            message: 'Current password does not match existing credentials',
+          });
+        }
+        if (passResult.error === 'PASSWORD_TOO_SHORT') {
+          return res.status(400).json({
+            error: 'PASSWORD_TOO_SHORT',
+            message: 'New password must be at least 8 characters long',
+          });
+        }
+        return res.status(400).json({
+          error: passResult.error || 'PASSWORD_UPDATE_FAILED',
+          message: 'Failed to update password',
+        });
+      }
+      recordAuditLog(
+        session.user.email,
+        session.user.role,
+        'PASSWORD_CHANGED',
+        `User ${session.user.email} updated account password`
+      );
+    }
+
+    // 2. Profile metadata update (name, department, deskId)
+    let updatedUser = session.user;
+    if (name !== undefined || department !== undefined || deskId !== undefined) {
+      if (name !== undefined && name.trim().length === 0) {
+        return res.status(400).json({
+          error: 'INVALID_NAME',
+          message: 'Display name cannot be empty',
+        });
+      }
+      const u = updateUserProfileInDb(session.user.id, { name, department, deskId });
+      if (u) updatedUser = u;
+      recordAuditLog(
+        session.user.email,
+        session.user.role,
+        'PROFILE_UPDATED',
+        `User ${session.user.email} updated profile metadata`
+      );
+    }
+
+    return res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        role: updatedUser.role,
+        status: updatedUser.status,
+        department: updatedUser.department,
+        deskId: updatedUser.desk_id,
+        createdAt: updatedUser.created_at,
+        lastLoginAt: updatedUser.last_login_at,
+        permissions: BUILT_IN_PERMISSIONS[updatedUser.role] || [],
+        aal: session.aal,
+      },
     });
   });
 

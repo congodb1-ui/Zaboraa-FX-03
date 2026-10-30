@@ -5,10 +5,16 @@ import { fetchAuthConfig, getSupabaseClient } from '../services/supabaseClient';
 export interface UserProfile {
   userId: string;
   email: string;
+  name?: string;
   role: string;
   status: string;
+  department?: string;
+  deskId?: string;
   permissions: string[];
   aal?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
+  assignedAccounts?: string[];
 }
 
 interface AuthContextType {
@@ -46,6 +52,13 @@ interface AuthContextType {
     department?: string;
     deskId?: string;
   }) => Promise<{ error?: string }>;
+  updateProfile: (data: {
+    name?: string;
+    department?: string;
+    deskId?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }) => Promise<{ success: boolean; error?: string }>;
   signInWithOtp: (email: string) => Promise<{ error?: string }>;
   signInWithLocalAccount: (email: string, role: string) => Promise<{ error?: string }>;
   signOut: () => Promise<void>;
@@ -143,8 +156,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const authedProfile: UserProfile = {
               userId: data.userId,
               email: data.email,
+              name: data.name,
               role: data.role,
               status: data.status,
+              department: data.department,
+              deskId: data.deskId,
+              createdAt: data.createdAt,
+              lastLoginAt: data.lastLoginAt,
+              assignedAccounts: data.assignedAccounts || [],
               permissions: data.permissions || DEFAULT_ROLE_PERMISSIONS[data.role] || [],
               aal: data.aal || 'aal1',
             };
@@ -283,8 +302,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authedProfile: UserProfile = {
           userId: data.user.id,
           email: data.user.email,
+          name: data.user.name,
           role: data.user.role,
           status: data.user.status,
+          department: data.user.department,
+          deskId: data.user.deskId,
+          createdAt: data.user.createdAt,
+          lastLoginAt: data.user.lastLoginAt,
           permissions: data.user.permissions || DEFAULT_ROLE_PERMISSIONS[data.user.role] || [],
           aal: data.user.aal || 'aal1',
         };
@@ -351,8 +375,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const authedProfile: UserProfile = {
           userId: data.user.id,
           email: data.user.email,
+          name: data.user.name,
           role: data.user.role,
           status: data.user.status,
+          department: data.user.department,
+          deskId: data.user.deskId,
+          createdAt: data.user.createdAt,
+          lastLoginAt: data.user.lastLoginAt,
           permissions: data.user.permissions || DEFAULT_ROLE_PERMISSIONS[data.user.role] || [],
           aal: data.user.aal || 'aal1',
         };
@@ -366,6 +395,71 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: 'Registration failed' };
     } catch (err: any) {
       return { error: `Connection failed: ${err.message}` };
+    }
+  };
+
+  /**
+   * Update Profile Details & Credentials
+   */
+  const updateProfile = async (data: {
+    name?: string;
+    department?: string;
+    deskId?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    const token = getAccessToken();
+    if (!token) {
+      return { success: false, error: 'Authentication required' };
+    }
+
+    try {
+      const res = await fetch('/api/auth/profile', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+      });
+
+      const resData = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          error: resData.message || resData.error || 'Failed to update profile',
+        };
+      }
+
+      if (resData.user) {
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: resData.user.name,
+                department: resData.user.department,
+                deskId: resData.user.deskId,
+                lastLoginAt: resData.user.lastLoginAt || prev.lastLoginAt,
+              }
+            : null
+        );
+
+        setUser((prev) =>
+          prev
+            ? ({
+                ...prev,
+                user_metadata: {
+                  ...prev.user_metadata,
+                  name: resData.user.name,
+                },
+              } as unknown as User)
+            : null
+        );
+      }
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Network error updating profile' };
     }
   };
 
@@ -478,6 +572,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithCredentials,
         signInWithPassword,
         registerAccount,
+        updateProfile,
         signInWithOtp,
         signInWithLocalAccount,
         signOut,

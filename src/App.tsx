@@ -17,6 +17,7 @@ import { SmartMoneyFootprintView } from './components/SmartMoneyFootprintView';
 import { AdminAccountsView } from './components/AdminAccountsView';
 import { LoginView } from './components/LoginView';
 import { PublicPortalView } from './components/PublicPortalView';
+import { ProfileView } from './components/ProfileView';
 import { useAuth } from './context/AuthContext';
 
 import {
@@ -61,7 +62,7 @@ export const App: React.FC = () => {
     if (isPublic) {
       const publicAllowed: NavTab[] = ['public', 'login', 'technical', 'fundamentals', 'smartmoney'];
       if (!publicAllowed.includes(activeTab)) {
-        setActiveTab('public');
+        setActiveTab(activeTab === 'profile' ? 'login' : 'public');
       }
     } else {
       if (activeTab === 'public') {
@@ -71,7 +72,7 @@ export const App: React.FC = () => {
           setActiveTab('markets');
         }
       } else if (effectiveRole === 'viewer') {
-        const viewerAllowed: NavTab[] = ['markets', 'technical', 'fundamentals', 'smartmoney', 'ai-analyst'];
+        const viewerAllowed: NavTab[] = ['markets', 'technical', 'fundamentals', 'smartmoney', 'ai-analyst', 'profile'];
         if (!viewerAllowed.includes(activeTab)) {
           setActiveTab('markets');
         }
@@ -752,6 +753,10 @@ export const App: React.FC = () => {
                 </button>
               </div>
             )
+          )}
+
+          {activeTab === 'profile' && (
+            <ProfileView onNavigateToDesk={() => setActiveTab('markets')} />
           )}
         </main>
       </div>
